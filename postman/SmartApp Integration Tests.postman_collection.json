@@ -1,0 +1,3116 @@
+{
+    "info": {
+        "name": "SmartApp Integration Tests",
+        "_postman_id": "216c38a6-dae5-42b3-b257-94f7b801743f",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "item": [
+        {
+            "name": "Auth Service",
+            "item": [
+                {
+                    "name": "Register User",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "let user = pm.response.json();",
+                                    "pm.environment.set('user_id', user.id);"
+                                ]
+                            }
+                        },
+                        {
+                            "listen": "prerequest",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    ""
+                                ]
+                            }
+                        }
+                    ],
+                    "request": {
+                        "url": {
+                            "raw": "{{base_url_auth}}/auth/register",
+                            "host": [
+                                "{{base_url_auth}}"
+                            ],
+                            "path": [
+                                "auth",
+                                "register"
+                            ]
+                        },
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "default"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"username\": \"testuser1\",\n  \"password\": \"Password123!\",\n  \"email\": \"testuser@example.com\",\n  \"accept_tos\": true\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": [],
+                    "protocolProfileBehavior": {}
+                },
+                {
+                    "name": "Login User",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "pm.environment.set(\"access-token\", pm.response.json().access_token);",
+                                    "",
+                                    "if (pm.response.json().refresh_token) {",
+                                    "    pm.environment.set(\"refresh-token\", pm.response.json().refresh_token);",
+                                    "}"
+                                ]
+                            }
+                        },
+                        {
+                            "listen": "prerequest",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    ""
+                                ]
+                            }
+                        }
+                    ],
+                    "request": {
+                        "url": {
+                            "raw": "{{base_url_auth}}/auth/login",
+                            "host": [
+                                "{{base_url_auth}}"
+                            ],
+                            "path": [
+                                "auth",
+                                "login"
+                            ]
+                        },
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "default"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"username\": \"testuser\",\n  \"password\": \"Password123!\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": [],
+                    "protocolProfileBehavior": {}
+                },
+                {
+                    "name": "Get Current User",
+                    "request": {
+                        "url": {
+                            "raw": "{{base_url_auth}}/auth/me",
+                            "host": [
+                                "{{base_url_auth}}"
+                            ],
+                            "path": [
+                                "auth",
+                                "me"
+                            ]
+                        },
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{access_token}}",
+                                "type": "default"
+                            }
+                        ]
+                    },
+                    "response": [],
+                    "protocolProfileBehavior": {}
+                }
+            ]
+        },
+        {
+            "name": "Broker Adapter Service - Login",
+            "item": [
+                {
+                    "name": "Get Token",
+                    "event": [
+                        {
+                            "listen": "prerequest",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    ""
+                                ]
+                            }
+                        },
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    ""
+                                ]
+                            }
+                        }
+                    ],
+                    "item": [
+                        {
+                            "name": "Obtain User Token",
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "var data = JSON.parse(responseBody);",
+                                            "pm.environment.set(\"access-token\", data.access_token);"
+                                        ]
+                                    }
+                                },
+                                {
+                                    "listen": "prerequest",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            ""
+                                        ]
+                                    }
+                                }
+                            ],
+                            "request": {
+                                "url": {
+                                    "raw": "{{base_url_auth}}/auth/login",
+                                    "host": [
+                                        "{{base_url_auth}}"
+                                    ],
+                                    "path": [
+                                        "auth",
+                                        "login"
+                                    ]
+                                },
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "default"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"username\": \"testuser\",\n  \"password\": \"Password123!\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            },
+                            "response": [],
+                            "protocolProfileBehavior": {}
+                        }
+                    ]
+                },
+                {
+                    "name": "Broker Connection Registration",
+                    "event": [
+                        {
+                            "listen": "prerequest",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    ""
+                                ]
+                            }
+                        },
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    ""
+                                ]
+                            }
+                        }
+                    ],
+                    "item": [
+                        {
+                            "name": "Create Broker Account",
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "var data = JSON.parse(responseBody);",
+                                            "pm.environment.set(\"oauth_url\", data.authorize_url);",
+                                            "pm.environment.set(\"oauth_state\", data.state);",
+                                            ""
+                                        ]
+                                    }
+                                },
+                                {
+                                    "listen": "prerequest",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            ""
+                                        ]
+                                    }
+                                }
+                            ],
+                            "request": {
+                                "url": {
+                                    "raw": "{{base_url_broker_adapter}}/api/v1/broker_connection/fyers",
+                                    "host": [
+                                        "{{base_url_broker_adapter}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "broker_connection",
+                                        "fyers"
+                                    ]
+                                },
+                                "method": "PUT",
+                                "header": [],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{ \r\n  \"auth_type\": \"OAUTH2\",\r\n  \"mobile_number\": \"9535397000\"\r\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            },
+                            "response": [],
+                            "protocolProfileBehavior": {}
+                        }
+                    ]
+                },
+                {
+                    "name": "OAuth Flow",
+                    "event": [
+                        {
+                            "listen": "prerequest",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    ""
+                                ]
+                            }
+                        },
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    ""
+                                ]
+                            }
+                        }
+                    ],
+                    "item": [
+                        {
+                            "name": "Generate OAuth URL",
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "var data = JSON.parse(responseBody);",
+                                            "pm.environment.set(\"oauth_url\", data.authorize_url);",
+                                            "pm.environment.set(\"oauth_state\", data.state);",
+                                            ""
+                                        ]
+                                    }
+                                },
+                                {
+                                    "listen": "prerequest",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            ""
+                                        ]
+                                    }
+                                }
+                            ],
+                            "request": {
+                                "url": {
+                                    "raw": "{{base_url_broker_adapter}}/oauth/fyers/authorize",
+                                    "host": [
+                                        "{{base_url_broker_adapter}}"
+                                    ],
+                                    "path": [
+                                        "oauth",
+                                        "fyers",
+                                        "authorize"
+                                    ]
+                                },
+                                "method": "GET",
+                                "header": [],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            },
+                            "response": [],
+                            "protocolProfileBehavior": {
+                                "disableBodyPruning": true
+                            }
+                        },
+                        {
+                            "name": "OAuth Login",
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "var data = JSON.parse(responseBody);",
+                                            "pm.environment.set(\"oauth_url\", data.authorize_url);",
+                                            "pm.environment.set(\"oauth_state\", data.state);",
+                                            ""
+                                        ]
+                                    }
+                                },
+                                {
+                                    "listen": "prerequest",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            ""
+                                        ]
+                                    }
+                                }
+                            ],
+                            "request": {
+                                "url": {
+                                    "raw": "{{base_url_broker_adapter}}/oauth/fyers/callback?account_id=XA07373&code=200&auth_code=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhcHBfaWQiOiJQVkgzUEo4TDBEIiwidXVpZCI6IjcxZjRiMTdkYmFhZTRlN2JiOTZiNzkzNjRkYWU4ZGU4IiwiaXBBZGRyIjoiIiwibm9uY2UiOiIiLCJzY29wZSI6IiIsImRpc3BsYXlfbmFtZSI6IlhBMDczNzMiLCJvbXMiOiJLMSIsImhzbV9rZXkiOiIxOTIyMTk2Mjg1Yjg4MmQ1MGI4YmFjMjkyZjU5MDEyMTEyODhlOTJjZWRkODNmZmYwMjU1MzQxNiIsImlzRGRwaUVuYWJsZWQiOiJOIiwiaXNNdGZFbmFibGVkIjoiTiIsImF1ZCI6IltcImQ6MVwiLFwiZDoyXCIsXCJ4OjBcIixcIng6MVwiLFwieDoyXCJdIiwiZXhwIjoxNzYyMzk0MjM0LCJpYXQiOjE3NjIzNjQyMzQsImlzcyI6ImFwaS5sb2dpbi5meWVycy5pbiIsIm5iZiI6MTc2MjM2NDIzNCwic3ViIjoiYXV0aF9jb2RlIn0.C_DweniDn0Lmh0sjLIh6GJ1N0N5O8OGaW1UKg1xfs74&state=None",
+                                    "host": [
+                                        "{{base_url_broker_adapter}}"
+                                    ],
+                                    "path": [
+                                        "oauth",
+                                        "fyers",
+                                        "callback"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "account_id",
+                                            "value": "XA07373"
+                                        },
+                                        {
+                                            "key": "code",
+                                            "value": "200"
+                                        },
+                                        {
+                                            "key": "auth_code",
+                                            "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhcHBfaWQiOiJQVkgzUEo4TDBEIiwidXVpZCI6IjcxZjRiMTdkYmFhZTRlN2JiOTZiNzkzNjRkYWU4ZGU4IiwiaXBBZGRyIjoiIiwibm9uY2UiOiIiLCJzY29wZSI6IiIsImRpc3BsYXlfbmFtZSI6IlhBMDczNzMiLCJvbXMiOiJLMSIsImhzbV9rZXkiOiIxOTIyMTk2Mjg1Yjg4MmQ1MGI4YmFjMjkyZjU5MDEyMTEyODhlOTJjZWRkODNmZmYwMjU1MzQxNiIsImlzRGRwaUVuYWJsZWQiOiJOIiwiaXNNdGZFbmFibGVkIjoiTiIsImF1ZCI6IltcImQ6MVwiLFwiZDoyXCIsXCJ4OjBcIixcIng6MVwiLFwieDoyXCJdIiwiZXhwIjoxNzYyMzk0MjM0LCJpYXQiOjE3NjIzNjQyMzQsImlzcyI6ImFwaS5sb2dpbi5meWVycy5pbiIsIm5iZiI6MTc2MjM2NDIzNCwic3ViIjoiYXV0aF9jb2RlIn0.C_DweniDn0Lmh0sjLIh6GJ1N0N5O8OGaW1UKg1xfs74"
+                                        },
+                                        {
+                                            "key": "state",
+                                            "value": "None"
+                                        }
+                                    ]
+                                },
+                                "method": "GET",
+                                "header": [],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            },
+                            "response": [],
+                            "protocolProfileBehavior": {
+                                "disableBodyPruning": true
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Refresh Token",
+                    "event": [
+                        {
+                            "listen": "prerequest",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    ""
+                                ]
+                            }
+                        },
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    ""
+                                ]
+                            }
+                        }
+                    ],
+                    "item": [
+                        {
+                            "name": "Refresh Broker Account Token",
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            ""
+                                        ]
+                                    }
+                                },
+                                {
+                                    "listen": "prerequest",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            ""
+                                        ]
+                                    }
+                                }
+                            ],
+                            "request": {
+                                "url": {
+                                    "raw": "{{base_url_broker_adapter}}/api/v1/user_credentials/refresh/fyers?account_id=XA07373",
+                                    "host": [
+                                        "{{base_url_broker_adapter}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "user_credentials",
+                                        "refresh",
+                                        "fyers"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "account_id",
+                                            "value": "XA07373"
+                                        }
+                                    ]
+                                },
+                                "method": "POST",
+                                "header": [],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{ \r\n  \"auth_type\": \"OAUTH2\",\r\n  \"secrets\": {\r\n    \"totp_key\": \"C2DLR7MR3Q7GPMKERCUTH4QJUJLDJTB6\",\r\n    \"pin\": \"1003\"\r\n  },\r\n  \"mobile_number\": \"9535397000\"\r\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            },
+                            "response": [],
+                            "protocolProfileBehavior": {}
+                        }
+                    ]
+                },
+                {
+                    "name": "Trading Account Registration",
+                    "event": [
+                        {
+                            "listen": "prerequest",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    ""
+                                ]
+                            }
+                        },
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    ""
+                                ]
+                            }
+                        }
+                    ],
+                    "item": [
+                        {
+                            "name": "Register Real Trading Account",
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "var data = JSON.parse(responseBody);",
+                                            "pm.environment.set(\"oauth_url\", data.authorize_url);",
+                                            "pm.environment.set(\"oauth_state\", data.state);",
+                                            ""
+                                        ]
+                                    }
+                                },
+                                {
+                                    "listen": "prerequest",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            ""
+                                        ]
+                                    }
+                                }
+                            ],
+                            "request": {
+                                "url": {
+                                    "raw": "{{base_url_broker_adapter}}/api/v1/trading_account/fyers",
+                                    "host": [
+                                        "{{base_url_broker_adapter}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "trading_account",
+                                        "fyers"
+                                    ]
+                                },
+                                "method": "POST",
+                                "header": [],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\r\n  \"account_name\": \"Real Fyers Account\",\r\n  \"account_type\": \"TRADING\",\r\n  \"base_currency\": \"INR\",\r\n  \"account_id\": \"XA07373\",\r\n  \"initial_balance\": 0\r\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            },
+                            "response": [],
+                            "protocolProfileBehavior": {}
+                        },
+                        {
+                            "name": "Register Real Trading Account Copy",
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "var data = JSON.parse(responseBody);",
+                                            "pm.environment.set(\"oauth_url\", data.authorize_url);",
+                                            "pm.environment.set(\"oauth_state\", data.state);",
+                                            ""
+                                        ]
+                                    }
+                                },
+                                {
+                                    "listen": "prerequest",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            ""
+                                        ]
+                                    }
+                                }
+                            ],
+                            "request": {
+                                "url": {
+                                    "raw": "{{base_url_broker_adapter}}/api/v1/trading_account/fyers",
+                                    "host": [
+                                        "{{base_url_broker_adapter}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "trading_account",
+                                        "fyers"
+                                    ]
+                                },
+                                "method": "POST",
+                                "header": [],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\r\n  \"account_name\": \"Real Fyers Account\",\r\n  \"account_type\": \"TRADING\",\r\n  \"base_currency\": \"INR\",\r\n  \"account_id\": \"XA07373\",\r\n  \"initial_balance\": 0\r\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            },
+                            "response": [],
+                            "protocolProfileBehavior": {}
+                        }
+                    ]
+                },
+                {
+                    "name": "Session",
+                    "event": [
+                        {
+                            "listen": "prerequest",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    ""
+                                ]
+                            }
+                        },
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    ""
+                                ]
+                            }
+                        }
+                    ],
+                    "item": [
+                        {
+                            "name": "Start User Session",
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "var data = JSON.parse(responseBody);",
+                                            "pm.environment.set(\"oauth_url\", data.authorize_url);",
+                                            "pm.environment.set(\"oauth_state\", data.state);",
+                                            ""
+                                        ]
+                                    }
+                                },
+                                {
+                                    "listen": "prerequest",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            ""
+                                        ]
+                                    }
+                                }
+                            ],
+                            "request": {
+                                "url": {
+                                    "raw": "{{base_url_broker_adapter}}/api/v1/session/fyers/12345",
+                                    "host": [
+                                        "{{base_url_broker_adapter}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "session",
+                                        "fyers",
+                                        "12345"
+                                    ]
+                                },
+                                "method": "POST",
+                                "header": [],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\r\n  \"account_name\": \"Fake Paper Account\",\r\n  \"account_type\": \"PAPER\",\r\n  \"base_currency\": \"INR\",\r\n  \"account_id\": \"12345\",\r\n  \"initial_balance\": 100000\r\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            },
+                            "response": [],
+                            "protocolProfileBehavior": {}
+                        },
+                        {
+                            "name": "Start User Account Session",
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "var data = JSON.parse(responseBody);",
+                                            "pm.environment.set(\"oauth_url\", data.authorize_url);",
+                                            "pm.environment.set(\"oauth_state\", data.state);",
+                                            ""
+                                        ]
+                                    }
+                                },
+                                {
+                                    "listen": "prerequest",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            ""
+                                        ]
+                                    }
+                                }
+                            ],
+                            "request": {
+                                "url": {
+                                    "raw": "{{base_url_broker_adapter}}/api/v1/session/fyers",
+                                    "host": [
+                                        "{{base_url_broker_adapter}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "session",
+                                        "fyers"
+                                    ]
+                                },
+                                "method": "POST",
+                                "header": [],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\r\n  \"account_name\": \"Fake Paper Account\",\r\n  \"account_type\": \"PAPER\",\r\n  \"base_currency\": \"INR\",\r\n  \"account_id\": \"12345\",\r\n  \"initial_balance\": 100000\r\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            },
+                            "response": [],
+                            "protocolProfileBehavior": {}
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "Broker Adapter Service",
+            "event": [
+                {
+                    "listen": "prerequest",
+                    "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                            ""
+                        ]
+                    }
+                },
+                {
+                    "listen": "test",
+                    "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                            ""
+                        ]
+                    }
+                }
+            ],
+            "item": [
+                {
+                    "name": "Orders",
+                    "event": [
+                        {
+                            "listen": "prerequest",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    ""
+                                ]
+                            }
+                        },
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    ""
+                                ]
+                            }
+                        }
+                    ],
+                    "item": [
+                        {
+                            "name": "List Orders",
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            ""
+                                        ]
+                                    }
+                                },
+                                {
+                                    "listen": "prerequest",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            ""
+                                        ]
+                                    }
+                                }
+                            ],
+                            "request": {
+                                "url": {
+                                    "raw": "{{base_url_broker_adapter}}/api/v1/orders/{{broker_id}}/{{account_id}}",
+                                    "host": [
+                                        "{{base_url_broker_adapter}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "orders",
+                                        "{{broker_id}}",
+                                        "{{account_id}}"
+                                    ]
+                                },
+                                "method": "GET",
+                                "header": [],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            },
+                            "response": [],
+                            "protocolProfileBehavior": {
+                                "disableBodyPruning": true
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Portfolio",
+                    "event": [
+                        {
+                            "listen": "prerequest",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    ""
+                                ]
+                            }
+                        },
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    ""
+                                ]
+                            }
+                        }
+                    ],
+                    "item": [
+                        {
+                            "name": "List Funds",
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            ""
+                                        ]
+                                    }
+                                },
+                                {
+                                    "listen": "prerequest",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            ""
+                                        ]
+                                    }
+                                }
+                            ],
+                            "request": {
+                                "url": {
+                                    "raw": "{{base_url_broker_adapter}}/api/v1/portfolio/{{broker_id}}/{{account_id}}/funds",
+                                    "host": [
+                                        "{{base_url_broker_adapter}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "portfolio",
+                                        "{{broker_id}}",
+                                        "{{account_id}}",
+                                        "funds"
+                                    ]
+                                },
+                                "method": "GET",
+                                "header": [],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            },
+                            "response": [],
+                            "protocolProfileBehavior": {
+                                "disableBodyPruning": true
+                            }
+                        },
+                        {
+                            "name": "List Holdings",
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            ""
+                                        ]
+                                    }
+                                },
+                                {
+                                    "listen": "prerequest",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            ""
+                                        ]
+                                    }
+                                }
+                            ],
+                            "request": {
+                                "url": {
+                                    "raw": "{{base_url_broker_adapter}}/api/v1/portfolio/{{broker_id}}/{{account_id}}/holdings",
+                                    "host": [
+                                        "{{base_url_broker_adapter}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "portfolio",
+                                        "{{broker_id}}",
+                                        "{{account_id}}",
+                                        "holdings"
+                                    ]
+                                },
+                                "method": "GET",
+                                "header": [],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            },
+                            "response": [],
+                            "protocolProfileBehavior": {
+                                "disableBodyPruning": true
+                            }
+                        },
+                        {
+                            "name": "List Positions",
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            ""
+                                        ]
+                                    }
+                                },
+                                {
+                                    "listen": "prerequest",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            ""
+                                        ]
+                                    }
+                                }
+                            ],
+                            "request": {
+                                "url": {
+                                    "raw": "{{base_url_broker_adapter}}/api/v1/portfolio/{{broker_id}}/{{account_id}}/positions",
+                                    "host": [
+                                        "{{base_url_broker_adapter}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "portfolio",
+                                        "{{broker_id}}",
+                                        "{{account_id}}",
+                                        "positions"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "account_id",
+                                            "value": "",
+                                            "disabled": true
+                                        }
+                                    ]
+                                },
+                                "method": "GET",
+                                "header": [],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            },
+                            "response": [],
+                            "protocolProfileBehavior": {
+                                "disableBodyPruning": true
+                            }
+                        },
+                        {
+                            "name": "List Positions Copy 2",
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            ""
+                                        ]
+                                    }
+                                },
+                                {
+                                    "listen": "prerequest",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            ""
+                                        ]
+                                    }
+                                }
+                            ],
+                            "request": {
+                                "url": {
+                                    "raw": "{{base_url_broker_adapter}}/api/v1/portfolio/{{broker_id}}/{{account_id}}/positions",
+                                    "host": [
+                                        "{{base_url_broker_adapter}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "portfolio",
+                                        "{{broker_id}}",
+                                        "{{account_id}}",
+                                        "positions"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "account_id",
+                                            "value": "",
+                                            "disabled": true
+                                        }
+                                    ]
+                                },
+                                "method": "GET",
+                                "header": [],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            },
+                            "response": [],
+                            "protocolProfileBehavior": {
+                                "disableBodyPruning": true
+                            }
+                        },
+                        {
+                            "name": "List Trades",
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            ""
+                                        ]
+                                    }
+                                },
+                                {
+                                    "listen": "prerequest",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            ""
+                                        ]
+                                    }
+                                }
+                            ],
+                            "request": {
+                                "url": {
+                                    "raw": "{{base_url_broker_adapter}}/api/v1/portfolio/{{broker_id}}/{{account_id}}/trades",
+                                    "host": [
+                                        "{{base_url_broker_adapter}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "portfolio",
+                                        "{{broker_id}}",
+                                        "{{account_id}}",
+                                        "trades"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "account_id",
+                                            "value": "",
+                                            "disabled": true
+                                        }
+                                    ]
+                                },
+                                "method": "GET",
+                                "header": [],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            },
+                            "response": [],
+                            "protocolProfileBehavior": {
+                                "disableBodyPruning": true
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Paper Trade",
+                    "event": [
+                        {
+                            "listen": "prerequest",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    ""
+                                ]
+                            }
+                        },
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    ""
+                                ]
+                            }
+                        }
+                    ],
+                    "item": [
+                        {
+                            "name": "Place Order-Limit Copy",
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            ""
+                                        ]
+                                    }
+                                },
+                                {
+                                    "listen": "prerequest",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            ""
+                                        ]
+                                    }
+                                }
+                            ],
+                            "request": {
+                                "url": {
+                                    "raw": "{{base_url_broker_adapter}}/api/v1/orders/{{broker_id}}",
+                                    "host": [
+                                        "{{base_url_broker_adapter}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "orders",
+                                        "{{broker_id}}"
+                                    ]
+                                },
+                                "method": "POST",
+                                "header": [],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\r\n  \"instrument\": {\r\n    \"instrument_type\": \"CS\",\r\n    \"symbol\": \"NSE:SBI-FUT\"\r\n  },\r\n  \"qty\": 1,\r\n  \"side\": \"1\",\r\n  \"type\": \"2\",\r\n  \"position_type\": \"BRACKET\",\r\n  \"tif\": \"0\",\r\n  \"price\": 10,\r\n  \"stop_price\": 0,\r\n  \"target_price\": 0,\r\n  \"trigger_price\": 0,\r\n  \"client_order_id\": \"string\"\r\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            },
+                            "response": [],
+                            "protocolProfileBehavior": {}
+                        },
+                        {
+                            "name": "List Orders",
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            ""
+                                        ]
+                                    }
+                                },
+                                {
+                                    "listen": "prerequest",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            ""
+                                        ]
+                                    }
+                                }
+                            ],
+                            "request": {
+                                "url": {
+                                    "raw": "{{base_url_broker_adapter}}/api/v1/orders/{{broker_id}}/12345",
+                                    "host": [
+                                        "{{base_url_broker_adapter}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "orders",
+                                        "{{broker_id}}",
+                                        "12345"
+                                    ]
+                                },
+                                "method": "GET",
+                                "header": [],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            },
+                            "response": [],
+                            "protocolProfileBehavior": {
+                                "disableBodyPruning": true
+                            }
+                        },
+                        {
+                            "name": "List Trades",
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            ""
+                                        ]
+                                    }
+                                },
+                                {
+                                    "listen": "prerequest",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            ""
+                                        ]
+                                    }
+                                }
+                            ],
+                            "request": {
+                                "url": {
+                                    "raw": "{{base_url_broker_adapter}}/api/v1/trades/{{broker_id}}/12345",
+                                    "host": [
+                                        "{{base_url_broker_adapter}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "trades",
+                                        "{{broker_id}}",
+                                        "12345"
+                                    ]
+                                },
+                                "method": "GET",
+                                "header": [],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            },
+                            "response": [],
+                            "protocolProfileBehavior": {
+                                "disableBodyPruning": true
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Order Placement",
+                    "event": [
+                        {
+                            "listen": "prerequest",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    ""
+                                ]
+                            }
+                        },
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    ""
+                                ]
+                            }
+                        }
+                    ],
+                    "item": [
+                        {
+                            "name": "Normal",
+                            "event": [
+                                {
+                                    "listen": "prerequest",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            ""
+                                        ]
+                                    }
+                                },
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            ""
+                                        ]
+                                    }
+                                }
+                            ],
+                            "item": [
+                                {
+                                    "name": "Place Order-Limit",
+                                    "event": [
+                                        {
+                                            "listen": "test",
+                                            "script": {
+                                                "type": "text/javascript",
+                                                "exec": [
+                                                    ""
+                                                ]
+                                            }
+                                        },
+                                        {
+                                            "listen": "prerequest",
+                                            "script": {
+                                                "type": "text/javascript",
+                                                "exec": [
+                                                    ""
+                                                ]
+                                            }
+                                        }
+                                    ],
+                                    "request": {
+                                        "url": {
+                                            "raw": "{{base_url_broker_adapter}}/api/v1/orders/{{broker_id}}/{{paper_account_id}}",
+                                            "host": [
+                                                "{{base_url_broker_adapter}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "orders",
+                                                "{{broker_id}}",
+                                                "{{paper_account_id}}"
+                                            ]
+                                        },
+                                        "method": "POST",
+                                        "header": [],
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\r\n  \"client_order_id\": \"1111\",\r\n  \"position_type\": \"INTRADAY\",\r\n  \"execution_intent\": \"SINGLE\",\r\n  \"protection_type\": \"NONE\",\r\n  \"trigger_type\": \"IMMEDIATE\",\r\n  \"underlying_symbol\": \"CRUDEOIL\",\r\n  \"legs\": [\r\n    {\r\n      \"instrument_id\": \"MCX:COMMODITY:COMMODITY:CRUDEOIL:FUTURES:2026-01-16\",\r\n      \"instrument_type\": \"EQUITY\",\r\n      \"side\": \"BUY\",\r\n      \"qty\": 1,\r\n      \"order_type\": \"LIMIT\",\r\n      \"price\": 0,\r\n      \"stop_price\": 0,\r\n      \"ltp\": 0,\r\n      \"disclosed_qty\": 0\r\n    }\r\n  ],\r\n  \"stop_loss\": 0,\r\n  \"take_profit\": 0,\r\n  \"trailing_points\": 0,\r\n  \"trigger_price\": 0,\r\n  \"tif\": \"DAY\",\r\n  \"offline_order\": false,\r\n  \"tag\": \"string\"\r\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "response": [],
+                                    "protocolProfileBehavior": {}
+                                },
+                                {
+                                    "name": "Place Order-Limit Copy",
+                                    "event": [
+                                        {
+                                            "listen": "test",
+                                            "script": {
+                                                "type": "text/javascript",
+                                                "exec": [
+                                                    ""
+                                                ]
+                                            }
+                                        },
+                                        {
+                                            "listen": "prerequest",
+                                            "script": {
+                                                "type": "text/javascript",
+                                                "exec": [
+                                                    ""
+                                                ]
+                                            }
+                                        }
+                                    ],
+                                    "request": {
+                                        "url": {
+                                            "raw": "{{base_url_broker_adapter}}/api/v1/orders/{{broker_id}}/{{paper_account_id}}",
+                                            "host": [
+                                                "{{base_url_broker_adapter}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "orders",
+                                                "{{broker_id}}",
+                                                "{{paper_account_id}}"
+                                            ]
+                                        },
+                                        "method": "POST",
+                                        "header": [],
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\r\n  \"client_order_id\": \"1111\",\r\n  \"position_type\": \"INTRADAY\",\r\n  \"execution_intent\": \"SINGLE\",\r\n  \"protection_type\": \"NONE\",\r\n  \"trigger_type\": \"IMMEDIATE\",\r\n  \"underlying_symbol\": \"CRUDEOIL\",\r\n  \"legs\": [\r\n    {\r\n      \"instrument_id\": \"MCX:COMMODITY:COMMODITY:CRUDEOIL:FUTURES:2026-01-16\",\r\n      \"instrument_type\": \"EQUITY\",\r\n      \"side\": \"BUY\",\r\n      \"qty\": 1,\r\n      \"order_type\": \"LIMIT\",\r\n      \"price\": 0,\r\n      \"stop_price\": 0,\r\n      \"ltp\": 0,\r\n      \"disclosed_qty\": 0\r\n    }\r\n  ],\r\n  \"stop_loss\": 0,\r\n  \"take_profit\": 0,\r\n  \"trailing_points\": 0,\r\n  \"trigger_price\": 0,\r\n  \"tif\": \"DAY\",\r\n  \"offline_order\": false,\r\n  \"tag\": \"string\"\r\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "response": [],
+                                    "protocolProfileBehavior": {}
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Bracket",
+                            "event": [
+                                {
+                                    "listen": "prerequest",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            ""
+                                        ]
+                                    }
+                                },
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            ""
+                                        ]
+                                    }
+                                }
+                            ],
+                            "item": [
+                                {
+                                    "name": "Place Order-Market Copy",
+                                    "event": [
+                                        {
+                                            "listen": "test",
+                                            "script": {
+                                                "type": "text/javascript",
+                                                "exec": [
+                                                    ""
+                                                ]
+                                            }
+                                        },
+                                        {
+                                            "listen": "prerequest",
+                                            "script": {
+                                                "type": "text/javascript",
+                                                "exec": [
+                                                    ""
+                                                ]
+                                            }
+                                        }
+                                    ],
+                                    "request": {
+                                        "url": {
+                                            "raw": "{{base_url_broker_adapter}}/api/v1/orders/normal/{{broker_id}}/{{paper_account_id}}",
+                                            "host": [
+                                                "{{base_url_broker_adapter}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "orders",
+                                                "normal",
+                                                "{{broker_id}}",
+                                                "{{paper_account_id}}"
+                                            ]
+                                        },
+                                        "method": "POST",
+                                        "header": [],
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\r\n  \"instrument_id\": \"NSE:CASH:EQUITY:WSTCSTPAPRNSE:CASH:EQUITY:WSTCSTPAPR\", \r\n  \"qty\": 30,\r\n  \"side\": \"SELL\",\r\n  \"type\": \"MARKET\",\r\n  \"tif\": \"DAY\",\r\n  \"ltp\": 26112,\r\n  \"price\": 1200,\r\n  \"position_type\": \"INTRADAY\",\r\n  \"stop_price\": 1180,\r\n  \"target_price\": 1300,\r\n  \"trigger_price\": 0,\r\n  \"client_order_id\": \"string\"\r\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "response": [],
+                                    "protocolProfileBehavior": {}
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "name": "Risk",
+                    "event": [
+                        {
+                            "listen": "prerequest",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    ""
+                                ]
+                            }
+                        },
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    ""
+                                ]
+                            }
+                        }
+                    ],
+                    "item": [
+                        {
+                            "name": "Fetch Risk Snapshot",
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            ""
+                                        ]
+                                    }
+                                },
+                                {
+                                    "listen": "prerequest",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            ""
+                                        ]
+                                    }
+                                }
+                            ],
+                            "request": {
+                                "url": {
+                                    "raw": "{{base_url_broker_adapter}}/api/v1/risk/{{broker_id}}/{{paper_account_id}}/snapshot",
+                                    "host": [
+                                        "{{base_url_broker_adapter}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "risk",
+                                        "{{broker_id}}",
+                                        "{{paper_account_id}}",
+                                        "snapshot"
+                                    ]
+                                },
+                                "method": "GET",
+                                "header": [],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\r\n  \"client_order_id\": \"233\",\r\n  \"position_type\": \"INTRADAY\",\r\n  \"execution_intent\": \"SINGLE\",\r\n  \"protection_type\": \"NONE\",\r\n  \"trigger_type\": \"IMMEDIATE\",\r\n  \"underlying_symbol\": \"NATURALGAS\",\r\n  \"legs\": [\r\n    {\r\n      \"instrument_id\": \"MCX:COMMODITY:COMMODITY:NATURALGAS:FUTURES:2026-01-27\",\r\n      \"instrument_type\": \"EQUITY\",\r\n      \"side\": \"BUY\",\r\n      \"qty\": 1,\r\n      \"order_type\": \"MARKET\",\r\n      \"price\": 0,\r\n      \"stop_price\": 0,\r\n      \"ltp\": 0,\r\n      \"disclosed_qty\": 0\r\n    }\r\n  ],\r\n  \"stop_loss\": 0,\r\n  \"take_profit\": 0,\r\n  \"trailing_points\": 0,\r\n  \"trigger_price\": 0,\r\n  \"tif\": \"DAY\",\r\n  \"offline_order\": false,\r\n  \"tag\": \"string\"\r\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            },
+                            "response": [],
+                            "protocolProfileBehavior": {
+                                "disableBodyPruning": true
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Position Grouping",
+                    "event": [
+                        {
+                            "listen": "prerequest",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    ""
+                                ]
+                            }
+                        },
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    ""
+                                ]
+                            }
+                        }
+                    ],
+                    "item": [
+                        {
+                            "name": "Create Position Group",
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            ""
+                                        ]
+                                    }
+                                },
+                                {
+                                    "listen": "prerequest",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            ""
+                                        ]
+                                    }
+                                }
+                            ],
+                            "request": {
+                                "url": {
+                                    "raw": "{{base_url_broker_adapter}}/api/v1/position-group/{{broker_id}}/{{account_id}}",
+                                    "host": [
+                                        "{{base_url_broker_adapter}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "position-group",
+                                        "{{broker_id}}",
+                                        "{{account_id}}"
+                                    ]
+                                },
+                                "method": "POST",
+                                "header": [],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\r\n  \"name\": \"Portfolio Hedge\",\r\n  \"type\": \"underlying_symbol\",\r\n  \"underlying_symbol\": \"NIFTY\"\r\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            },
+                            "response": [],
+                            "protocolProfileBehavior": {}
+                        }
+                    ]
+                },
+                {
+                    "name": "Obtain User Token",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "var data = JSON.parse(responseBody);",
+                                    "pm.environment.set(\"access-token\", data.access_token);"
+                                ]
+                            }
+                        },
+                        {
+                            "listen": "prerequest",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    ""
+                                ]
+                            }
+                        }
+                    ],
+                    "request": {
+                        "url": {
+                            "raw": "{{base_url_auth}}/auth/login",
+                            "host": [
+                                "{{base_url_auth}}"
+                            ],
+                            "path": [
+                                "auth",
+                                "login"
+                            ]
+                        },
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "default"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"username\": \"testuser\",\n  \"password\": \"Password123!\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": [],
+                    "protocolProfileBehavior": {}
+                }
+            ]
+        },
+        {
+            "name": "Market Data Service",
+            "event": [
+                {
+                    "listen": "prerequest",
+                    "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                            ""
+                        ]
+                    }
+                },
+                {
+                    "listen": "test",
+                    "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                            ""
+                        ]
+                    }
+                }
+            ],
+            "item": [
+                {
+                    "name": "Data APIs",
+                    "event": [
+                        {
+                            "listen": "prerequest",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    ""
+                                ]
+                            }
+                        },
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    ""
+                                ]
+                            }
+                        }
+                    ],
+                    "item": [
+                        {
+                            "name": "Get History",
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            ""
+                                        ]
+                                    }
+                                },
+                                {
+                                    "listen": "prerequest",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            ""
+                                        ]
+                                    }
+                                }
+                            ],
+                            "request": {
+                                "url": {
+                                    "raw": "{{base_url_market_data}}/api/v1/data/history/{{user_id}}/{{broker_id}}/NSE%3ASBIN-EQ",
+                                    "host": [
+                                        "{{base_url_market_data}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "data",
+                                        "history",
+                                        "{{user_id}}",
+                                        "{{broker_id}}",
+                                        "NSE%3ASBIN-EQ"
+                                    ]
+                                },
+                                "method": "GET",
+                                "header": [],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\r\n\"from_ts\": \"1690895316\",\r\n\"to_ts\": \"1691068173\",\r\n\"resolution\": \"1D\"\r\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            },
+                            "response": [],
+                            "protocolProfileBehavior": {
+                                "disableBodyPruning": true
+                            }
+                        },
+                        {
+                            "name": "Get Quote",
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            ""
+                                        ]
+                                    }
+                                },
+                                {
+                                    "listen": "prerequest",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            ""
+                                        ]
+                                    }
+                                }
+                            ],
+                            "request": {
+                                "url": {
+                                    "raw": "{{base_url_market_data}}/api/v1/data/quotes/{{user_id}}/{{broker_id}}",
+                                    "host": [
+                                        "{{base_url_market_data}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "data",
+                                        "quotes",
+                                        "{{user_id}}",
+                                        "{{broker_id}}"
+                                    ]
+                                },
+                                "method": "GET",
+                                "header": [],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "[\"NSE:SBIN-EQ\", \"NSE:MPSLTD-EQ\"]",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            },
+                            "response": [],
+                            "protocolProfileBehavior": {
+                                "disableBodyPruning": true
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Broker Instruments API",
+                    "event": [
+                        {
+                            "listen": "prerequest",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    ""
+                                ]
+                            }
+                        },
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    ""
+                                ]
+                            }
+                        }
+                    ],
+                    "item": [
+                        {
+                            "name": "Get Broker Instrument",
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            ""
+                                        ]
+                                    }
+                                },
+                                {
+                                    "listen": "prerequest",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            ""
+                                        ]
+                                    }
+                                }
+                            ],
+                            "request": {
+                                "url": {
+                                    "raw": "{{base_url_market_data}}/api/v1/broker-instruments/{{broker_id}}/trading-symbols/BSE:SENSEX2612281000PE",
+                                    "host": [
+                                        "{{base_url_market_data}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "broker-instruments",
+                                        "{{broker_id}}",
+                                        "trading-symbols",
+                                        "BSE:SENSEX2612281000PE"
+                                    ]
+                                },
+                                "method": "GET",
+                                "header": [],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "[\"NSE:SBIN-EQ\", \"NSE:MPSLTD-EQ\"]",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            },
+                            "response": [],
+                            "protocolProfileBehavior": {
+                                "disableBodyPruning": true
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Obtain User Token",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "var data = JSON.parse(responseBody);",
+                                    "pm.environment.set(\"access-token\", data.access_token);"
+                                ]
+                            }
+                        },
+                        {
+                            "listen": "prerequest",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    ""
+                                ]
+                            }
+                        }
+                    ],
+                    "request": {
+                        "url": {
+                            "raw": "{{base_url_auth}}/auth/login",
+                            "host": [
+                                "{{base_url_auth}}"
+                            ],
+                            "path": [
+                                "auth",
+                                "login"
+                            ]
+                        },
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "default"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"username\": \"testuser\",\n  \"password\": \"Password123!\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": [],
+                    "protocolProfileBehavior": {}
+                },
+                {
+                    "name": "Start Security Master Sync",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    ""
+                                ]
+                            }
+                        },
+                        {
+                            "listen": "prerequest",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    ""
+                                ]
+                            }
+                        }
+                    ],
+                    "request": {
+                        "url": {
+                            "raw": "{{base_url_market_data}}/api/v1/broker-instruments/{{broker_id}}",
+                            "host": [
+                                "{{base_url_market_data}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "broker-instruments",
+                                "{{broker_id}}"
+                            ]
+                        },
+                        "method": "POST",
+                        "header": [],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": [],
+                    "protocolProfileBehavior": {}
+                },
+                {
+                    "name": "Get History",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    ""
+                                ]
+                            }
+                        },
+                        {
+                            "listen": "prerequest",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    ""
+                                ]
+                            }
+                        }
+                    ],
+                    "request": {
+                        "url": {
+                            "raw": "{{base_url_market_data}}/api/v1/data/history/{{user_id}}/{{broker_id}}/NSE%3ASBIN-EQ",
+                            "host": [
+                                "{{base_url_market_data}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "data",
+                                "history",
+                                "{{user_id}}",
+                                "{{broker_id}}",
+                                "NSE%3ASBIN-EQ"
+                            ]
+                        },
+                        "method": "GET",
+                        "header": [],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\r\n\"from_ts\": \"1690895316\",\r\n\"to_ts\": \"1691068173\",\r\n\"resolution\": \"1D\"\r\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": [],
+                    "protocolProfileBehavior": {
+                        "disableBodyPruning": true
+                    }
+                },
+                {
+                    "name": "Place Order-Stop",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    ""
+                                ]
+                            }
+                        },
+                        {
+                            "listen": "prerequest",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    ""
+                                ]
+                            }
+                        }
+                    ],
+                    "request": {
+                        "url": {
+                            "raw": "{{base_url_broker_adapter}}/api/v1/orders/{{broker_id}}",
+                            "host": [
+                                "{{base_url_broker_adapter}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "orders",
+                                "{{broker_id}}"
+                            ]
+                        },
+                        "method": "POST",
+                        "header": [],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\r\n  \"instrument\": {\r\n    \"asset_class\": \"EQUITY\",\r\n    \"symbol\": \"NSE:SBI-FUT\",\r\n    \"exchange\": \"string\",\r\n    \"expiry\": \"string\",\r\n    \"strike\": 0,\r\n    \"option_type\": \"CALL\",\r\n    \"base_currency\": \"string\",\r\n    \"quote_currency\": \"string\",\r\n    \"isin\": \"string\",\r\n    \"token\": \"string\",\r\n    \"extras\": {\r\n      \"additionalProp1\": {}\r\n    }\r\n  },\r\n  \"qty\": 1,\r\n  \"side\": \"BUY\",\r\n  \"type\": \"MARKET\",\r\n  \"product_type\": \"INTRADAY\",\r\n  \"tif\": \"DAY\",\r\n  \"price\": 0,\r\n  \"stop_price\": 0,\r\n  \"target_price\": 0,\r\n  \"trigger_price\": 0,\r\n  \"client_order_id\": \"string\"\r\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": [],
+                    "protocolProfileBehavior": {}
+                }
+            ]
+        },
+        {
+            "name": "User Settings Service",
+            "item": [
+                {
+                    "name": "Upsert Settings",
+                    "request": {
+                        "url": {
+                            "raw": "{{base_url_user_settings}}/api/v1/settings",
+                            "host": [
+                                "{{base_url_user_settings}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "settings"
+                            ]
+                        },
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{access_token}}",
+                                "type": "default"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "default"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"user_id\": \"{{user_id}}\",\n  \"risk\": {\n    \"max_daily_loss\": 1000\n  },\n  \"preferences\": {\n    \"default_product_type\": \"INTRADAY\"\n  }\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": [],
+                    "protocolProfileBehavior": {}
+                },
+                {
+                    "name": "Get User Settings",
+                    "request": {
+                        "url": {
+                            "raw": "{{base_url_user_settings}}/api/v1/settings/{{user_id}}",
+                            "host": [
+                                "{{base_url_user_settings}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "settings",
+                                "{{user_id}}"
+                            ]
+                        },
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{access_token}}",
+                                "type": "default"
+                            }
+                        ]
+                    },
+                    "response": [],
+                    "protocolProfileBehavior": {}
+                }
+            ]
+        },
+        {
+            "name": "Paper Trading Service",
+            "event": [
+                {
+                    "listen": "prerequest",
+                    "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                            ""
+                        ]
+                    }
+                },
+                {
+                    "listen": "test",
+                    "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                            ""
+                        ]
+                    }
+                }
+            ],
+            "item": [
+                {
+                    "name": "Create Order",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    ""
+                                ]
+                            }
+                        },
+                        {
+                            "listen": "prerequest",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    ""
+                                ]
+                            }
+                        }
+                    ],
+                    "request": {
+                        "url": {
+                            "raw": "{{base_url_mock}}/api/v1/order/{{broker_id}}/{{paper_account_id}}",
+                            "host": [
+                                "{{base_url_mock}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "order",
+                                "{{broker_id}}",
+                                "{{paper_account_id}}"
+                            ]
+                        },
+                        "method": "POST",
+                        "header": [],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\r\n  \"instrument_id\": \"NSE:CASH:EQUITY:WSTCSTPAPR\",\r\n  \"qty\": 100,\r\n  \"side\": \"BUY\",\r\n  \"type\": \"MARKET\",\r\n  \"tif\": \"DAY\",\r\n  \"price\": 10,\r\n  \"instrument_type\": \"EQUITY\",\r\n  \"stop_price\": 0,\r\n  \"position_type\": \"INTRADAY\",\r\n  \"tag\": \"Test\",\r\n  \"stop_loss\": 10,\r\n  \"take_profit\": 50,\r\n  \"disclosed_qty\": 0\r\n}\r\n",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": [],
+                    "protocolProfileBehavior": {}
+                },
+                {
+                    "name": "Create Order Bracket",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    ""
+                                ]
+                            }
+                        },
+                        {
+                            "listen": "prerequest",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    ""
+                                ]
+                            }
+                        }
+                    ],
+                    "request": {
+                        "url": {
+                            "raw": "{{base_url_mock}}/api/v1/order/{{broker_id}}/{{paper_account_id}}",
+                            "host": [
+                                "{{base_url_mock}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "order",
+                                "{{broker_id}}",
+                                "{{paper_account_id}}"
+                            ]
+                        },
+                        "method": "POST",
+                        "header": [],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\r\n  \"instrument_id\": \"NSE:CASH:EQUITY:WSTCSTPAPR\",\r\n  \"qty\": 100,\r\n  \"side\": \"BUY\",\r\n  \"type\": \"MARKET\",\r\n  \"tif\": \"DAY\",\r\n  \"price\": 10,\r\n  \"instrument_type\": \"EQUITY\",\r\n  \"stop_price\": 0,\r\n  \"position_type\": \"BRACKET\",\r\n  \"tag\": \"Test\",\r\n  \"stop_loss\": 10,\r\n  \"take_profit\": 50,\r\n  \"disclosed_qty\": 0\r\n}\r\n",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": [],
+                    "protocolProfileBehavior": {}
+                },
+                {
+                    "name": "Create Order Cover",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    ""
+                                ]
+                            }
+                        },
+                        {
+                            "listen": "prerequest",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    ""
+                                ]
+                            }
+                        }
+                    ],
+                    "request": {
+                        "url": {
+                            "raw": "{{base_url_mock}}/api/v1/order/{{broker_id}}/{{paper_account_id}}",
+                            "host": [
+                                "{{base_url_mock}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "order",
+                                "{{broker_id}}",
+                                "{{paper_account_id}}"
+                            ]
+                        },
+                        "method": "POST",
+                        "header": [],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\r\n  \"instrument_id\": \"NSE:CASH:EQUITY:WSTCSTPAPR\",\r\n  \"qty\": 100,\r\n  \"side\": \"BUY\",\r\n  \"type\": \"MARKET\",\r\n  \"tif\": \"DAY\",\r\n  \"price\": 10,\r\n  \"instrument_type\": \"EQUITY\",\r\n  \"stop_price\": 0,\r\n  \"position_type\": \"BRACKET\",\r\n  \"tag\": \"Test\",\r\n  \"stop_loss\": 10,\r\n  \"take_profit\": 50,\r\n  \"disclosed_qty\": 0\r\n}\r\n",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": [],
+                    "protocolProfileBehavior": {}
+                },
+                {
+                    "name": "Create Order GTT Single",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    ""
+                                ]
+                            }
+                        },
+                        {
+                            "listen": "prerequest",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    ""
+                                ]
+                            }
+                        }
+                    ],
+                    "request": {
+                        "url": {
+                            "raw": "{{base_url_mock}}/api/v1/order/{{broker_id}}/{{paper_account_id}}",
+                            "host": [
+                                "{{base_url_mock}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "order",
+                                "{{broker_id}}",
+                                "{{paper_account_id}}"
+                            ]
+                        },
+                        "method": "POST",
+                        "header": [],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\r\n  \"instrument_id\": \"NSE:CASH:EQUITY:WSTCSTPAPR\",\r\n  \"qty\": 100,\r\n  \"side\": \"BUY\",\r\n  \"type\": \"MARKET\",\r\n  \"tif\": \"DAY\",\r\n  \"price\": 10,\r\n  \"instrument_type\": \"EQUITY\",\r\n  \"stop_price\": 0,\r\n  \"position_type\": \"BRACKET\",\r\n  \"tag\": \"Test\",\r\n  \"stop_loss\": 10,\r\n  \"take_profit\": 50,\r\n  \"disclosed_qty\": 0\r\n}\r\n",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": [],
+                    "protocolProfileBehavior": {}
+                },
+                {
+                    "name": "Create Order GTT OCO",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    ""
+                                ]
+                            }
+                        },
+                        {
+                            "listen": "prerequest",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    ""
+                                ]
+                            }
+                        }
+                    ],
+                    "request": {
+                        "url": {
+                            "raw": "{{base_url_mock}}/api/v1/order/{{broker_id}}/{{paper_account_id}}",
+                            "host": [
+                                "{{base_url_mock}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "order",
+                                "{{broker_id}}",
+                                "{{paper_account_id}}"
+                            ]
+                        },
+                        "method": "POST",
+                        "header": [],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\r\n  \"instrument_id\": \"NSE:CASH:EQUITY:WSTCSTPAPR\",\r\n  \"qty\": 100,\r\n  \"side\": \"BUY\",\r\n  \"type\": \"MARKET\",\r\n  \"tif\": \"DAY\",\r\n  \"price\": 10,\r\n  \"instrument_type\": \"EQUITY\",\r\n  \"stop_price\": 0,\r\n  \"position_type\": \"BRACKET\",\r\n  \"tag\": \"Test\",\r\n  \"stop_loss\": 10,\r\n  \"take_profit\": 50,\r\n  \"disclosed_qty\": 0\r\n}\r\n",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": [],
+                    "protocolProfileBehavior": {}
+                },
+                {
+                    "name": "Modify Order",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    ""
+                                ]
+                            }
+                        },
+                        {
+                            "listen": "prerequest",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    ""
+                                ]
+                            }
+                        }
+                    ],
+                    "request": {
+                        "url": {
+                            "raw": "{{base_url_mock}}/api/v1/paper/order/{{user_id}}/{{broker_id}}/{{paper_account_id}}/cd6cf082-b4c3-460d-b693-46244ea23f94",
+                            "host": [
+                                "{{base_url_mock}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "paper",
+                                "order",
+                                "{{user_id}}",
+                                "{{broker_id}}",
+                                "{{paper_account_id}}",
+                                "cd6cf082-b4c3-460d-b693-46244ea23f94"
+                            ]
+                        },
+                        "method": "PUT",
+                        "header": [],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\r\n  \r\n  \"qty\": 0,\r\n  \"price\": 100,\r\n  \"stop_price\": 0\r\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "auth": {
+                            "type": "noauth"
+                        }
+                    },
+                    "response": [],
+                    "protocolProfileBehavior": {}
+                },
+                {
+                    "name": "List Orders",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    ""
+                                ]
+                            }
+                        },
+                        {
+                            "listen": "prerequest",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    ""
+                                ]
+                            }
+                        }
+                    ],
+                    "request": {
+                        "url": {
+                            "raw": "{{base_url_mock}}/api/v1/order/{{broker_id}}/{{paper_account_id}}",
+                            "host": [
+                                "{{base_url_mock}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "order",
+                                "{{broker_id}}",
+                                "{{paper_account_id}}"
+                            ]
+                        },
+                        "method": "GET",
+                        "header": [],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": [],
+                    "protocolProfileBehavior": {
+                        "disableBodyPruning": true
+                    }
+                },
+                {
+                    "name": "List Positions",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    ""
+                                ]
+                            }
+                        },
+                        {
+                            "listen": "prerequest",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    ""
+                                ]
+                            }
+                        }
+                    ],
+                    "request": {
+                        "url": {
+                            "raw": "{{base_url_mock}}/api/v1/position/{{broker_id}}/{{paper_account_id}}",
+                            "host": [
+                                "{{base_url_mock}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "position",
+                                "{{broker_id}}",
+                                "{{paper_account_id}}"
+                            ]
+                        },
+                        "method": "GET",
+                        "header": [],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\r\n  \r\n  \"qty\": 0,\r\n  \"price\": 100,\r\n  \"stop_price\": 0\r\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": [],
+                    "protocolProfileBehavior": {
+                        "disableBodyPruning": true
+                    }
+                },
+                {
+                    "name": "Exit All Positions",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    ""
+                                ]
+                            }
+                        },
+                        {
+                            "listen": "prerequest",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    ""
+                                ]
+                            }
+                        }
+                    ],
+                    "request": {
+                        "url": {
+                            "raw": "{{base_url_mock}}/api/v1/position/{{broker_id}}/{{paper_account_id}}",
+                            "host": [
+                                "{{base_url_mock}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "position",
+                                "{{broker_id}}",
+                                "{{paper_account_id}}"
+                            ]
+                        },
+                        "method": "GET",
+                        "header": [],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\r\n  \r\n  \"qty\": 0,\r\n  \"price\": 100,\r\n  \"stop_price\": 0\r\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": [],
+                    "protocolProfileBehavior": {
+                        "disableBodyPruning": true
+                    }
+                },
+                {
+                    "name": "List Trades",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    ""
+                                ]
+                            }
+                        },
+                        {
+                            "listen": "prerequest",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    ""
+                                ]
+                            }
+                        }
+                    ],
+                    "request": {
+                        "url": {
+                            "raw": "{{base_url_mock}}/api/v1/trade/{{broker_id}}",
+                            "host": [
+                                "{{base_url_mock}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "trade",
+                                "{{broker_id}}"
+                            ]
+                        },
+                        "method": "GET",
+                        "header": [],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\r\n  \r\n  \"qty\": 0,\r\n  \"price\": 100,\r\n  \"stop_price\": 0\r\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": [],
+                    "protocolProfileBehavior": {
+                        "disableBodyPruning": true
+                    }
+                },
+                {
+                    "name": "Cancel Order",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    ""
+                                ]
+                            }
+                        },
+                        {
+                            "listen": "prerequest",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    ""
+                                ]
+                            }
+                        }
+                    ],
+                    "request": {
+                        "url": {
+                            "raw": "{{base_url_mock}}/api/v1/paper/order/{{user_id}}/{{broker_id}}/{{paper_account_id}}",
+                            "host": [
+                                "{{base_url_mock}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "paper",
+                                "order",
+                                "{{user_id}}",
+                                "{{broker_id}}",
+                                "{{paper_account_id}}"
+                            ]
+                        },
+                        "method": "GET",
+                        "header": [],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\r\n  \r\n  \"qty\": 0,\r\n  \"price\": 100,\r\n  \"stop_price\": 0\r\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "auth": {
+                            "type": "noauth"
+                        }
+                    },
+                    "response": [],
+                    "protocolProfileBehavior": {
+                        "disableBodyPruning": true
+                    }
+                },
+                {
+                    "name": "Get Order",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    ""
+                                ]
+                            }
+                        },
+                        {
+                            "listen": "prerequest",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    ""
+                                ]
+                            }
+                        }
+                    ],
+                    "request": {
+                        "url": {
+                            "raw": "{{base_url_mock}}/api/v1/paper/order/{{user_id}}/{{broker_id}}/{{paper_account_id}}/cd6cf082-b4c3-460d-b693-46244ea23f94",
+                            "host": [
+                                "{{base_url_mock}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "paper",
+                                "order",
+                                "{{user_id}}",
+                                "{{broker_id}}",
+                                "{{paper_account_id}}",
+                                "cd6cf082-b4c3-460d-b693-46244ea23f94"
+                            ]
+                        },
+                        "method": "GET",
+                        "header": [],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\r\n  \r\n  \"qty\": 0,\r\n  \"price\": 100,\r\n  \"stop_price\": 0\r\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "auth": {
+                            "type": "noauth"
+                        }
+                    },
+                    "response": [],
+                    "protocolProfileBehavior": {
+                        "disableBodyPruning": true
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Start Security Master Sync Copy",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                            ""
+                        ]
+                    }
+                },
+                {
+                    "listen": "prerequest",
+                    "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                            ""
+                        ]
+                    }
+                }
+            ],
+            "request": {
+                "url": {
+                    "raw": "{{base_url_trade_executor}}/api/v1/orders/{{broker_id}}",
+                    "host": [
+                        "{{base_url_trade_executor}}"
+                    ],
+                    "path": [
+                        "api",
+                        "v1",
+                        "orders",
+                        "{{broker_id}}"
+                    ]
+                },
+                "method": "POST",
+                "header": [],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\r\n  \"instrument\": {\r\n    \"instrument_type\": \"CS\",\r\n    \"symbol\": \"NSE:SBI-FUT\"\r\n  },\r\n  \"qty\": 1,\r\n  \"side\": \"1\",\r\n  \"type\": \"2\",\r\n  \"tif\": \"0\",\r\n  \"price\": 10,\r\n  \"stop_price\": 0,\r\n  \"target_price\": 0,\r\n  \"trigger_price\": 0,\r\n  \"client_order_id\": \"string\"\r\n}",
+                    "options": {
+                        "raw": {
+                            "language": "json"
+                        }
+                    }
+                }
+            },
+            "response": [],
+            "protocolProfileBehavior": {}
+        }
+    ],
+    "event": [
+        {
+            "listen": "prerequest",
+            "script": {
+                "type": "text/javascript",
+                "exec": [
+                    ""
+                ]
+            }
+        },
+        {
+            "listen": "test",
+            "script": {
+                "type": "text/javascript",
+                "exec": [
+                    ""
+                ]
+            }
+        }
+    ],
+    "variable": [],
+    "auth": {
+        "type": "bearer",
+        "bearer": [
+            {
+                "key": "token",
+                "value": "{{access-token}}",
+                "type": "string"
+            }
+        ]
+    }
+}
