@@ -1,0 +1,660 @@
+{
+  "info": {
+    "name": "Position Intelligence Engine (PIE)",
+    "description": "API testing collection for PIE features - Real-time position monitoring, rule-based actions, and automated management",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{auth_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    let jsonData = pm.response.json();",
+                  "    pm.environment.set('auth_token', jsonData.access_token);",
+                  "    pm.environment.set('user_id', jsonData.user_id);",
+                  "    console.log('✅ Authentication token stored');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"test_pie@smarttrade.local\",\n    \"password\": \"Test123!@#\"\n}"
+            },
+            "url": {
+              "raw": "{{auth_base_url}}/auth/login",
+              "host": [
+                "{{auth_base_url}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Strategies",
+      "item": [
+        {
+          "name": "Create Strategy",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function() {",
+                  "    pm.expect(pm.response.code).to.equal(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has strategy ID', function() {",
+                  "    let jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('id');",
+                  "    pm.environment.set('strategy_id', jsonData.id);",
+                  "    console.log('✅ Strategy created: ' + jsonData.id);",
+                  "});",
+                  "",
+                  "pm.test('Strategy has correct type and status', function() {",
+                  "    let jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.strategy_type).to.equal('bull_spread');",
+                  "    pm.expect(jsonData.status).to.equal('PENDING');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"strategy_type\": \"bull_spread\",\n    \"underlying_symbol\": \"RELIANCE\",\n    \"expiry_date\": \"2026-04-30\",\n    \"bias\": \"bullish\",\n    \"legs\": [\n        {\n            \"instrument_id\": \"NSE_EQ|INE002A01018\",\n            \"side\": \"BUY\",\n            \"qty\": 1,\n            \"order_type\": \"MARKET\"\n        },\n        {\n            \"instrument_id\": \"NSE_EQ|INE002A01018_CE_2600\",\n            \"side\": \"SELL\",\n            \"qty\": 1,\n            \"order_type\": \"MARKET\"\n        }\n    ]\n}"
+            },
+            "url": {
+              "raw": "{{bas_base_url}}/api/v1/strategies/{{broker_id}}/{{account_id}}",
+              "host": [
+                "{{bas_base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "strategies",
+                "{{broker_id}}",
+                "{{account_id}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "List Strategies",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function() {",
+                  "    pm.expect(pm.response.code).to.equal(200);",
+                  "});",
+                  "",
+                  "pm.test('Response is paginated', function() {",
+                  "    let jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('items');",
+                  "    pm.expect(jsonData).to.have.property('total');",
+                  "    console.log('✅ Listed ' + jsonData.total + ' strategies');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{bas_base_url}}/api/v1/strategies/{{broker_id}}/{{account_id}}?skip=0&limit=20",
+              "host": [
+                "{{bas_base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "strategies",
+                "{{broker_id}}",
+                "{{account_id}}"
+              ],
+              "query": [
+                {
+                  "key": "skip",
+                  "value": "0"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Strategy Details",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function() {",
+                  "    pm.expect(pm.response.code).to.equal(200);",
+                  "});",
+                  "",
+                  "pm.test('Strategy has all fields', function() {",
+                  "    let jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('leg_details');",
+                  "    pm.expect(jsonData).to.have.property('adjustment_history');",
+                  "    pm.expect(jsonData).to.have.property('net_premium');",
+                  "    console.log('✅ Strategy details retrieved');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{bas_base_url}}/api/v1/strategies/{{broker_id}}/{{account_id}}/{{strategy_id}}",
+              "host": [
+                "{{bas_base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "strategies",
+                "{{broker_id}}",
+                "{{account_id}}",
+                "{{strategy_id}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Adjust Strategy (Add Hedge)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function() {",
+                  "    pm.expect(pm.response.code).to.equal(200);",
+                  "});",
+                  "",
+                  "pm.test('Strategy legs increased', function() {",
+                  "    let jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.leg_details.length).to.be.greaterThan(2);",
+                  "    pm.expect(jsonData.adjustment_history.length).to.be.greaterThan(0);",
+                  "    console.log('✅ Strategy adjusted with hedge');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"action\": \"HEDGE\",\n    \"new_legs\": [\n        {\n            \"instrument_id\": \"NSE_EQ|INE002A01018_PE_2500\",\n            \"side\": \"BUY\",\n            \"qty\": 1,\n            \"order_type\": \"MARKET\"\n        }\n    ]\n}"
+            },
+            "url": {
+              "raw": "{{bas_base_url}}/api/v1/strategies/{{broker_id}}/{{account_id}}/{{strategy_id}}/adjust",
+              "host": [
+                "{{bas_base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "strategies",
+                "{{broker_id}}",
+                "{{account_id}}",
+                "{{strategy_id}}",
+                "adjust"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Close Strategy",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 or 204', function() {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 204]);",
+                  "    console.log('✅ Strategy closed');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{bas_base_url}}/api/v1/strategies/{{broker_id}}/{{account_id}}/{{strategy_id}}",
+              "host": [
+                "{{bas_base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "strategies",
+                "{{broker_id}}",
+                "{{account_id}}",
+                "{{strategy_id}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auto-Entry",
+      "item": [
+        {
+          "name": "Create Auto-Entry Config",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function() {",
+                  "    pm.expect(pm.response.code).to.equal(200);",
+                  "});",
+                  "",
+                  "pm.test('Config has ID and is enabled', function() {",
+                  "    let jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('id');",
+                  "    pm.expect(jsonData.enabled).to.equal(true);",
+                  "    pm.environment.set('auto_entry_id', jsonData.id);",
+                  "    console.log('✅ Auto-entry config created');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"daily_limit\": 5,\n    \"cooldown_minutes\": 5,\n    \"order_template\": {\n        \"order_type\": \"MARKET\",\n        \"quantity\": 1\n    }\n}"
+            },
+            "url": {
+              "raw": "{{bas_base_url}}/api/v1/auto-entry/{{broker_id}}/{{account_id}}",
+              "host": [
+                "{{bas_base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auto-entry",
+                "{{broker_id}}",
+                "{{account_id}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Toggle Auto-Entry",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function() {",
+                  "    pm.expect(pm.response.code).to.equal(200);",
+                  "});",
+                  "",
+                  "pm.test('Config toggled', function() {",
+                  "    let jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('enabled');",
+                  "    console.log('✅ Auto-entry toggled to: ' + jsonData.enabled);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"enabled\": false\n}"
+            },
+            "url": {
+              "raw": "{{bas_base_url}}/api/v1/auto-entry/{{broker_id}}/{{account_id}}/{{auto_entry_id}}/toggle",
+              "host": [
+                "{{bas_base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auto-entry",
+                "{{broker_id}}",
+                "{{account_id}}",
+                "{{auto_entry_id}}",
+                "toggle"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "PIE Status & Monitoring",
+      "item": [
+        {
+          "name": "Get PIE Status",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function() {",
+                  "    pm.expect(pm.response.code).to.equal(200);",
+                  "});",
+                  "",
+                  "pm.test('Status has all metrics', function() {",
+                  "    let jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('position_groups_count');",
+                  "    pm.expect(jsonData).to.have.property('active_strategies_count');",
+                  "    pm.expect(jsonData).to.have.property('total_mtm');",
+                  "    pm.expect(jsonData).to.have.property('is_kill_switch_active');",
+                  "    console.log('✅ PIE Status: MTM=' + jsonData.total_mtm + ', KillSwitch=' + jsonData.is_kill_switch_active);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{bas_base_url}}/api/v1/pie/{{broker_id}}/{{account_id}}/status",
+              "host": [
+                "{{bas_base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pie",
+                "{{broker_id}}",
+                "{{account_id}}",
+                "status"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Action Logs",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function() {",
+                  "    pm.expect(pm.response.code).to.equal(200);",
+                  "});",
+                  "",
+                  "pm.test('Response is paginated', function() {",
+                  "    let jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('items');",
+                  "    pm.expect(jsonData).to.have.property('total');",
+                  "    console.log('✅ Retrieved ' + jsonData.total + ' action logs');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{bas_base_url}}/api/v1/actions/{{broker_id}}/{{account_id}}?page=1&page_size=10",
+              "host": [
+                "{{bas_base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "actions",
+                "{{broker_id}}",
+                "{{account_id}}"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "page_size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Kill Switch",
+      "item": [
+        {
+          "name": "Activate Kill Switch",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code indicates success or cooldown', function() {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 429]);",
+                  "    if (pm.response.code === 200) {",
+                  "        console.log('✅ Kill switch activated');",
+                  "    } else {",
+                  "        console.log('⏳ Kill switch in cooldown period');",
+                  "    }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"reason\": \"Manual user trigger - Postman test\"\n}"
+            },
+            "url": {
+              "raw": "{{bas_base_url}}/api/v1/kill-switch/{{broker_id}}/{{account_id}}",
+              "host": [
+                "{{bas_base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "kill-switch",
+                "{{broker_id}}",
+                "{{account_id}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Error Scenarios",
+      "item": [
+        {
+          "name": "Invalid Broker ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 4xx (not found)', function() {",
+                  "    pm.expect(pm.response.code).to.be.greaterThanOrEqual(400);",
+                  "    pm.expect(pm.response.code).to.be.lessThan(500);",
+                  "    console.log('✅ Invalid broker ID correctly rejected');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{bas_base_url}}/api/v1/pie/invalid_broker/ACC123/status",
+              "host": [
+                "{{bas_base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pie",
+                "invalid_broker",
+                "ACC123",
+                "status"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Missing Auth Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 401 (unauthorized)', function() {",
+                  "    pm.expect(pm.response.code).to.equal(401);",
+                  "    console.log('✅ Unauthorized request correctly rejected');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{bas_base_url}}/api/v1/pie/{{broker_id}}/{{account_id}}/status",
+              "host": [
+                "{{bas_base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pie",
+                "{{broker_id}}",
+                "{{account_id}}",
+                "status"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "auth_base_url",
+      "value": "http://localhost:8001",
+      "type": "string"
+    },
+    {
+      "key": "bas_base_url",
+      "value": "http://localhost:8005",
+      "type": "string"
+    },
+    {
+      "key": "broker_id",
+      "value": "fyers",
+      "type": "string"
+    },
+    {
+      "key": "account_id",
+      "value": "TEST_ACC_001",
+      "type": "string"
+    },
+    {
+      "key": "auth_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "user_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "strategy_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "auto_entry_id",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}

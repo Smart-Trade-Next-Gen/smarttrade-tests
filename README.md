@@ -9,6 +9,7 @@ Cross-service integration and API test artifacts for the SmartTrade trading plat
 ```
 postman/        — Postman collection and environment files
 scripts/        — Test runner scripts
+docs/           — E2E test guides and quickstart docs
 results/        — Test output (gitignored)
 ```
 
