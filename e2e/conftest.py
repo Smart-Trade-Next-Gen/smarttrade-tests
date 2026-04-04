@@ -18,6 +18,7 @@ from e2e.clients import BASClient, MDSWebSocketClient, MockClient
 from e2e.harness import EventCollector, AssertionEngine, ScenarioEngine
 from e2e.fixtures.logging import configure_logging
 from e2e.fixtures.market_data_stream import MockMarketDataStream
+from e2e.fixtures.chaos_engine import ChaosEngine
 
 log = logging.getLogger(__name__)
 
@@ -313,3 +314,20 @@ async def cleanup_test_account(
                     pass
     except Exception:
         pass
+
+
+# ────────────────────────────────────────────────────────────────────────────────
+# FUNCTION-SCOPED FIXTURES: CHAOS TESTING
+# ────────────────────────────────────────────────────────────────────────────────
+
+
+@pytest.fixture
+def chaos_engine() -> ChaosEngine:
+    """
+    Provide ChaosEngine for resilience and chaos testing.
+
+    Scope: function (fresh engine per test)
+    """
+    engine = ChaosEngine()
+    yield engine
+    engine.reset()
