@@ -1,0 +1,50 @@
+# Position Close - BUY then SELL (Happy Path)
+# Scenario: Buy 100 WIPRO, then sell same 100 to close position
+
+name: position_close_buy_sell
+description: |
+  Two-order scenario: BUY 100 WIPRO, then SELL 100 WIPRO to close position.
+  Validates position lifecycle: create → close.
+  Validates realized P&L calculation on close.
+
+broker_id: mock
+account_id: TEST_POSITION_CLOSE_001
+
+concurrent: false
+expected_positions_delta: 0
+expected_financial_invariants:
+  - realized_pnl_calculated
+  - position_closed_to_zero
+
+orders:
+  - name: buy_100_wipro
+    instrument_id: INSTR_NSE_WIPRO_EQ
+    side: BUY
+    qty: 100
+    order_type: MARKET
+    position_type: INTRADAY
+
+    fills:
+      - sequence: 1
+        qty: 100
+        price: "800.00"
+
+    expected_status: FILLED
+    expected_filled_qty: 100
+    expected_avg_price: "800.00"
+
+  - name: sell_100_wipro_to_close
+    instrument_id: INSTR_NSE_WIPRO_EQ
+    side: SELL
+    qty: 100
+    order_type: MARKET
+    position_type: INTRADAY
+
+    fills:
+      - sequence: 1
+        qty: 100
+        price: "820.00"
+
+    expected_status: FILLED
+    expected_filled_qty: 100
+    expected_avg_price: "820.00"

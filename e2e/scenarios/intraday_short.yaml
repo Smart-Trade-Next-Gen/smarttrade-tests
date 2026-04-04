@@ -1,0 +1,34 @@
+# Intraday Short - SELL Without Prior BUY (Happy Path)
+# Scenario: Short sell 100 shares of ITC (allowed in intraday)
+
+name: intraday_short
+description: |
+  Intraday short sell order for 100 shares of ITC.
+  Allows SELL without prior BUY position (normal in intraday trading).
+  Validates negative position creation and short position handling.
+
+broker_id: mock
+account_id: TEST_INTRADAY_SHORT_001
+
+concurrent: false
+expected_positions_delta: -1
+expected_financial_invariants:
+  - sell_credit_correct
+  - short_position_allowed_intraday
+
+orders:
+  - name: short_100_itc
+    instrument_id: INSTR_NSE_ITC_EQ
+    side: SELL
+    qty: 100
+    order_type: MARKET
+    position_type: INTRADAY
+
+    fills:
+      - sequence: 1
+        qty: 100
+        price: "450.00"
+
+    expected_status: FILLED
+    expected_filled_qty: 100
+    expected_avg_price: "450.00"

@@ -1,0 +1,32 @@
+# Cancel Order - After Placement (Happy Path)
+# Scenario: Place LIMIT order but cancel before it can fill
+
+name: cancel_after_place
+description: |
+  Place a LIMIT BUY order at price higher than market,
+  immediately cancel it before any fill can occur.
+  Validates order cancellation and CANCELLED status.
+
+broker_id: mock
+account_id: TEST_CANCEL_AFTER_PLACE_001
+
+concurrent: false
+expected_positions_delta: 0
+expected_financial_invariants:
+  - no_position_created
+  - no_funds_deducted
+
+orders:
+  - name: buy_maruti_limit_high_then_cancel
+    instrument_id: INSTR_NSE_MARUTI_EQ
+    side: BUY
+    qty: 25
+    order_type: LIMIT
+    price: "12000.00"
+    position_type: INTRADAY
+
+    fills: []  # No fills, order is cancelled
+
+    expected_status: CANCELLED
+    expected_filled_qty: 0
+    expected_avg_price: null

@@ -1,0 +1,50 @@
+# Concurrent Orders - Two Simultaneous Orders (Happy Path)
+# Scenario: Place BUY and SELL orders concurrently
+
+name: concurrent_orders_2x
+description: |
+  Two concurrent orders: BUY SUNPHARMA + SELL BAJAJFINSV.
+  Tests framework's ability to handle multiple concurrent order flows.
+  Each order has its own event stream and validation.
+
+broker_id: mock
+account_id: TEST_CONCURRENT_001
+
+concurrent: true
+expected_positions_delta: 0
+expected_financial_invariants:
+  - buy_debit_correct
+  - sell_credit_correct
+
+orders:
+  - name: buy_100_sunpharma
+    instrument_id: INSTR_NSE_SUNPHARMA_EQ
+    side: BUY
+    qty: 100
+    order_type: MARKET
+    position_type: INTRADAY
+
+    fills:
+      - sequence: 1
+        qty: 100
+        price: "650.00"
+
+    expected_status: FILLED
+    expected_filled_qty: 100
+    expected_avg_price: "650.00"
+
+  - name: sell_50_bajajfinsv
+    instrument_id: INSTR_NSE_BAJAJFINSV_EQ
+    side: SELL
+    qty: 50
+    order_type: MARKET
+    position_type: INTRADAY
+
+    fills:
+      - sequence: 1
+        qty: 50
+        price: "18000.00"
+
+    expected_status: FILLED
+    expected_filled_qty: 50
+    expected_avg_price: "18000.00"

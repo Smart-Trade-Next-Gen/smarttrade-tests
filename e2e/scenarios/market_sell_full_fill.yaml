@@ -1,0 +1,34 @@
+# Market SELL Order - Full Fill (Happy Path)
+# Scenario: Sell 100 shares of INFY at market price, fills immediately
+
+name: market_sell_full_fill
+description: |
+  Market SELL order for 100 shares of INFY.
+  Order should fill immediately at market price with single execution.
+  Validates SELL order flow and position closure.
+
+broker_id: mock
+account_id: TEST_MARKET_SELL_001
+
+concurrent: false
+expected_positions_delta: -1
+expected_financial_invariants:
+  - sell_credit_correct
+  - position_closed_or_reduced
+
+orders:
+  - name: sell_100_infy
+    instrument_id: INSTR_NSE_INFY_EQ
+    side: SELL
+    qty: 100
+    order_type: MARKET
+    position_type: INTRADAY
+
+    fills:
+      - sequence: 1
+        qty: 100
+        price: "1950.00"
+
+    expected_status: FILLED
+    expected_filled_qty: 100
+    expected_avg_price: "1950.00"

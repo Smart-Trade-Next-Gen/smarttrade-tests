@@ -8,6 +8,7 @@ from e2e.harness.scenario_engine import (
     OrderScenario,
     FillSpec,
 )
+from e2e.harness.scenario_executor import ScenarioExecutor, ScenarioResult
 
 __all__ = [
     "EventCollector",
@@ -18,4 +19,6 @@ __all__ = [
     "TestScenario",
     "OrderScenario",
     "FillSpec",
+    "ScenarioExecutor",
+    "ScenarioResult",
 ]

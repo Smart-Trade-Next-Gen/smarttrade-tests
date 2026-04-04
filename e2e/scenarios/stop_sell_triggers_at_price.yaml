@@ -1,0 +1,34 @@
+# STOP SELL Order - Triggers at Price (Happy Path)
+# Scenario: Sell 75 shares of HDFC with STOP order at 2450.00
+
+name: stop_sell_triggers_at_price
+description: |
+  STOP SELL order for 75 shares of HDFC at 2450.00.
+  Order triggers when price falls to or below stop price.
+  Validates stop order execution rules (SELL ≤ stop_price for SHORT).
+
+broker_id: mock
+account_id: TEST_STOP_SELL_001
+
+concurrent: false
+expected_positions_delta: -1
+expected_financial_invariants:
+  - sell_credit_correct
+
+orders:
+  - name: sell_75_hdfc_stop_2450
+    instrument_id: INSTR_NSE_HDFC_EQ
+    side: SELL
+    qty: 75
+    order_type: STOP
+    stop_price: "2450.00"
+    position_type: INTRADAY
+
+    fills:
+      - sequence: 1
+        qty: 75
+        price: "2449.00"
+
+    expected_status: FILLED
+    expected_filled_qty: 75
+    expected_avg_price: "2449.00"

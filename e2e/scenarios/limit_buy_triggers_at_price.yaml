@@ -1,0 +1,37 @@
+# LIMIT BUY Order - Triggers at Price (Happy Path)
+# Scenario: Buy 50 shares of TCS with LIMIT order at 3800.00
+# Price starts above limit, drops to trigger point
+
+name: limit_buy_triggers_at_price
+description: |
+  LIMIT BUY order for 50 shares of TCS at 3800.00.
+  Price sequence shows order does NOT fill above limit,
+  fills ONLY when price reaches or falls below limit.
+  Validates limit order execution rules (BUY ≤ limit_price).
+
+broker_id: mock
+account_id: TEST_LIMIT_BUY_001
+
+concurrent: false
+expected_positions_delta: 1
+expected_financial_invariants:
+  - buy_debit_correct
+  - position_created
+
+orders:
+  - name: buy_50_tcs_limit_3800
+    instrument_id: INSTR_NSE_TCS_EQ
+    side: BUY
+    qty: 50
+    order_type: LIMIT
+    price: "3800.00"
+    position_type: INTRADAY
+
+    fills:
+      - sequence: 1
+        qty: 50
+        price: "3799.50"
+
+    expected_status: FILLED
+    expected_filled_qty: 50
+    expected_avg_price: "3799.50"

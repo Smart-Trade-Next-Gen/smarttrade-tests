@@ -1,0 +1,34 @@
+# Market BUY Order - Full Fill (Happy Path)
+# Scenario: Buy 100 shares of SBIN at market price, fills immediately
+
+name: market_buy_full_fill
+description: |
+  Market BUY order for 100 shares of SBIN.
+  Order should fill immediately at market price with single execution.
+  Validates basic order lifecycle and position creation.
+
+broker_id: mock
+account_id: TEST_MARKET_BUY_001
+
+concurrent: false
+expected_positions_delta: 1
+expected_financial_invariants:
+  - buy_debit_correct
+  - position_created
+
+orders:
+  - name: buy_100_sbin
+    instrument_id: INSTR_NSE_SBIN_EQ
+    side: BUY
+    qty: 100
+    order_type: MARKET
+    position_type: INTRADAY
+
+    fills:
+      - sequence: 1
+        qty: 100
+        price: "550.00"
+
+    expected_status: FILLED
+    expected_filled_qty: 100
+    expected_avg_price: "550.00"

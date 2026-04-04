@@ -1,0 +1,42 @@
+# Partial Fills - Three Increments (Happy Path)
+# Scenario: Buy 150 shares of RELIANCE in 3 partial fills
+
+name: partial_fill_3x
+description: |
+  Buy order for 150 shares of RELIANCE filled in 3 partial fills.
+  Validates cumulative fill tracking, weighted average price calculation,
+  and multi-fill event sequence handling.
+
+broker_id: mock
+account_id: TEST_PARTIAL_FILL_001
+
+concurrent: false
+expected_positions_delta: 1
+expected_financial_invariants:
+  - buy_debit_correct
+  - cumulative_fills_sum_to_total
+
+orders:
+  - name: buy_150_reliance_partial_3x
+    instrument_id: INSTR_NSE_RELIANCE_EQ
+    side: BUY
+    qty: 150
+    order_type: LIMIT
+    price: "2950.00"
+    position_type: INTRADAY
+
+    fills:
+      - sequence: 1
+        qty: 50
+        price: "2945.00"
+      - sequence: 2
+        qty: 50
+        price: "2946.00"
+      - sequence: 3
+        qty: 50
+        price: "2947.00"
+
+    expected_status: FILLED
+    expected_filled_qty: 150
+    # Weighted avg: (50*2945 + 50*2946 + 50*2947) / 150 = 2946.00
+    expected_avg_price: "2946.00"
