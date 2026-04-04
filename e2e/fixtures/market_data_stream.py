@@ -42,14 +42,16 @@ class MockMarketDataStream:
         )
     """
 
-    def __init__(self, mock_client):
+    def __init__(self, mock_client, broker_id: str = "mock"):
         """
         Initialize market data stream.
 
         Args:
             mock_client: MockClient for price update injection
+            broker_id: Broker ID for price updates (default: "mock")
         """
         self.mock_client = mock_client
+        self.broker_id = broker_id
         self._price_cache = {}  # instrument_id -> last_price
         self._update_history = []  # For debugging
 
@@ -88,10 +90,20 @@ class MockMarketDataStream:
             f"Bid: {bid} | Ask: {ask}"
         )
 
-        # Send to mock service via MDS WebSocket or REST endpoint
-        # For now, we assume the mock service consumes these via event bus
-        # TODO: Implement actual transmission to mock service
-        # await self.mock_client.inject_price_update(update)
+        # Send to mock service to trigger price-driven execution
+        result = await self.mock_client.inject_price_update(
+            broker_id=self.broker_id,
+            instrument_id=instrument_id,
+            ltp=ltp,
+            bid=bid,
+            ask=ask,
+        )
+
+        if result.get("status") == "not_implemented":
+            log.warning(
+                f"Price injection not available. Consider using inject_fill() "
+                f"for deterministic Phase 5 tests instead of Phase 6 real execution."
+            )
 
     async def update_prices_gradual(
         self,

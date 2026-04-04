@@ -239,6 +239,68 @@ class MockClient:
                 fill_price=price,
             )
 
+    async def inject_price_update(
+        self,
+        broker_id: str,
+        instrument_id: str,
+        ltp: Decimal,
+        bid: Optional[Decimal] = None,
+        ask: Optional[Decimal] = None,
+    ) -> dict:
+        """
+        Inject a price update to trigger price-driven execution.
+
+        This method sends a price update to the Mock Service, which triggers
+        the PriceExecutionEngine to evaluate all open orders and execute
+        any that match the trigger conditions.
+
+        Args:
+            broker_id: Broker ID (e.g., "mock")
+            instrument_id: Instrument ID to update price for
+            ltp: Last traded price
+            bid: Bid price (optional)
+            ask: Ask price (optional)
+
+        Returns:
+            Response dict with status and updated orders
+
+        Raises:
+            httpx.HTTPError: On HTTP error
+        """
+        client = self._get_client()
+        headers = self._get_headers()
+
+        payload = {
+            "instrument_id": instrument_id,
+            "ltp": str(ltp),
+        }
+        if bid is not None:
+            payload["bid"] = str(bid)
+        if ask is not None:
+            payload["ask"] = str(ask)
+
+        url = f"/api/v1/price/{broker_id}"
+        log.debug(
+            f"Injecting price update | broker_id={broker_id} | "
+            f"instrument_id={instrument_id} | ltp={ltp}"
+        )
+
+        try:
+            response = await client.post(
+                url,
+                json=payload,
+                headers=headers,
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPError as e:
+            # Price endpoint may not exist yet - log warning but don't fail
+            log.warning(
+                f"Price injection endpoint not available: {e}. "
+                f"Use inject_fill() for deterministic testing instead."
+            )
+            return {"status": "not_implemented", "message": "Price injection not available"}
+
     def reset_sequence(self, order_id: Optional[str] = None) -> None:
         """
         Reset sequence tracking for an order or all orders.

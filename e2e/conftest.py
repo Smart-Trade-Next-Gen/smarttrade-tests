@@ -136,7 +136,7 @@ async def mock_client(
 
 
 @pytest.fixture
-async def market_data_stream(mock_client: MockClient) -> MockMarketDataStream:
+async def market_data_stream(mock_client: MockClient, config: TestConfig) -> MockMarketDataStream:
     """
     Provide MockMarketDataStream for real execution mode tests.
 
@@ -144,7 +144,7 @@ async def market_data_stream(mock_client: MockClient) -> MockMarketDataStream:
 
     Scope: function (fresh stream per test)
     """
-    stream = MockMarketDataStream(mock_client)
+    stream = MockMarketDataStream(mock_client, broker_id=config.broker_id)
     yield stream
     stream.reset()
 
