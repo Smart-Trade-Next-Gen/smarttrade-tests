@@ -150,7 +150,7 @@ class BASClient:
 
         response = await client.post(
             url,
-            json=request.model_dump(exclude_none=True),
+            json=request.model_dump(mode='json', exclude_none=True),
             headers=headers,
         )
         response.raise_for_status()
@@ -192,7 +192,7 @@ class BASClient:
 
         response = await client.put(
             url,
-            json=request.model_dump(exclude_none=True),
+            json=request.model_dump(mode='json', exclude_none=True),
             headers=headers,
         )
         response.raise_for_status()
