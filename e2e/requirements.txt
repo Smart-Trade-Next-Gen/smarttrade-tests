@@ -1,0 +1,40 @@
+# E2E Test Framework Requirements
+# Phase 1-8 comprehensive testing
+
+# Core testing framework
+pytest==9.0.2
+pytest-asyncio==1.3.0
+pytest-cov==7.0.0
+pytest-html==4.1.1
+pytest-xdist==3.5.0  # Parallel execution
+pytest-timeout==2.2.0  # Test timeouts
+
+# HTTP client
+httpx==0.26.0
+aiohttp==3.9.1
+
+# WebSocket support
+websockets==12.0
+
+# Async utilities
+asyncio-contextmanager==1.0.0
+
+# Data validation
+pydantic==2.5.3
+pydantic-settings==2.1.0
+
+# Logging and observability
+python-json-logger==2.0.7
+structlog==24.1.0
+
+# Testing utilities
+faker==21.0.0  # Generate test data
+freezegun==1.4.0  # Time mocking
+
+# Linting and formatting (optional, for CI)
+ruff==0.2.0
+mypy==1.7.1
+
+# Development (local testing only)
+python-dotenv==1.0.0
+ipython==8.19.0

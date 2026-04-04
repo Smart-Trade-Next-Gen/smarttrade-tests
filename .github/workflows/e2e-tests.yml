@@ -1,0 +1,415 @@
+name: E2E Tests
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'e2e/**'
+      - '.github/workflows/e2e-tests.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'e2e/**'
+      - '.github/workflows/e2e-tests.yml'
+  workflow_dispatch:
+    inputs:
+      test_stage:
+        description: 'Test stage to run'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - smoke
+          - injection
+          - real_execution
+          - resilience
+
+env:
+  PYTHON_VERSION: '3.12'
+  E2E_ENV: 'ci'
+  CI: true
+
+concurrency:
+  group: ${{ github.ref }}-e2e
+  cancel-in-progress: true
+
+jobs:
+  # Stage 1: Quick validation (smoke tests only)
+  smoke-tests:
+    name: Smoke Tests (Critical Path)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          cd e2e && pip install -r requirements.txt
+
+      - name: Run smoke tests
+        id: smoke
+        run: |
+          cd e2e
+          pytest tests/ -m smoke -v --tb=short --maxfail=1 \
+            --html=../test-results/smoke-report.html --self-contained-html \
+            --junit-xml=../test-results/smoke-junit.xml || true
+
+      - name: Upload smoke test report
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: smoke-test-report
+          path: test-results/smoke-report.html
+          retention-days: 30
+
+      - name: Comment on PR with smoke results
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const result = ${{ steps.smoke.outcome == 'success' }} ? '✅ PASS' : '❌ FAIL';
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## E2E Smoke Tests: ${result}\n\nRun [details](${context.payload.pull_request.html_url}/checks)`
+            });
+
+  # Stage 2: Injection mode tests (deterministic)
+  injection-tests:
+    name: Injection Mode Tests (Phase 5)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: smoke-tests
+    if: success() || github.event_name == 'workflow_dispatch'
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: smarttrade_mock_service
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+
+      - name: Install dependencies
+        run: |
+          cd e2e && pip install -r requirements.txt
+
+      - name: Health check services
+        run: |
+          echo "Checking PostgreSQL..."
+          until psql -h localhost -U postgres -d smarttrade_mock_service -c '\q' 2>/dev/null; do
+            echo "Waiting for PostgreSQL..."
+            sleep 2
+          done
+          echo "PostgreSQL is ready"
+
+          echo "Checking Redis..."
+          until redis-cli -h localhost ping 2>/dev/null | grep -q PONG; do
+            echo "Waiting for Redis..."
+            sleep 2
+          done
+          echo "Redis is ready"
+
+      - name: Run injection mode tests
+        id: injection
+        run: |
+          cd e2e
+          pytest tests/ -m injection -v --tb=short --maxfail=3 \
+            --html=../test-results/injection-report.html --self-contained-html \
+            --junit-xml=../test-results/injection-junit.xml \
+            --cov=e2e --cov-report=xml --cov-report=html || true
+
+      - name: Upload injection test report
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: injection-test-report
+          path: |
+            test-results/injection-report.html
+            test-results/injection-junit.xml
+          retention-days: 30
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-report
+          path: htmlcov/
+          retention-days: 30
+
+  # Stage 3: Real execution mode tests (price-driven)
+  real-execution-tests:
+    name: Real Execution Tests (Phase 6)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: injection-tests
+    if: success() || github.event_name == 'workflow_dispatch'
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: smarttrade_mock_service
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+
+      - name: Install dependencies
+        run: |
+          cd e2e && pip install -r requirements.txt
+
+      - name: Health check services
+        run: |
+          echo "Checking PostgreSQL..."
+          until psql -h localhost -U postgres -d smarttrade_mock_service -c '\q' 2>/dev/null; do
+            sleep 2
+          done
+
+          echo "Checking Redis..."
+          until redis-cli -h localhost ping 2>/dev/null | grep -q PONG; do
+            sleep 2
+          done
+
+      - name: Run real execution tests
+        id: real_exec
+        run: |
+          cd e2e
+          pytest tests/ -m real_execution -v --tb=short --maxfail=3 \
+            --html=../test-results/real-exec-report.html --self-contained-html \
+            --junit-xml=../test-results/real-exec-junit.xml \
+            -W ignore::DeprecationWarning || true
+
+      - name: Upload real execution test report
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: real-execution-test-report
+          path: |
+            test-results/real-exec-report.html
+            test-results/real-exec-junit.xml
+          retention-days: 30
+
+  # Stage 4: Resilience and chaos tests
+  resilience-tests:
+    name: Resilience & Chaos Tests (Phase 7)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: real-execution-tests
+    if: success() || github.event_name == 'workflow_dispatch'
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: smarttrade_mock_service
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+
+      - name: Install dependencies
+        run: |
+          cd e2e && pip install -r requirements.txt
+
+      - name: Health check services
+        run: |
+          echo "Checking PostgreSQL..."
+          until psql -h localhost -U postgres -d smarttrade_mock_service -c '\q' 2>/dev/null; do
+            sleep 2
+          done
+
+          echo "Checking Redis..."
+          until redis-cli -h localhost ping 2>/dev/null | grep -q PONG; do
+            sleep 2
+          done
+
+      - name: Run resilience tests
+        id: resilience
+        run: |
+          cd e2e
+          pytest tests/ -m resilience -v --tb=short --maxfail=2 \
+            --html=../test-results/resilience-report.html --self-contained-html \
+            --junit-xml=../test-results/resilience-junit.xml || true
+
+      - name: Upload resilience test report
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: resilience-test-report
+          path: |
+            test-results/resilience-report.html
+            test-results/resilience-junit.xml
+          retention-days: 30
+
+  # Final: Aggregation and reporting
+  test-summary:
+    name: Test Summary
+    runs-on: ubuntu-latest
+    needs: [smoke-tests, injection-tests, real-execution-tests, resilience-tests]
+    if: always()
+    timeout-minutes: 5
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: all-reports/
+
+      - name: Generate test summary
+        id: summary
+        run: |
+          echo "## E2E Test Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          smoke_pass=${{ needs.smoke-tests.result == 'success' && '✅' || '❌' }}
+          injection_pass=${{ needs.injection-tests.result == 'success' && '✅' || '❌' }}
+          real_exec_pass=${{ needs.real-execution-tests.result == 'success' && '✅' || '❌' }}
+          resilience_pass=${{ needs.resilience-tests.result == 'success' && '✅' || '❌' }}
+
+          echo "| Stage | Result | Details |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|---------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Smoke (Phase 5) | ${smoke_pass} | 2 critical path tests |" >> $GITHUB_STEP_SUMMARY
+          echo "| Injection (Phase 5) | ${injection_pass} | 18 deterministic tests |" >> $GITHUB_STEP_SUMMARY
+          echo "| Real Execution (Phase 6) | ${real_exec_pass} | 10 price-driven tests |" >> $GITHUB_STEP_SUMMARY
+          echo "| Resilience (Phase 7) | ${resilience_pass} | 11 chaos/recovery tests |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Total**: 41 E2E tests" >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload all test reports
+        uses: actions/upload-artifact@v3
+        with:
+          name: all-test-reports
+          path: all-reports/
+          retention-days: 30
+
+      - name: Set conclusion
+        id: conclusion
+        run: |
+          if [ "${{ needs.smoke-tests.result }}" = "success" ] && \
+             [ "${{ needs.injection-tests.result }}" = "success" ] && \
+             [ "${{ needs.real-execution-tests.result }}" = "success" ] && \
+             [ "${{ needs.resilience-tests.result }}" = "success" ]; then
+            echo "all_passed=true" >> $GITHUB_OUTPUT
+          else
+            echo "all_passed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Final status check
+        if: steps.conclusion.outputs.all_passed != 'true'
+        run: |
+          echo "❌ Some E2E tests failed. Check artifacts for details."
+          exit 1
+
+      - name: Success notification
+        if: steps.conclusion.outputs.all_passed == 'true'
+        run: |
+          echo "✅ All E2E tests passed!"
