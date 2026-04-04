@@ -463,6 +463,33 @@ Build async event collector using per-order asyncio.Queue. Events must be collec
 - Missing order_id (create queue on demand)
 - Long-running tests (clear events after test to free memory)
 
+**NEW (v2): Event Storage Model**
+
+Define clear source of truth:
+- `events[order_id]` is the **PRIMARY source of truth** — stores complete event history
+- `asyncio.Queue` is used **ONLY for signaling/waiting** — may drop events on overflow
+
+Critical rule: Queue may drop oldest events due to `maxsize=1000`, but `events[]` dict must retain FULL chronological history. This ensures assertions always have complete data, even if queue overflows.
+
+**NEW (v2): Backpressure & Drop Monitoring**
+
+Add tracking:
+- Counter: `dropped_events_count` per `order_id`
+- Log warning on every drop: `"EventCollector overflow for {order_id}; dropped event {event_id}"`
+- Update counter: `self.dropped_events_counts[order_id] += 1`
+
+In tests, add assertion:
+```python
+assert event_collector.dropped_events_counts.get(order_id, 0) == 0
+```
+
+This fails tests if unexpected event loss occurs. Allow override for chaos tests via:
+```python
+@pytest.mark.chaos_allow_drops
+async def test_with_event_drops(...):
+    # May have drops
+```
+
 **Files/Modules Impacted:**
 ```
 e2e/harness/
@@ -547,6 +574,33 @@ Build comprehensive assertion library for validating order lifecycles, financial
 - Missing events (timeout detected by EventCollector, not here)
 - Rounding errors (use tolerance for Decimal comparisons)
 - Negative positions (intraday short; validate carefully)
+
+**NEW (v2): Execution Trigger Validation**
+
+Add method to validate order execution occurred at correct price conditions:
+
+```python
+@staticmethod
+def assert_execution_trigger(events, order_type, limit_price=None, 
+                            stop_price=None, execution_price=None) -> None:
+    """
+    Validate execution happened at correct trigger condition.
+    
+    Rules:
+    - LIMIT BUY: execution_price ≤ limit_price
+    - LIMIT SELL: execution_price ≥ limit_price
+    - STOP BUY: execution_price ≥ stop_price (triggers when price rises)
+    - STOP SELL: execution_price ≤ stop_price (triggers when price falls)
+    - MARKET: any price (no constraint)
+    """
+```
+
+Critical for **REAL execution mode** to validate Mock's execution engine respects order type semantics.
+
+Validation rules:
+- Extract execution_price from order_fill events
+- Match against limit_price / stop_price
+- Raise AssertionError if trigger condition violated
 
 **Files/Modules Impacted:**
 ```
@@ -772,6 +826,47 @@ Complete the `conftest.py` files with all fixtures: auth tokens, service clients
 - WebSocket disconnect during test setup (retry in fixture)
 - Concurrent fixture initialization (ensure thread-safe)
 
+**NEW (v2): Test Isolation Guarantee**
+
+Ensure each test operates in isolated environment:
+
+Options (implement at least one):
+1. **Unique account_id per test** (already implemented via hashlib)
+2. **AND reset account state before test**
+
+Add pre-test setup hook:
+```python
+@pytest.fixture(autouse=True)
+async def reset_test_account(bas_client, test_account_id, config):
+    """Reset account state before each test"""
+    # Attempt to cancel all open orders
+    try:
+        orders = await bas_client.get_orders(config.broker_id, test_account_id)
+        for order in orders:
+            if order.status not in ["FILLED", "CANCELLED", "REJECTED"]:
+                await bas_client.cancel_order(config.broker_id, test_account_id, order.exchange_order_id)
+    except Exception:
+        pass  # Account may not exist yet
+    
+    yield  # Run test
+```
+
+Optional post-test cleanup (for aggressive isolation):
+```python
+@pytest.fixture(autouse=True)
+async def cleanup_test_account(bas_client, test_account_id, config):
+    yield  # Run test
+    
+    # After test: clear positions/balances if needed
+    try:
+        exit_req = BasExitPositionRequest(exit_all=True, cancel_pending_orders=True)
+        await bas_client.exit_position(config.broker_id, test_account_id, exit_req)
+    except Exception:
+        pass
+```
+
+This ensures no state leakage across tests.
+
 **Files/Modules Impacted:**
 ```
 e2e/conftest.py (full)
@@ -860,18 +955,70 @@ Build framework to execute scenarios end-to-end: place orders (concurrent if nee
        events_collected: dict[str, list[dict]]  # order_id → events
        post_state: dict  # funds, positions, trades
        execution_time: float
-       status: str  # SUCCESS | FAILURE
+       status: str  # NEW (v2): See status values below
+       failure_reason: str | None  # NEW (v2): Detailed failure info
    ```
-2. Execution flow:
-   - Capture pre-state
-   - Place orders (sequential or concurrent based on `scenario.concurrent`)
-   - Inject fills (INJECTION mode) or wait for execution (REAL mode)
-   - Collect all events
-   - Capture post-state
-   - Return ScenarioResult
-3. Handle execution modes:
-   - **INJECTION**: Call mock_client.inject_fill for each fill in scenario
-   - **REAL**: Wait for Mock's price engine to trigger fills (via LTP)
+
+**UPDATED (v2): ScenarioResult Status Granularity**
+
+Replace generic SUCCESS/FAILURE with:
+- `SUCCESS` — All orders executed, all assertions passed
+- `ASSERTION_FAILURE` — Execution OK, but assertion failed (e.g., financial invariant)
+- `TIMEOUT` — Event not received within timeout (e.g., order didn't fill)
+- `EXECUTION_FAILURE` — Order placement failed (e.g., invalid instrument)
+- `INFRA_FAILURE` — Service unavailable, network error, etc.
+
+Include `failure_reason` field with details for debugging:
+```python
+ScenarioResult(
+    ...,
+    status="ASSERTION_FAILURE",
+    failure_reason="Financial invariant failed: available should be 5000, got 4950"
+)
+```
+
+This enables precise failure classification in reports and CI.
+
+2. **UPDATED (v2): Dual Execution Mode Flow**
+
+Explicitly define execution paths to prevent mixing modes:
+
+```python
+async def execute_scenario(...):
+    # ... setup phase ...
+    
+    IF execution_mode == 'INJECTION':
+        # Deterministic injection path
+        for order in scenario.orders:
+            [order_resp] = await bas_client.place_order(...)
+            order_id = order_resp.broker_order_id
+            
+            # Inject deterministic fills
+            for seq, fill_qty, fill_price in order.fills:
+                await mock_client.inject_fill(
+                    ..., order_id=order_id, sequence=seq,
+                    fill_qty=fill_qty, fill_price=fill_price
+                )
+            # Collect events
+            events = await event_collector.wait_for_completion(order_id)
+    
+    ELIF execution_mode == 'REAL':
+        # Real execution path (NO inject_fill calls)
+        # Configure price source
+        await scenario_price_source.inject_price_sequence(
+            instrument_id,
+            prices=scenario.price_feed[instrument_id]
+        )
+        
+        for order in scenario.orders:
+            [order_resp] = await bas_client.place_order(...)
+            order_id = order_resp.broker_order_id
+            # DO NOT call inject_fill()
+            # Wait for natural execution
+            events = await event_collector.wait_for_completion(order_id, timeout=10)
+```
+
+This ensures real execution mode is not accidentally bypassed by inject_fill.
 
 **Acceptance Criteria:**
 - ✅ Execute scenarios end-to-end
@@ -1290,10 +1437,56 @@ Write tests validating WebSocket reconnection, event replay, and recovery from n
 - Events lost due to replay buffer (timeout and fail)
 - Order placed during disconnect (confirm on reconnect)
 
+**NEW (v2): Replay Window Configuration**
+
+Add configurable replay window to validate event replay behavior:
+
+```python
+# In config.py
+mds_replay_window_seconds: float = 300  # 5 minutes; events buffered for 5m
+
+# In test
+@pytest.fixture
+def replay_config(config):
+    return {
+        "replay_window_seconds": config.mds_replay_window_seconds,
+        "max_events_buffered": 10000,
+    }
+
+# In test
+async def test_reconnect_within_replay_window(mds_client, event_collector, replay_config):
+    # Disconnect, wait < replay_window, reconnect
+    await mds_client.disconnect()
+    
+    # Wait 2 seconds (< 300 second replay window)
+    await asyncio.sleep(2)
+    
+    await mds_client.connect()
+    await mds_client.subscribe_account(...)
+    
+    # Events should be replayed from buffer
+    events = await event_collector.wait_for_completion(order_id, timeout=10)
+    assert len(events) > 0
+
+async def test_reconnect_outside_replay_window(mds_client, event_collector, replay_config):
+    # Disconnect, wait > replay_window, reconnect
+    await mds_client.disconnect()
+    
+    # Wait longer than replay window (simulated by test)
+    # Events are not guaranteed to be replayed
+    
+    await mds_client.connect()
+    # Expect timeout or partial events
+```
+
+Used in resilience tests to validate event replay boundaries.
+
 **Files/Modules Impacted:**
 ```
 e2e/tests/
 └── test_resilience_reconnect.py
+
+e2e/config/config.py (add mds_replay_window_seconds)
 ```
 
 ---
@@ -1511,10 +1704,42 @@ Build rich HTML test reports with event timelines, order state transitions, fina
 - Missing timestamps (use default)
 - Decimal precision in JSON (serialize as string)
 
+**NEW (v2): Test Metrics Collection**
+
+Capture per-test metrics for observability:
+
+```python
+class TestMetrics:
+    total_orders_executed: int
+    total_events_processed: int
+    avg_execution_latency_ms: float
+    dropped_events_count: int
+    assertion_count: int
+    assertion_failures: int
+```
+
+Collect metrics:
+```python
+metrics = {
+    "total_orders_executed": len(scenario.orders),
+    "total_events_processed": sum(len(e) for e in events.values()),
+    "avg_execution_latency_ms": execution_time_ms / len(scenario.orders),
+    "dropped_events_count": event_collector.dropped_events_counts.get(order_id, 0),
+}
+```
+
+Include metrics in:
+- HTML report (display as summary stats)
+- JSON artifacts (for aggregation)
+- Logs (per-test metrics line)
+
+This enables performance tracking across test runs.
+
 **Files/Modules Impacted:**
 ```
 e2e/fixtures/html_reporter.py
 e2e/conftest.py (integrate reporter)
+e2e/fixtures/test_metrics.py (NEW)
 test-artifacts/ (generated)
 ```
 
@@ -1859,6 +2084,49 @@ Build GitHub Actions workflow to automatically run E2E tests on PR and commit to
 - Service startup timeout (increase retry count)
 - Flaky tests (use retry logic)
 - Artifact upload fails (don't fail workflow)
+
+**NEW (v2): Test Execution Matrix**
+
+Define test execution strategy based on environment:
+
+```yaml
+execution_matrix:
+  ci:
+    name: "Pull Request & Commit to main"
+    markers: "-m 'not chaos and not real_execution'"
+    timeouts:
+      - smoke (5s timeout)
+      - injection (5s timeout)
+    max_duration: 5 minutes
+  
+  nightly:
+    name: "Full Suite (scheduled 11 PM)"
+    markers: ""  # All tests
+    timeouts:
+      - all markers enabled
+      - real_execution (10s timeout)
+      - resilience (30s timeout)
+    max_duration: 15 minutes
+  
+  manual:
+    name: "Chaos & Stress Testing (user-triggered)"
+    markers: "-m 'chaos or stress'"
+    timeouts:
+      - extended (60s timeout)
+    max_duration: 30 minutes
+```
+
+Usage in CI:
+```bash
+# PR/Commit: fast
+pytest tests/ -m "not chaos and not real_execution" -v
+
+# Nightly: full
+pytest tests/ -v --tb=short
+
+# Manual: chaos only
+pytest tests/ -m "chaos" -v --tb=short
+```
 
 **Files/Modules Impacted:**
 ```
