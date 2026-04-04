@@ -7,6 +7,54 @@
 
 ---
 
+## CRITICAL POLICY: Mock Behaves as Real Broker
+
+### NEW (v3): Execution Mode Policy
+
+**Foundational Constraint**: Mock Service MUST behave like a real broker in all E2E tests.
+
+This ensures tests validate realistic execution behavior, not artificial shortcuts.
+
+**Two Execution Modes:**
+
+1. **REAL Mode (Default, Mandatory for E2E)**
+   - Execution driven **ONLY** by market conditions (price feed)
+   - Mock execution engine evaluates order type rules (LIMIT, STOP, MARKET)
+   - Mock triggers fills when conditions are met
+   - Tests **MUST NOT** manually trigger execution
+   - Tests validate full chain: Mock → BAS → MDS → Client
+   - Used in CI and primary E2E suite
+
+2. **INJECTION Mode (Restricted, Debug-Only)**
+   - Direct execution injection via `inject_fill()`
+   - Used **ONLY** for isolated unit testing or debugging
+   - **FORBIDDEN in E2E tests**
+   - **EXCLUDED from CI**
+
+### Strict Rules
+
+- ❌ `inject_fill()` is **FORBIDDEN** in REAL mode
+- ✅ Tests **MUST** define market conditions (price sequences) instead of execution events
+- ✅ Tests **MUST** validate price-triggered execution correctness
+- ✅ Mock **MUST** be treated as external broker, not test helper
+- ✅ BAS is the only execution authority for orders
+
+### Developer Guardrails
+
+Runtime checks:
+```python
+# In MockClient
+if execution_mode == 'REAL':
+    if inject_fill_called:
+        raise RuntimeError("inject_fill() forbidden in REAL mode")
+```
+
+Code checks:
+- Lint rule to flag `inject_fill()` usage in E2E test files
+- CI check to ensure REAL mode tests only
+
+---
+
 ## 1. Phase-wise Task Breakdown
 
 | Phase | Tasks | Duration | Priority | Blocking |
@@ -362,6 +410,33 @@ Build REST client for Mock service's execution injection endpoint. Enable determ
 - Fill qty exceeds remaining (Mock returns error; propagate)
 - Decimal precision (ensure string conversion preserves precision)
 
+**NEW (v3): MockClient Responsibilities & Constraints**
+
+MockClient is responsible ONLY for:
+- Configuring execution scenarios (price sequences in INJECTION mode)
+- Supporting INJECTION mode for debugging
+
+MockClient MUST NOT:
+- Trigger execution in REAL mode
+- Modify order state directly
+- Act as execution authority
+
+**Guard against misuse:**
+```python
+class MockClient:
+    def __init__(self, ..., execution_mode: str = "INJECTION"):
+        self.execution_mode = execution_mode
+    
+    async def inject_fill(self, ...):
+        if self.execution_mode == "REAL":
+            raise RuntimeError(
+                "inject_fill() is FORBIDDEN in REAL mode. "
+                "Use price_source to configure market conditions instead."
+            )
+```
+
+This prevents developers from accidentally bypassing execution engine in REAL mode tests.
+
 **Files/Modules Impacted:**
 ```
 e2e/clients/
@@ -601,6 +676,41 @@ Validation rules:
 - Extract execution_price from order_fill events
 - Match against limit_price / stop_price
 - Raise AssertionError if trigger condition violated
+
+**NEW (v3): Real Execution Validation Rules**
+
+Tests MUST validate execution correctness under real market conditions:
+
+Rules:
+- **Execution occurs ONLY when price condition is satisfied**
+- **No execution before trigger condition is met**
+- **Execution timing aligns with price sequence**
+
+Example validation:
+```python
+@staticmethod
+def assert_real_execution_correctness(
+    events: list[dict],
+    order_type: str,
+    limit_price: Decimal | None,
+    stop_price: Decimal | None,
+    price_sequence: list[Decimal]
+):
+    """
+    Validate execution behavior matches Mock's execution engine
+    for given order type and price sequence.
+    
+    Example:
+    LIMIT BUY @ 150
+    Price sequence: 151, 152, 149
+    
+    Expected:
+    - Execution at price 149 (first time ≤ 150)
+    - NOT at 151 or 152
+    """
+```
+
+This ensures Mock behaves like a real broker, not an artificial execution authority.
 
 **Files/Modules Impacted:**
 ```
@@ -885,19 +995,46 @@ e2e/tests/conftest.py (full)
 **Estimated Effort:** 2 hours  
 
 **Description:**
-Write 8-10 YAML scenario files covering core happy paths, partial fills, cancels, and SELL flows. Scenarios serve as data-driven specifications for tests.
+Write 8-10 YAML scenario files defining market conditions and order specifications. Scenarios serve as data-driven specifications; execution is driven by Mock's execution engine reacting to market conditions.
+
+**UPDATED (v3): Scenario-Driven Execution Model**
+
+Scenarios define market conditions, NOT execution events:
+
+```yaml
+name: "limit_buy_triggers_at_price"
+order:
+  side: BUY
+  qty: 100
+  order_type: LIMIT
+  limit_price: 150.00
+  
+price_sequence:
+  - timestamp: 0.0, price: 151.00  # Above limit, no fill
+  - timestamp: 0.5, price: 150.50  # Still above, no fill
+  - timestamp: 1.0, price: 149.00  # Below limit, FILLS HERE
+  - timestamp: 1.5, price: 148.00  # Further down
+```
+
+Mock's execution engine evaluates:
+- LIMIT BUY @ 150: fills when price ≤ 150
+- LIMIT SELL @ 150: fills when price ≥ 150
+- STOP BUY: fills when price ≥ stop
+- MARKET: fills immediately
+
+Tests validate Mock's behavior matches order type rules.
 
 **Implementation Steps:**
 1. Create `e2e/scenarios/` directory
 2. Create YAML files (one per scenario):
-   - `market_buy_full_fill.yaml` — BUY 100 @ MARKET, 1 fill → FILLED
-   - `market_sell_full_fill.yaml` — SELL 100 @ MARKET, 1 fill → FILLED
-   - `limit_buy_partial_fill_3x.yaml` — BUY 100 @ LIMIT, 3 partial fills → FILLED
-   - `cancel_after_place.yaml` — Place order, cancel (no fills) → CANCELLED
-   - `cancel_after_partial.yaml` — Place, partial fill, cancel → CANCELLED
-   - `intraday_short.yaml` — INTRADAY SELL without BUY (short position)
-   - `position_close.yaml` — BUY 100, then SELL 100 → close position
-   - `concurrent_orders_3x.yaml` — 3 concurrent BUY orders on different instruments
+   - `market_buy_full_fill.yaml` — MARKET BUY, fills immediately
+   - `limit_buy_triggers_at_price.yaml` — LIMIT BUY, fills when price condition met
+   - `stop_buy_triggers.yaml` — STOP BUY, triggers at stop price
+   - `cancel_unfilled.yaml` — Place order, cancel before trigger
+   - `partial_fills.yaml` — Multiple fills as price moves through levels
+   - `intraday_short.yaml` — SELL without prior BUY (short)
+   - `position_close.yaml` — BUY then SELL to close
+   - `concurrent_orders.yaml` — Multiple orders with different triggers
 3. Validate YAML syntax and required fields
 
 **Acceptance Criteria:**
@@ -1020,18 +1157,62 @@ async def execute_scenario(...):
 
 This ensures real execution mode is not accidentally bypassed by inject_fill.
 
+3. **NEW (v3): Real Execution Flow (Mandatory for E2E)**
+
+REAL mode execution flow is mandatory:
+
+```python
+async def execute_scenario(
+    scenario: TestScenario,
+    execution_mode: str = "REAL",  # Default MUST be REAL
+    ...
+):
+    # Validate execution mode
+    if execution_mode == "REAL":
+        # Configure price source FIRST
+        await scenario_price_source.inject_price_sequence(
+            instrument_id,
+            prices=scenario.price_sequence,
+            intervals=scenario.intervals  # Timing between prices
+        )
+    
+    for order in scenario.orders:
+        # Place order
+        [order_resp] = await bas_client.place_order(...)
+        order_id = order_resp.broker_order_id
+        
+        # For REAL mode: Mock evaluates execution internally
+        # For INJECTION mode: inject_fill called (debugging only)
+        if execution_mode == "INJECTION":
+            await mock_client.inject_fill(...)  # For debugging
+        
+        # Wait for execution (driven by Mock's execution engine)
+        events = await event_collector.wait_for_completion(
+            order_id, 
+            timeout=config.timeout_real_execution
+        )
+```
+
+Key constraints:
+- Default execution_mode = "REAL" (not INJECTION)
+- INJECTION mode blocked from E2E suite
+- Tests validate full chain: Mock → BAS → MDS → Client
+
 **Acceptance Criteria:**
 - ✅ Execute scenarios end-to-end
 - ✅ Support concurrent order placement
 - ✅ Collect all events for each order
 - ✅ Return structured result
-- ✅ Support both INJECTION and REAL modes
+- ✅ Support both INJECTION (debugging) and REAL (E2E) modes
 - ✅ Measure execution time
+- ✅ **REAL mode is default and mandatory for E2E tests**
+- ✅ MockClient.inject_fill() raises error if called in REAL mode
 
 **Edge Cases:**
 - Order placement fails (capture error, continue)
 - Timeout on event collection (return partial result)
 - Real mode: Mock doesn't fill within timeout (return as timeout)
+- Attempt to use inject_fill in REAL mode (raise RuntimeError)
 
 **Files/Modules Impacted:**
 ```
@@ -2087,46 +2268,49 @@ Build GitHub Actions workflow to automatically run E2E tests on PR and commit to
 
 **NEW (v2): Test Execution Matrix**
 
+**UPDATED (v3): CI Execution Policy (Real Mode Only)**
+
 Define test execution strategy based on environment:
 
 ```yaml
 execution_matrix:
   ci:
-    name: "Pull Request & Commit to main"
-    markers: "-m 'not chaos and not real_execution'"
-    timeouts:
-      - smoke (5s timeout)
-      - injection (5s timeout)
-    max_duration: 5 minutes
+    name: "Pull Request & Commit to main — REAL EXECUTION ONLY"
+    markers: "-m 'real_execution and not chaos'"  # UPDATED: Must include real_execution
+    requirement: "Tests MUST validate realistic broker behavior"
+    max_duration: 10 minutes
   
   nightly:
     name: "Full Suite (scheduled 11 PM)"
-    markers: ""  # All tests
+    markers: "-m 'not chaos'"  # Include all real_execution tests
     timeouts:
-      - all markers enabled
       - real_execution (10s timeout)
       - resilience (30s timeout)
     max_duration: 15 minutes
   
   manual:
-    name: "Chaos & Stress Testing (user-triggered)"
-    markers: "-m 'chaos or stress'"
-    timeouts:
-      - extended (60s timeout)
+    name: "Debug & Chaos Testing (user-triggered)"
+    markers: "-m 'chaos or injection'"  # Only for debugging
+    note: "For developer troubleshooting only, not in CI"
     max_duration: 30 minutes
 ```
 
-Usage in CI:
+**CI Command (from GitHub Actions):**
 ```bash
-# PR/Commit: fast
-pytest tests/ -m "not chaos and not real_execution" -v
-
-# Nightly: full
-pytest tests/ -v --tb=short
-
-# Manual: chaos only
-pytest tests/ -m "chaos" -v --tb=short
+pytest tests/ \
+  -m 'real_execution and not chaos' \
+  -v --tb=short \
+  --html=test-report.html
 ```
+
+**Key enforcement:**
+- ✅ CI runs ONLY `@pytest.mark.real_execution` tests
+- ✅ INJECTION tests (`@pytest.mark.injection`) excluded from CI
+- ✅ All CI tests validate realistic execution behavior
+- ✅ No artificial execution shortcuts in CI
+
+**Rationale:**
+Ensures CI validates full realistic chain (Mock → BAS → MDS), not isolated unit behavior.
 
 **Files/Modules Impacted:**
 ```
@@ -2423,6 +2607,107 @@ This gives you working happy path injection tests in ~3-4 weeks.
 | **Test data conflicts (concurrent tests)** | Medium | Low | Generate unique account_id per test |
 | **Docker image build failures** | Low | Medium | Version lock base images; test locally before CI |
 | **Token expiration during long test runs** | Low | Low | Implement token refresh; use long-lived test tokens |
+
+---
+
+## 7. Architecture Enforcement Rules
+
+### NEW (v3): Mock Behaves as Real Broker Enforcement
+
+SmartTrade E2E testing MUST enforce the constraint: **"Mock Service behaves as an external broker"**.
+
+**Architectural Principle:**
+- BAS is the execution authority for orders
+- Mock simulates external broker behavior
+- Tests validate full chain: Mock → BAS → MDS → Client
+- Tests MUST NOT bypass the execution engine
+
+**Execution Architecture:**
+```
+Test Framework
+    ↓
+BAS (order authority)
+    ↓
+Mock (simulates broker, evaluates execution internally)
+    ↓
+BAS (processes execution, publishes events)
+    ↓
+MDS (streams events)
+    ↓
+Test client observes
+```
+
+**Forbidden Shortcuts:**
+- ❌ `inject_fill()` in REAL mode (bypasses execution engine)
+- ❌ Direct order state modification (bypasses BAS)
+- ❌ Artificial execution outcomes (not price-triggered)
+- ❌ Isolation of Mock behavior from full chain
+
+**Enforcement:**
+1. **Runtime Guard** (in MockClient):
+   ```python
+   if execution_mode == "REAL":
+       raise RuntimeError("inject_fill() forbidden in REAL mode")
+   ```
+
+2. **Static Analysis** (CI check):
+   ```bash
+   # Prevent inject_fill() usage in E2E test files
+   grep -r "inject_fill" e2e/tests/ && exit 1
+   ```
+
+3. **Test Markers** (filtering):
+   ```bash
+   # CI only runs REAL execution tests
+   pytest -m "real_execution and not chaos"
+   ```
+
+4. **Code Review Policy**:
+   - REAL mode default (no INJECTION shortcuts)
+   - INJECTION marked as debug-only
+   - Architecture reviewers verify no execution bypass
+
+---
+
+### NEW (v3): Developer Guardrails
+
+Prevent common mistakes that violate architecture:
+
+**Lint Rules:**
+```yaml
+# Add to .pre-commit-config.yaml
+e2e-no-inject-fill:
+  entry: "grep -r 'inject_fill' e2e/tests/"
+  language: "system"
+  pass_filenames: false
+  always_run: true
+  fail_fast: true
+  stages: ["commit"]
+```
+
+**Test Marker Enforcement:**
+```python
+# Pytest plugin in conftest.py
+def pytest_configure(config):
+    # All tests in e2e/tests/ MUST have real_execution marker
+    # OR be marked injection (excluded from CI)
+    pass
+```
+
+**Documentation (README.md):**
+```markdown
+## Execution Modes
+
+### REAL Mode (E2E, Default)
+- Used in CI
+- Validates realistic broker behavior
+- Mock execution engine drives fills
+
+### INJECTION Mode (Debug Only)
+- Used for unit testing, isolated validation
+- NOT in CI
+- Forbidden in E2E test suite
+```
 
 ---
 

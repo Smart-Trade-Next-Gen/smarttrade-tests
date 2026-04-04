@@ -1,0 +1,21 @@
+# E2E Configuration for Local Development
+# Use localhost URLs for all services
+
+env: dev
+bas_url: http://localhost:8005
+mds_ws_url: ws://localhost:8004
+mock_url: http://localhost:8002
+auth_url: http://localhost:8001
+
+# Test credentials
+test_user: testuser@example.com
+test_password: testpassword123
+
+# Broker and account IDs
+broker_id: fyers
+account_id: TEST123456
+
+# Timeout settings (in seconds)
+timeout_fast: 5.0        # Quick smoke tests
+timeout_medium: 10.0     # Standard wait for events
+timeout_slow: 30.0       # Full order lifecycle wait

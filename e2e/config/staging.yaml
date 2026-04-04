@@ -1,0 +1,21 @@
+# E2E Configuration for Staging Environment
+# Update with actual staging URLs and credentials
+
+env: staging
+bas_url: https://staging-bas.smarttrade.asia
+mds_ws_url: wss://staging-mds.smarttrade.asia
+mock_url: https://staging-mock.smarttrade.asia
+auth_url: https://staging-auth.smarttrade.asia
+
+# Test credentials (use staging test account)
+test_user: staging-testuser@example.com
+test_password: staging-testpassword123
+
+# Broker and account IDs
+broker_id: fyers
+account_id: STAGING123456
+
+# Timeout settings (in seconds) - higher for remote network latency
+timeout_fast: 5.0        # Quick smoke tests
+timeout_medium: 15.0     # Standard wait for events
+timeout_slow: 60.0       # Full order lifecycle wait
