@@ -90,13 +90,28 @@ async def auth_token(config: TestConfig) -> str:
     """
     Get authentication token for service access.
 
-    This is a placeholder that returns a mock token.
-    Can be replaced with actual AuthClient login when E2E-013 is implemented.
+    Generates a JWT token using the same secret as the services.
+    Uses test credentials for E2E testing.
 
     Scope: function (fresh token per test)
     """
-    # TODO: Implement AuthClient login to get real token
-    return "placeholder_token_from_auth_service"
+    import jwt
+    from datetime import datetime, timedelta
+
+    # Secret from docker-compose environment
+    secret = "jIjETudRTwtHBE_Ez5uU_NeMvi_6zXrst8E3YmdgVxFz7D2Ij6c1rwVF_T9R_HMC"
+
+    payload = {
+        "sub": "test_user",
+        "user_id": "test_user_123",
+        "email": "test@example.com",
+        "roles": ["user"],
+        "iat": datetime.utcnow(),
+        "exp": datetime.utcnow() + timedelta(hours=24),
+    }
+
+    token = jwt.encode(payload, secret, algorithm="HS256")
+    return token
 
 
 # ────────────────────────────────────────────────────────────────────────────────
