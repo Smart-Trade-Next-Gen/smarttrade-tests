@@ -54,7 +54,7 @@ async def test_many_orders_same_instrument(
             legs=[
                 BasOrderLeg(
                     instrument_id=instrument_id,
-                    instrument_type="EQ",
+                    instrument_type="EQUITY",
                     side=OrderSide.BUY,
                     qty=qty_per_order,
                     order_type=OrderType.MARKET,
@@ -157,7 +157,7 @@ async def test_rapid_price_updates(
             legs=[
                 BasOrderLeg(
                     instrument_id=instrument_id,
-                    instrument_type="EQ",
+                    instrument_type="EQUITY",
                     side=OrderSide.BUY,
                     qty=100,
                     order_type=OrderType.LIMIT,
@@ -247,7 +247,7 @@ async def test_limit_orders_narrow_range(
             legs=[
                 BasOrderLeg(
                     instrument_id=instrument_id,
-                    instrument_type="EQ",
+                    instrument_type="EQUITY",
                     side=OrderSide.BUY,
                     qty=50,
                     order_type=OrderType.LIMIT,

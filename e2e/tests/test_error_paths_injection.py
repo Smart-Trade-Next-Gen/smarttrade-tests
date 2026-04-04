@@ -44,7 +44,7 @@ async def test_zero_quantity_order_rejected(
             legs=[
                 BasOrderLeg(
                     instrument_id="INSTR_NSE_ICICIBANK_EQ",
-                    instrument_type="EQ",
+                    instrument_type="EQUITY",
                     side=OrderSide.BUY,
                     qty=0,  # Invalid: zero qty
                     order_type=OrderType.MARKET,
@@ -95,7 +95,7 @@ async def test_negative_quantity_order_rejected(
             legs=[
                 BasOrderLeg(
                     instrument_id="INSTR_NSE_HDFC_EQ",
-                    instrument_type="EQ",
+                    instrument_type="EQUITY",
                     side=OrderSide.BUY,
                     qty=-100,  # Invalid: negative qty
                     order_type=OrderType.MARKET,
@@ -143,7 +143,7 @@ async def test_invalid_limit_price_zero(
             legs=[
                 BasOrderLeg(
                     instrument_id="INSTR_NSE_LT_EQ",
-                    instrument_type="EQ",
+                    instrument_type="EQUITY",
                     side=OrderSide.BUY,
                     qty=50,
                     order_type=OrderType.LIMIT,
@@ -190,7 +190,7 @@ async def test_overfill_rejected(
         legs=[
             BasOrderLeg(
                 instrument_id="INSTR_NSE_POWERGRID_EQ",
-                instrument_type="EQ",
+                instrument_type="EQUITY",
                 side=OrderSide.BUY,
                 qty=100,
                 order_type=OrderType.LIMIT,
@@ -279,7 +279,7 @@ async def test_sequence_violation_ignored(
         legs=[
             BasOrderLeg(
                 instrument_id="INSTR_NSE_ULTRACEMCO_EQ",
-                instrument_type="EQ",
+                instrument_type="EQUITY",
                 side=OrderSide.BUY,
                 qty=100,
                 order_type=OrderType.MARKET,

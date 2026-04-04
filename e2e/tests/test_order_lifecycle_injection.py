@@ -52,7 +52,7 @@ async def test_market_buy_full_fill(
         legs=[
             BasOrderLeg(
                 instrument_id="INSTR_NSE_SBIN_EQ",
-                instrument_type="EQ",
+                instrument_type="EQUITY",
                 side=OrderSide.BUY,
                 qty=100,
                 order_type=OrderType.MARKET,
@@ -146,7 +146,7 @@ async def test_market_sell_full_fill(
         legs=[
             BasOrderLeg(
                 instrument_id="INSTR_NSE_INFY_EQ",
-                instrument_type="EQ",
+                instrument_type="EQUITY",
                 side=OrderSide.SELL,
                 qty=100,
                 order_type=OrderType.MARKET,
@@ -240,7 +240,7 @@ async def test_limit_buy_triggers_at_price(
         legs=[
             BasOrderLeg(
                 instrument_id="INSTR_NSE_TCS_EQ",
-                instrument_type="EQ",
+                instrument_type="EQUITY",
                 side=OrderSide.BUY,
                 qty=50,
                 order_type=OrderType.LIMIT,
@@ -327,7 +327,7 @@ async def test_limit_sell_triggers_at_price(
         legs=[
             BasOrderLeg(
                 instrument_id="INSTR_NSE_TCS_EQ",
-                instrument_type="EQ",
+                instrument_type="EQUITY",
                 side=OrderSide.SELL,
                 qty=50,
                 order_type=OrderType.LIMIT,

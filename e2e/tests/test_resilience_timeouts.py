@@ -52,7 +52,7 @@ async def test_order_placement_under_mock_latency(
         legs=[
             BasOrderLeg(
                 instrument_id="INSTR_NSE_SBIN_EQ",
-                instrument_type="EQ",
+                instrument_type="EQUITY",
                 side=OrderSide.BUY,
                 qty=100,
                 order_type=OrderType.LIMIT,
@@ -113,7 +113,7 @@ async def test_fill_injection_retry_on_timeout(
         legs=[
             BasOrderLeg(
                 instrument_id="INSTR_NSE_INFY_EQ",
-                instrument_type="EQ",
+                instrument_type="EQUITY",
                 side=OrderSide.BUY,
                 qty=100,
                 order_type=OrderType.MARKET,
@@ -186,7 +186,7 @@ async def test_event_collection_with_delayed_delivery(
         legs=[
             BasOrderLeg(
                 instrument_id="INSTR_NSE_TCS_EQ",
-                instrument_type="EQ",
+                instrument_type="EQUITY",
                 side=OrderSide.BUY,
                 qty=50,
                 order_type=OrderType.MARKET,
@@ -267,7 +267,7 @@ async def test_position_state_consistent_under_latency(
             legs=[
                 BasOrderLeg(
                     instrument_id=instrument,
-                    instrument_type="EQ",
+                    instrument_type="EQUITY",
                     side=OrderSide.BUY,
                     qty=qty,
                     order_type=OrderType.MARKET,

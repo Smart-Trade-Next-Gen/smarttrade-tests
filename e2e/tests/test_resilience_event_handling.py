@@ -50,7 +50,7 @@ async def test_duplicate_fill_events_idempotent(
         legs=[
             BasOrderLeg(
                 instrument_id="INSTR_NSE_SBIN_EQ",
-                instrument_type="EQ",
+                instrument_type="EQUITY",
                 side=OrderSide.BUY,
                 qty=100,
                 order_type=OrderType.MARKET,
@@ -137,7 +137,7 @@ async def test_partial_fill_then_missing_event(
         legs=[
             BasOrderLeg(
                 instrument_id="INSTR_NSE_RELIANCE_EQ",
-                instrument_type="EQ",
+                instrument_type="EQUITY",
                 side=OrderSide.BUY,
                 qty=100,
                 order_type=OrderType.LIMIT,
@@ -227,7 +227,7 @@ async def test_out_of_order_fill_events(
         legs=[
             BasOrderLeg(
                 instrument_id="INSTR_NSE_HDFC_EQ",
-                instrument_type="EQ",
+                instrument_type="EQUITY",
                 side=OrderSide.BUY,
                 qty=150,
                 order_type=OrderType.MARKET,
@@ -332,7 +332,7 @@ async def test_recovery_after_event_stream_interruption(
         legs=[
             BasOrderLeg(
                 instrument_id="INSTR_NSE_TITAN_EQ",
-                instrument_type="EQ",
+                instrument_type="EQUITY",
                 side=OrderSide.BUY,
                 qty=100,
                 order_type=OrderType.MARKET,

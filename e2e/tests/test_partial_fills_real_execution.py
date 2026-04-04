@@ -51,7 +51,7 @@ async def test_partial_fill_streaming_prices_2x(
         legs=[
             BasOrderLeg(
                 instrument_id=instrument_id,
-                instrument_type="EQ",
+                instrument_type="EQUITY",
                 side=OrderSide.BUY,
                 qty=100,
                 order_type=OrderType.MARKET,
@@ -142,7 +142,7 @@ async def test_limit_order_partial_fills_on_price_movement(
         legs=[
             BasOrderLeg(
                 instrument_id=instrument_id,
-                instrument_type="EQ",
+                instrument_type="EQUITY",
                 side=OrderSide.BUY,
                 qty=150,
                 order_type=OrderType.LIMIT,
@@ -231,7 +231,7 @@ async def test_concurrent_orders_partial_fills(
         legs=[
             BasOrderLeg(
                 instrument_id=buy_instrument,
-                instrument_type="EQ",
+                instrument_type="EQUITY",
                 side=OrderSide.BUY,
                 qty=100,
                 order_type=OrderType.MARKET,
@@ -251,7 +251,7 @@ async def test_concurrent_orders_partial_fills(
         legs=[
             BasOrderLeg(
                 instrument_id=sell_instrument,
-                instrument_type="EQ",
+                instrument_type="EQUITY",
                 side=OrderSide.SELL,
                 qty=100,
                 order_type=OrderType.MARKET,

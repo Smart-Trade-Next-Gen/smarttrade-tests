@@ -46,7 +46,7 @@ async def test_cancel_unfilled_order(
         legs=[
             BasOrderLeg(
                 instrument_id="INSTR_NSE_MARUTI_EQ",
-                instrument_type="EQ",
+                instrument_type="EQUITY",
                 side=OrderSide.BUY,
                 qty=100,
                 order_type=OrderType.LIMIT,
@@ -118,7 +118,7 @@ async def test_cancel_partial_fill(
         legs=[
             BasOrderLeg(
                 instrument_id="INSTR_NSE_HEROMOTOCO_EQ",
-                instrument_type="EQ",
+                instrument_type="EQUITY",
                 side=OrderSide.BUY,
                 qty=100,
                 order_type=OrderType.LIMIT,
@@ -207,7 +207,7 @@ async def test_cancel_then_fill_rejected(
         legs=[
             BasOrderLeg(
                 instrument_id="INSTR_NSE_TITAN_EQ",
-                instrument_type="EQ",
+                instrument_type="EQUITY",
                 side=OrderSide.BUY,
                 qty=50,
                 order_type=OrderType.LIMIT,

@@ -47,7 +47,7 @@ async def test_two_concurrent_buy_orders(
         legs=[
             BasOrderLeg(
                 instrument_id="INSTR_NSE_AXIS_EQ",
-                instrument_type="EQ",
+                instrument_type="EQUITY",
                 side=OrderSide.BUY,
                 qty=50,
                 order_type=OrderType.MARKET,
@@ -66,7 +66,7 @@ async def test_two_concurrent_buy_orders(
         legs=[
             BasOrderLeg(
                 instrument_id="INSTR_NSE_KOTAK_EQ",
-                instrument_type="EQ",
+                instrument_type="EQUITY",
                 side=OrderSide.BUY,
                 qty=75,
                 order_type=OrderType.MARKET,
@@ -164,7 +164,7 @@ async def test_concurrent_buy_and_sell(
         legs=[
             BasOrderLeg(
                 instrument_id="INSTR_NSE_ASIAN_EQ",
-                instrument_type="EQ",
+                instrument_type="EQUITY",
                 side=OrderSide.BUY,
                 qty=100,
                 order_type=OrderType.MARKET,
@@ -183,7 +183,7 @@ async def test_concurrent_buy_and_sell(
         legs=[
             BasOrderLeg(
                 instrument_id="INSTR_NSE_BHARTIARTL_EQ",
-                instrument_type="EQ",
+                instrument_type="EQUITY",
                 side=OrderSide.SELL,
                 qty=100,
                 order_type=OrderType.MARKET,
@@ -302,7 +302,7 @@ async def test_three_concurrent_orders_same_instrument(
             legs=[
                 BasOrderLeg(
                     instrument_id="INSTR_NSE_RELIANCE_EQ",
-                    instrument_type="EQ",
+                    instrument_type="EQUITY",
                     side=OrderSide.BUY,
                     qty=50,
                     order_type=OrderType.MARKET,

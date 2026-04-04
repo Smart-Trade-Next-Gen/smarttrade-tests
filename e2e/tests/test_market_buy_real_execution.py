@@ -55,7 +55,7 @@ async def test_market_buy_executes_immediately(
         legs=[
             BasOrderLeg(
                 instrument_id="INSTR_NSE_SBIN_EQ",
-                instrument_type="EQ",
+                instrument_type="EQUITY",
                 side=OrderSide.BUY,
                 qty=100,
                 order_type=OrderType.MARKET,
@@ -128,7 +128,7 @@ async def test_limit_buy_triggers_on_price_cross(
         legs=[
             BasOrderLeg(
                 instrument_id="INSTR_NSE_TCS_EQ",
-                instrument_type="EQ",
+                instrument_type="EQUITY",
                 side=OrderSide.BUY,
                 qty=50,
                 order_type=OrderType.LIMIT,
@@ -209,7 +209,7 @@ async def test_limit_sell_triggers_on_price_cross(
         legs=[
             BasOrderLeg(
                 instrument_id="INSTR_NSE_TCS_EQ",
-                instrument_type="EQ",
+                instrument_type="EQUITY",
                 side=OrderSide.SELL,
                 qty=50,
                 order_type=OrderType.LIMIT,
@@ -287,7 +287,7 @@ async def test_stop_buy_triggers_on_price_cross(
         legs=[
             BasOrderLeg(
                 instrument_id="INSTR_NSE_KOTAKBANK_EQ",
-                instrument_type="EQ",
+                instrument_type="EQUITY",
                 side=OrderSide.BUY,
                 qty=100,
                 order_type=OrderType.STOP,

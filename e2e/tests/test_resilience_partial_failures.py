@@ -60,7 +60,7 @@ async def test_concurrent_orders_with_partial_failures(
             legs=[
                 BasOrderLeg(
                     instrument_id=instruments[i],
-                    instrument_type="EQ",
+                    instrument_type="EQUITY",
                     side=OrderSide.BUY,
                     qty=100,
                     order_type=OrderType.MARKET,
@@ -140,7 +140,7 @@ async def test_recovery_after_service_slowdown(
         legs=[
             BasOrderLeg(
                 instrument_id="INSTR_NSE_SBIN_EQ",
-                instrument_type="EQ",
+                instrument_type="EQUITY",
                 side=OrderSide.BUY,
                 qty=100,
                 order_type=OrderType.MARKET,
@@ -236,7 +236,7 @@ async def test_invariants_preserved_under_partial_failures(
             legs=[
                 BasOrderLeg(
                     instrument_id=instrument,
-                    instrument_type="EQ",
+                    instrument_type="EQUITY",
                     side=OrderSide.BUY,
                     qty=qty,
                     order_type=OrderType.MARKET,

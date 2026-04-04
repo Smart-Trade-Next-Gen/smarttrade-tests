@@ -43,7 +43,7 @@ async def test_partial_fill_2x(
         legs=[
             BasOrderLeg(
                 instrument_id="INSTR_NSE_RELIANCE_EQ",
-                instrument_type="EQ",
+                instrument_type="EQUITY",
                 side=OrderSide.BUY,
                 qty=100,
                 order_type=OrderType.LIMIT,
@@ -136,7 +136,7 @@ async def test_partial_fill_3x(
         legs=[
             BasOrderLeg(
                 instrument_id="INSTR_NSE_RELIANCE_EQ",
-                instrument_type="EQ",
+                instrument_type="EQUITY",
                 side=OrderSide.BUY,
                 qty=150,
                 order_type=OrderType.LIMIT,
@@ -233,7 +233,7 @@ async def test_partial_fill_many_small(
         legs=[
             BasOrderLeg(
                 instrument_id="INSTR_NSE_HDFC_EQ",
-                instrument_type="EQ",
+                instrument_type="EQUITY",
                 side=OrderSide.BUY,
                 qty=100,
                 order_type=OrderType.LIMIT,
