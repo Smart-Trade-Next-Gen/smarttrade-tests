@@ -1,38 +1,33 @@
 """
 Base pytest configuration for E2E tests.
 
-Provides shared fixtures for service clients, event collection, and lifecycle management.
-Will be populated with actual fixtures in E2E-023.
+Provides comprehensive fixtures for service clients, event collection, assertions,
+and lifecycle management. All fixtures are properly scoped and cleaned up.
 """
 
+import asyncio
+import hashlib
 import logging
 import os
+from typing import AsyncGenerator
 
 import pytest
 
 from e2e.config import TestConfig
-from e2e.clients import BASClient
-from e2e.harness import EventCollector
+from e2e.clients import BASClient, MDSWebSocketClient, MockClient
+from e2e.harness import EventCollector, AssertionEngine, ScenarioEngine
 from e2e.fixtures.logging import configure_logging
+
+log = logging.getLogger(__name__)
 
 
 def pytest_configure(config):
     """Register custom markers and configure logging."""
-    config.addinivalue_line(
-        "markers", "smoke: quick sanity tests"
-    )
-    config.addinivalue_line(
-        "markers", "injection: deterministic injection mode"
-    )
-    config.addinivalue_line(
-        "markers", "real_execution: real execution mode"
-    )
-    config.addinivalue_line(
-        "markers", "resilience: network failures"
-    )
-    config.addinivalue_line(
-        "markers", "chaos: chaos testing"
-    )
+    config.addinivalue_line("markers", "smoke: quick sanity tests")
+    config.addinivalue_line("markers", "injection: deterministic injection mode")
+    config.addinivalue_line("markers", "real_execution: real execution mode")
+    config.addinivalue_line("markers", "resilience: network failures")
+    config.addinivalue_line("markers", "chaos: chaos testing")
 
     # Configure logging based on environment
     env = os.getenv("E2E_ENV", "dev").lower()
@@ -40,41 +35,79 @@ def pytest_configure(config):
     configure_logging(log_level)
 
 
+# ────────────────────────────────────────────────────────────────────────────────
+# SESSION-SCOPED FIXTURES
+# ────────────────────────────────────────────────────────────────────────────────
+
+
 @pytest.fixture(scope="session")
 def config() -> TestConfig:
-    """Load E2E test configuration from environment and YAML files."""
+    """
+    Load E2E test configuration from environment and YAML files.
+
+    Scope: session (loaded once per test run)
+    """
     return TestConfig.from_env()
+
+
+# ────────────────────────────────────────────────────────────────────────────────
+# FUNCTION-SCOPED FIXTURES: LOGGING & UTILITIES
+# ────────────────────────────────────────────────────────────────────────────────
 
 
 @pytest.fixture
 def logger() -> logging.Logger:
-    """Provide a logger for tests."""
+    """
+    Provide a logger for tests.
+
+    Scope: function
+    """
     return logging.getLogger("e2e.test")
+
+
+@pytest.fixture
+def test_account_id(request) -> str:
+    """
+    Generate a unique account ID per test.
+
+    Ensures test isolation by giving each test its own account ID.
+
+    Scope: function
+    """
+    test_hash = hashlib.md5(request.node.nodeid.encode()).hexdigest()[:8]
+    return f"TEST_E2E_{test_hash}"
+
+
+# ────────────────────────────────────────────────────────────────────────────────
+# FUNCTION-SCOPED FIXTURES: AUTHENTICATION
+# ────────────────────────────────────────────────────────────────────────────────
 
 
 @pytest.fixture
 async def auth_token(config: TestConfig) -> str:
     """
-    Get authentication token.
+    Get authentication token for service access.
 
     This is a placeholder that returns a mock token.
-    In E2E-013, this will be replaced with actual AuthClient login.
+    Can be replaced with actual AuthClient login when E2E-013 is implemented.
+
+    Scope: function (fresh token per test)
     """
     # TODO: Implement AuthClient login to get real token
     return "placeholder_token_from_auth_service"
 
 
+# ────────────────────────────────────────────────────────────────────────────────
+# FUNCTION-SCOPED FIXTURES: SERVICE CLIENTS
+# ────────────────────────────────────────────────────────────────────────────────
+
+
 @pytest.fixture
-async def bas_client(config: TestConfig, auth_token: str) -> BASClient:
+async def bas_client(config: TestConfig, auth_token: str) -> AsyncGenerator[BASClient, None]:
     """
     Provide BASClient instance with proper setup/teardown.
 
-    Args:
-        config: E2E test configuration
-        auth_token: Valid authentication token
-
-    Yields:
-        BASClient instance
+    Scope: function (fresh client per test)
     """
     async with BASClient(
         base_url=config.bas_url,
@@ -85,11 +118,183 @@ async def bas_client(config: TestConfig, auth_token: str) -> BASClient:
 
 
 @pytest.fixture
+async def mock_client(
+    config: TestConfig, auth_token: str
+) -> AsyncGenerator[MockClient, None]:
+    """
+    Provide MockClient instance for deterministic fill injection.
+
+    Scope: function (fresh client per test)
+    """
+    async with MockClient(
+        base_url=config.mock_url,
+        token=auth_token,
+        timeout=config.timeout_fast,
+    ) as client:
+        yield client
+
+
+@pytest.fixture
+async def mds_client(
+    config: TestConfig, auth_token: str, event_collector: EventCollector
+) -> AsyncGenerator[MDSWebSocketClient, None]:
+    """
+    Provide MDSWebSocketClient instance with subscription.
+
+    Scope: function (fresh connection per test)
+    """
+    client = MDSWebSocketClient(
+        ws_url=config.mds_ws_url,
+        account_id=config.account_id,
+        timeout=config.timeout_slow,
+    )
+    await client.connect()
+    await client.subscribe_account(config.account_id)
+
+    yield client
+
+    await client.disconnect()
+
+
+# ────────────────────────────────────────────────────────────────────────────────
+# FUNCTION-SCOPED FIXTURES: EVENT COLLECTION & HARNESS
+# ────────────────────────────────────────────────────────────────────────────────
+
+
+@pytest.fixture
 def event_collector() -> EventCollector:
     """
-    Provide EventCollector instance for event-driven test validation.
+    Provide EventCollector instance for async event collection.
 
-    Yields:
-        EventCollector instance
+    Scope: function (fresh collector per test)
     """
-    return EventCollector(maxsize=1000)
+    collector = EventCollector(maxsize=1000)
+    yield collector
+    collector.clear()
+
+
+@pytest.fixture
+def assertions() -> AssertionEngine:
+    """
+    Provide AssertionEngine instance for order/position validation.
+
+    Scope: function
+    """
+    return AssertionEngine()
+
+
+@pytest.fixture
+def scenario_engine() -> ScenarioEngine:
+    """
+    Provide ScenarioEngine instance for scenario loading.
+
+    Scope: function
+    """
+    return ScenarioEngine()
+
+
+# ────────────────────────────────────────────────────────────────────────────────
+# FUNCTION-SCOPED FIXTURES: STATE CAPTURE (PRE/POST)
+# ────────────────────────────────────────────────────────────────────────────────
+
+
+@pytest.fixture
+async def pre_state(bas_client: BASClient, test_account_id: str, config: TestConfig) -> dict:
+    """
+    Capture funds and positions before test execution.
+
+    Scope: function (setup phase)
+    """
+    try:
+        funds = await bas_client.get_funds(config.broker_id, test_account_id)
+        positions = await bas_client.get_positions(config.broker_id, test_account_id)
+        return {"funds": funds, "positions": positions}
+    except Exception as e:
+        log.warning(f"Failed to capture pre-state: {e}")
+        return {"funds": None, "positions": None}
+
+
+@pytest.fixture
+async def post_state(bas_client: BASClient, test_account_id: str, config: TestConfig):
+    """
+    Capture funds and positions after test execution.
+
+    Scope: function (teardown phase, yields before test runs)
+
+    Usage: Use in test to get post-test state
+    """
+    # Store in a dict that can be captured after test
+    state = {"funds": None, "positions": None}
+
+    yield state  # Let test run first
+
+    try:
+        state["funds"] = await bas_client.get_funds(config.broker_id, test_account_id)
+        state["positions"] = await bas_client.get_positions(config.broker_id, test_account_id)
+    except Exception as e:
+        log.warning(f"Failed to capture post-state: {e}")
+
+
+# ────────────────────────────────────────────────────────────────────────────────
+# AUTOUSE FIXTURES: TEST ISOLATION & CLEANUP
+# ────────────────────────────────────────────────────────────────────────────────
+
+
+@pytest.fixture(autouse=True)
+async def reset_test_account(
+    bas_client: BASClient, test_account_id: str, config: TestConfig
+) -> None:
+    """
+    Reset account state before each test for isolation.
+
+    This is an autouse fixture that runs for every test.
+    Attempts to cancel all open orders before test execution.
+
+    Scope: function (autouse)
+    """
+    try:
+        # Try to cancel all open orders for this account
+        orders = await bas_client.get_orders(config.broker_id, test_account_id)
+        for order in orders:
+            status = order.status.upper() if hasattr(order, 'status') else order.get('status', '')
+            if status not in ["FILLED", "CANCELLED", "REJECTED", "EXPIRED"]:
+                try:
+                    order_id = order.exchange_order_id if hasattr(order, 'exchange_order_id') else order.get('broker_order_id')
+                    if order_id:
+                        await bas_client.cancel_order(config.broker_id, test_account_id, order_id)
+                except Exception:
+                    pass  # Ignore cancellation errors
+    except Exception:
+        pass  # Account may not exist yet, that's ok
+
+    yield  # Run test
+
+
+@pytest.fixture
+async def cleanup_test_account(
+    bas_client: BASClient, test_account_id: str, config: TestConfig
+) -> None:
+    """
+    Clean up account state after test execution.
+
+    Optional aggressive cleanup fixture (not autouse).
+    Can be explicitly requested in tests that need it.
+
+    Scope: function
+    """
+    yield  # Let test run
+
+    try:
+        # Exit all open positions
+        orders = await bas_client.get_orders(config.broker_id, test_account_id)
+        for order in orders:
+            status = order.status.upper() if hasattr(order, 'status') else order.get('status', '')
+            if status not in ["FILLED", "CANCELLED", "REJECTED", "EXPIRED"]:
+                try:
+                    order_id = order.exchange_order_id if hasattr(order, 'exchange_order_id') else order.get('broker_order_id')
+                    if order_id:
+                        await bas_client.cancel_order(config.broker_id, test_account_id, order_id)
+                except Exception:
+                    pass
+    except Exception:
+        pass
