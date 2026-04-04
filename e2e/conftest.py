@@ -17,6 +17,7 @@ from e2e.config import TestConfig
 from e2e.clients import BASClient, MDSWebSocketClient, MockClient
 from e2e.harness import EventCollector, AssertionEngine, ScenarioEngine
 from e2e.fixtures.logging import configure_logging
+from e2e.fixtures.market_data_stream import MockMarketDataStream
 
 log = logging.getLogger(__name__)
 
@@ -132,6 +133,20 @@ async def mock_client(
         timeout=config.timeout_fast,
     ) as client:
         yield client
+
+
+@pytest.fixture
+async def market_data_stream(mock_client: MockClient) -> MockMarketDataStream:
+    """
+    Provide MockMarketDataStream for real execution mode tests.
+
+    Allows tests to inject price updates that trigger execution via Mock's PriceExecutionEngine.
+
+    Scope: function (fresh stream per test)
+    """
+    stream = MockMarketDataStream(mock_client)
+    yield stream
+    stream.reset()
 
 
 @pytest.fixture
