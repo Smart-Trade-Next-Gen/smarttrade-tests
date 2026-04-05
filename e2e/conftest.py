@@ -47,6 +47,10 @@ def pytest_configure(config):
     log_level = "DEBUG" if env == "dev" else "INFO"
     configure_logging(log_level)
 
+    # Ensure reports directory exists
+    reports_dir = Path(__file__).parent / "reports"
+    reports_dir.mkdir(exist_ok=True)
+
 
 # ────────────────────────────────────────────────────────────────────────────────
 # SESSION-SCOPED FIXTURES
@@ -411,48 +415,3 @@ def chaos_engine() -> ChaosEngine:
 def pytest_html_report_title(report):
     """Set HTML report title."""
     report.title = "SmartTrade E2E Test Report"
-
-
-@pytest.hookimpl(tryfirst=True)
-def pytest_configure(config):
-    """Configure pytest with custom HTML styling."""
-    # Ensure reports directory exists
-    reports_dir = Path(__file__).parent / "reports"
-    reports_dir.mkdir(exist_ok=True)
-
-
-def pytest_html_results_summary(prefix, summary, postfix, num_passed, num_failed, num_skipped, num_errors, session):
-    """Customize HTML results summary."""
-    total = num_passed + num_failed + num_skipped + num_errors
-    summary.clear()
-
-    if total > 0:
-        summary.append(f"Total: {total} | ")
-
-        if num_passed > 0:
-            summary.append(f"✅ Passed: {num_passed} | ")
-        if num_failed > 0:
-            summary.append(f"❌ Failed: {num_failed} | ")
-        if num_skipped > 0:
-            summary.append(f"⏭️ Skipped: {num_skipped} | ")
-        if num_errors > 0:
-            summary.append(f"⚠️ Errors: {num_errors}")
-
-
-@pytest.hookimpl(hookwrapper=True)
-def pytest_runtest_makereport(item, call):
-    """Enhance test report with additional information."""
-    outcome = yield
-    report = outcome.get_result()
-
-    # Add test markers to report
-    markers = [m.name for m in item.iter_markers()]
-    if markers:
-        report.markers = ", ".join(markers)
-
-    # Add test duration
-    if hasattr(report, "duration"):
-        if report.duration < 0.1:
-            report.duration_str = f"{report.duration*1000:.0f}ms"
-        else:
-            report.duration_str = f"{report.duration:.2f}s"
