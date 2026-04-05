@@ -10,8 +10,18 @@ import hashlib
 import logging
 import os
 from typing import AsyncGenerator
+from pathlib import Path
 
 import pytest
+
+# Load .env file for JWT_SECRET_KEY and other environment variables
+try:
+    from dotenv import load_dotenv
+    env_file = Path(__file__).parent.parent.parent / ".env"
+    if env_file.exists():
+        load_dotenv(env_file)
+except ImportError:
+    pass  # python-dotenv not available, rely on environment
 
 from e2e.config import TestConfig
 from e2e.clients import BASClient, MDSWebSocketClient, MockClient
@@ -97,14 +107,15 @@ async def auth_token(config: TestConfig) -> str:
     """
     from jose import jwt
     from datetime import datetime, timedelta
-    import time
+    import uuid
 
-    # Secret from docker-compose environment (must match docker-compose JWT_SECRET_KEY)
-    secret = "jIjETudRTwtHBE_Ez5uU_NeMvi_6zXrst8E3YmdgVxFz7D2Ij6c1rwVF_T9R_HMC"
+    # Secret from environment (must match docker-compose JWT_SECRET_KEY)
+    # Falls back to env var or default if not set
+    secret = os.getenv("JWT_SECRET_KEY", "jIjETudRTwtHBE_Ez5uU_NeMvi_6zXrst8E3YmdgVxFz7D2Ij6c1rwVF_T9R_HMC")
 
     now = datetime.utcnow()
     payload = {
-        "sub": "test_user_123",  # UUID string in production, test string for E2E
+        "sub": str(uuid.uuid4()),  # Must be a valid UUID string per smarttrade-common
         "roles": ["user"],
         "type": "access",  # Required by smarttrade-common token validation
         "iat": int(now.timestamp()),
