@@ -154,6 +154,10 @@ class BASClient:
             json=request.model_dump(mode='json', exclude_none=True),
             headers=headers,
         )
+
+        if response.status_code != 200:
+            log.error(f"❌ Order placement failed | Status: {response.status_code} | Body: {response.text}")
+
         response.raise_for_status()
 
         return [
@@ -412,15 +416,17 @@ class BASClient:
         account_id: str,
         initial_funds: Decimal = Decimal("1000000.00"),
         account_name: str = None,
+        account_type: str = "TRADING",
     ) -> dict:
         """
         Create a trading account for testing.
 
         Args:
-            broker_id: Broker ID (e.g., "mock")
+            broker_id: Broker ID (e.g., "fyers")
             account_id: Account ID to create
             initial_funds: Initial funds for the account (default: 1M INR)
             account_name: Name of the account (defaults to account_id)
+            account_type: Account type ("TRADING" for live, "PAPER" for paper trading)
 
         Returns:
             Response dict from the API
@@ -437,7 +443,7 @@ class BASClient:
             "account_name": account_name or account_id,
             "base_currency": "INR",
             "initial_balance": float(initial_funds),
-            "account_type": "TRADING",
+            "account_type": account_type,
         }
 
         log.debug(

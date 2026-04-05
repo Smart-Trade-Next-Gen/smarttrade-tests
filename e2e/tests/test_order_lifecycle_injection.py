@@ -39,7 +39,7 @@ async def test_market_buy_full_fill(
     - Financial invariants (debit correct)
     - Position creation
     """
-    broker_id = "mock"
+    broker_id = "fyers"
 
     # Arrange: Capture pre-state
     pre_funds = await bas_client.get_funds(broker_id, test_account_id)
@@ -133,7 +133,7 @@ async def test_market_sell_full_fill(
     - Short position (intraday allowed)
     - Position state for SHORT
     """
-    broker_id = "mock"
+    broker_id = "fyers"
 
     # Arrange: Capture pre-state
     pre_funds = await bas_client.get_funds(broker_id, test_account_id)
@@ -226,7 +226,7 @@ async def test_limit_buy_triggers_at_price(
     - Fill occurs at limit price (not above)
     - Limit order semantics (BUY ≤ limit_price)
     """
-    broker_id = "mock"
+    broker_id = "fyers"
 
     # Arrange: Capture pre-state
     pre_funds = await bas_client.get_funds(broker_id, test_account_id)
@@ -314,7 +314,7 @@ async def test_limit_sell_triggers_at_price(
     - Fill occurs at limit price (not below)
     - Limit order semantics (SELL ≥ limit_price)
     """
-    broker_id = "mock"
+    broker_id = "fyers"
 
     # Arrange: Capture pre-state
     pre_funds = await bas_client.get_funds(broker_id, test_account_id)

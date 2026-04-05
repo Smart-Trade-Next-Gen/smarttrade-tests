@@ -81,32 +81,34 @@ def logger() -> logging.Logger:
 @pytest.fixture(autouse=True)
 async def setup_trading_account(bas_client, test_account_id):
     """
-    Create trading accounts for all brokers (autouse).
+    Create paper trading accounts (autouse).
 
-    Automatically creates trading accounts for both "fyers" and "mock" brokers
-    before each test runs to support tests that might use either broker.
+    Automatically creates a paper trading account with fyers broker before each test.
+    Paper accounts use real broker ID but account_type=PAPER to enable paper trading.
 
     Scope: function
     """
-    for broker_id in ["fyers", "mock"]:
-        try:
-            # First delete any existing accounts with this ID (from prior test runs)
-            # This ensures we have a clean slate with the correct user_id
-            try:
-                await bas_client.delete_trading_account(broker_id, test_account_id)
-                log.debug(f"Deleted existing trading account: {broker_id}/{test_account_id}")
-            except Exception:
-                pass  # Account may not exist, that's fine
+    broker_id = "fyers"
 
-            # Create trading account via BASClient
-            await bas_client.create_trading_account(
-                broker_id=broker_id,
-                account_id=test_account_id,
-                initial_funds=Decimal("1000000.00"),
-            )
-            log.debug(f"✅ Trading account created: {broker_id}/{test_account_id}")
-        except Exception as e:
-            log.warning(f"⚠️ Trading account creation failed for {broker_id}/{test_account_id}: {e}")
+    try:
+        # First delete any existing accounts with this ID (from prior test runs)
+        # This ensures we have a clean slate with the correct user_id
+        try:
+            await bas_client.delete_trading_account(broker_id, test_account_id)
+            log.debug(f"Deleted existing trading account: {broker_id}/{test_account_id}")
+        except Exception:
+            pass  # Account may not exist, that's fine
+
+        # Create PAPER trading account
+        await bas_client.create_trading_account(
+            broker_id=broker_id,
+            account_id=test_account_id,
+            initial_funds=Decimal("1000000.00"),
+            account_type="PAPER",
+        )
+        log.debug(f"✅ Paper trading account created: {broker_id}/{test_account_id}")
+    except Exception as e:
+        log.warning(f"⚠️ Paper account creation failed for {broker_id}/{test_account_id}: {e}")
 
     # Yield control back to test
     yield
@@ -399,3 +401,58 @@ def chaos_engine() -> ChaosEngine:
     engine = ChaosEngine()
     yield engine
     engine.reset()
+
+
+# ────────────────────────────────────────────────────────────────────────────────
+# HTML REPORT STYLING & ENHANCEMENTS
+# ────────────────────────────────────────────────────────────────────────────────
+
+
+def pytest_html_report_title(report):
+    """Set HTML report title."""
+    report.title = "SmartTrade E2E Test Report"
+
+
+@pytest.hookimpl(tryfirst=True)
+def pytest_configure(config):
+    """Configure pytest with custom HTML styling."""
+    # Ensure reports directory exists
+    reports_dir = Path(__file__).parent / "reports"
+    reports_dir.mkdir(exist_ok=True)
+
+
+def pytest_html_results_summary(prefix, summary, postfix, num_passed, num_failed, num_skipped, num_errors, session):
+    """Customize HTML results summary."""
+    total = num_passed + num_failed + num_skipped + num_errors
+    summary.clear()
+
+    if total > 0:
+        summary.append(f"Total: {total} | ")
+
+        if num_passed > 0:
+            summary.append(f"✅ Passed: {num_passed} | ")
+        if num_failed > 0:
+            summary.append(f"❌ Failed: {num_failed} | ")
+        if num_skipped > 0:
+            summary.append(f"⏭️ Skipped: {num_skipped} | ")
+        if num_errors > 0:
+            summary.append(f"⚠️ Errors: {num_errors}")
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_makereport(item, call):
+    """Enhance test report with additional information."""
+    outcome = yield
+    report = outcome.get_result()
+
+    # Add test markers to report
+    markers = [m.name for m in item.iter_markers()]
+    if markers:
+        report.markers = ", ".join(markers)
+
+    # Add test duration
+    if hasattr(report, "duration"):
+        if report.duration < 0.1:
+            report.duration_str = f"{report.duration*1000:.0f}ms"
+        else:
+            report.duration_str = f"{report.duration:.2f}s"
