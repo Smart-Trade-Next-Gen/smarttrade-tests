@@ -454,3 +454,38 @@ class BASClient:
 
         response.raise_for_status()
         return response.json()
+
+    async def delete_trading_account(
+        self,
+        broker_id: str,
+        account_id: str,
+    ) -> dict:
+        """
+        Delete a trading account.
+
+        Args:
+            broker_id: Broker ID
+            account_id: Account ID to delete
+
+        Returns:
+            Response dict from the API
+
+        Raises:
+            httpx.HTTPError: On HTTP error
+        """
+        client = self._get_client()
+        headers = self._get_headers()
+
+        url = f"/api/v1/trading_account/{broker_id}/{account_id}"
+
+        log.debug(f"Deleting trading account | broker_id={broker_id} | account_id={account_id}")
+
+        response = await client.delete(url, headers=headers)
+
+        # Account deletion may return 404 if not found (which is fine)
+        if response.status_code == 404:
+            log.debug(f"Trading account not found: {account_id}")
+            return {"account_id": account_id}
+
+        response.raise_for_status()
+        return response.json()

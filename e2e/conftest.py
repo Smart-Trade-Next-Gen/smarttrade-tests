@@ -90,6 +90,14 @@ async def setup_trading_account(bas_client, test_account_id):
     """
     for broker_id in ["fyers", "mock"]:
         try:
+            # First delete any existing accounts with this ID (from prior test runs)
+            # This ensures we have a clean slate with the correct user_id
+            try:
+                await bas_client.delete_trading_account(broker_id, test_account_id)
+                log.debug(f"Deleted existing trading account: {broker_id}/{test_account_id}")
+            except Exception:
+                pass  # Account may not exist, that's fine
+
             # Create trading account via BASClient
             await bas_client.create_trading_account(
                 broker_id=broker_id,
