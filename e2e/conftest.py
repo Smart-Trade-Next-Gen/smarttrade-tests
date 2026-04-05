@@ -90,26 +90,30 @@ async def auth_token(config: TestConfig) -> str:
     """
     Get authentication token for service access.
 
-    Generates a JWT token using the same secret as the services.
+    Generates a JWT token using the same secret and library as the services.
     Uses test credentials for E2E testing.
 
     Scope: function (fresh token per test)
     """
-    import jwt
+    from jose import jwt
     from datetime import datetime, timedelta
+    import time
 
-    # Secret from docker-compose environment
+    # Secret from docker-compose environment (must match docker-compose JWT_SECRET_KEY)
     secret = "jIjETudRTwtHBE_Ez5uU_NeMvi_6zXrst8E3YmdgVxFz7D2Ij6c1rwVF_T9R_HMC"
 
+    now = datetime.utcnow()
     payload = {
-        "sub": "test_user",
-        "user_id": "test_user_123",
-        "email": "test@example.com",
+        "sub": "test_user_123",  # UUID string in production, test string for E2E
         "roles": ["user"],
-        "iat": datetime.utcnow(),
-        "exp": datetime.utcnow() + timedelta(hours=24),
+        "type": "access",  # Required by smarttrade-common token validation
+        "iat": int(now.timestamp()),
+        "exp": int((now + timedelta(hours=24)).timestamp()),
+        "iss": "auth-service",  # Required by smarttrade-common
+        "aud": "smarttrade-services",  # Required by smarttrade-common
     }
 
+    # Use python-jose (same as smarttrade-common) not PyJWT
     token = jwt.encode(payload, secret, algorithm="HS256")
     return token
 
