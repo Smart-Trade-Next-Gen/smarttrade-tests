@@ -11,6 +11,7 @@ import logging
 import os
 from typing import AsyncGenerator
 from pathlib import Path
+from decimal import Decimal
 
 import pytest
 
@@ -75,6 +76,31 @@ def logger() -> logging.Logger:
     Scope: function
     """
     return logging.getLogger("e2e.test")
+
+
+@pytest.fixture(autouse=True)
+async def setup_trading_account(bas_client, test_account_id, config):
+    """
+    Create a trading account for the test (autouse).
+
+    Automatically creates a trading account before each test runs.
+    Scope: function
+    """
+    try:
+        # Create trading account via BASClient
+        await bas_client.create_trading_account(
+            broker_id=config.broker_id,
+            account_id=test_account_id,
+            initial_funds=Decimal("1000000.00"),
+        )
+        log.debug(f"✅ Trading account created: {test_account_id}")
+    except Exception as e:
+        log.warning(f"⚠️ Trading account creation failed: {e}")
+
+    # Yield control back to test
+    yield
+
+    # Cleanup is optional - accounts can be reused
 
 
 @pytest.fixture

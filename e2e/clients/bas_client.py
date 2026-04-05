@@ -405,3 +405,47 @@ class BASClient:
         response.raise_for_status()
 
         return [Position.model_validate(item) for item in response.json()]
+
+    async def create_trading_account(
+        self,
+        broker_id: str,
+        account_id: str,
+        initial_funds: Decimal = Decimal("1000000.00"),
+    ) -> dict:
+        """
+        Create a trading account for testing.
+
+        Args:
+            broker_id: Broker ID (e.g., "mock")
+            account_id: Account ID to create
+            initial_funds: Initial funds for the account (default: 1M INR)
+
+        Returns:
+            Response dict from the API
+
+        Raises:
+            httpx.HTTPError: On HTTP error
+        """
+        client = self._get_client()
+        headers = self._get_headers()
+
+        url = f"/api/v1/trading_account/{broker_id}"
+        payload = {
+            "account_id": account_id,
+            "initial_funds": str(initial_funds),
+        }
+
+        log.debug(
+            f"Creating trading account | broker_id={broker_id} | account_id={account_id} | "
+            f"initial_funds={initial_funds}"
+        )
+
+        response = await client.post(url, json=payload, headers=headers)
+
+        # Account creation may return 200, 201, or 409 (if already exists)
+        if response.status_code == 409:
+            log.debug(f"Trading account already exists: {account_id}")
+            return {"account_id": account_id}
+
+        response.raise_for_status()
+        return response.json()
