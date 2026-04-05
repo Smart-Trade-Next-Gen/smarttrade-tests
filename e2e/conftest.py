@@ -79,23 +79,26 @@ def logger() -> logging.Logger:
 
 
 @pytest.fixture(autouse=True)
-async def setup_trading_account(bas_client, test_account_id, config):
+async def setup_trading_account(bas_client, test_account_id):
     """
-    Create a trading account for the test (autouse).
+    Create trading accounts for all brokers (autouse).
 
-    Automatically creates a trading account before each test runs.
+    Automatically creates trading accounts for both "fyers" and "mock" brokers
+    before each test runs to support tests that might use either broker.
+
     Scope: function
     """
-    try:
-        # Create trading account via BASClient
-        await bas_client.create_trading_account(
-            broker_id=config.broker_id,
-            account_id=test_account_id,
-            initial_funds=Decimal("1000000.00"),
-        )
-        log.debug(f"✅ Trading account created: {test_account_id}")
-    except Exception as e:
-        log.warning(f"⚠️ Trading account creation failed: {e}")
+    for broker_id in ["fyers", "mock"]:
+        try:
+            # Create trading account via BASClient
+            await bas_client.create_trading_account(
+                broker_id=broker_id,
+                account_id=test_account_id,
+                initial_funds=Decimal("1000000.00"),
+            )
+            log.debug(f"✅ Trading account created: {broker_id}/{test_account_id}")
+        except Exception as e:
+            log.warning(f"⚠️ Trading account creation failed for {broker_id}/{test_account_id}: {e}")
 
     # Yield control back to test
     yield
@@ -129,19 +132,20 @@ async def auth_token(config: TestConfig) -> str:
     Generates a JWT token using the same secret and library as the services.
     Uses test credentials for E2E testing.
 
-    Scope: function (fresh token per test)
+    Scope: function (fresh token per test, but with consistent user ID)
     """
     from jose import jwt
     from datetime import datetime, timedelta
-    import uuid
 
     # Secret from environment (must match docker-compose JWT_SECRET_KEY)
     # Falls back to env var or default if not set
     secret = os.getenv("JWT_SECRET_KEY", "jIjETudRTwtHBE_Ez5uU_NeMvi_6zXrst8E3YmdgVxFz7D2Ij6c1rwVF_T9R_HMC")
 
     now = datetime.utcnow()
+    # Use a fixed test user ID so all requests use the same user across the test
+    test_user_id = "00000000-0000-0000-0000-000000000001"
     payload = {
-        "sub": str(uuid.uuid4()),  # Must be a valid UUID string per smarttrade-common
+        "sub": test_user_id,  # Fixed UUID for consistency across test requests
         "roles": ["user"],
         "type": "access",  # Required by smarttrade-common token validation
         "iat": int(now.timestamp()),

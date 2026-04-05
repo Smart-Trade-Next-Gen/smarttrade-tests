@@ -411,6 +411,7 @@ class BASClient:
         broker_id: str,
         account_id: str,
         initial_funds: Decimal = Decimal("1000000.00"),
+        account_name: str = None,
     ) -> dict:
         """
         Create a trading account for testing.
@@ -419,6 +420,7 @@ class BASClient:
             broker_id: Broker ID (e.g., "mock")
             account_id: Account ID to create
             initial_funds: Initial funds for the account (default: 1M INR)
+            account_name: Name of the account (defaults to account_id)
 
         Returns:
             Response dict from the API
@@ -432,12 +434,15 @@ class BASClient:
         url = f"/api/v1/trading_account/{broker_id}"
         payload = {
             "account_id": account_id,
-            "initial_funds": str(initial_funds),
+            "account_name": account_name or account_id,
+            "base_currency": "INR",
+            "initial_balance": float(initial_funds),
+            "account_type": "TRADING",
         }
 
         log.debug(
             f"Creating trading account | broker_id={broker_id} | account_id={account_id} | "
-            f"initial_funds={initial_funds}"
+            f"initial_balance={initial_funds}"
         )
 
         response = await client.post(url, json=payload, headers=headers)
