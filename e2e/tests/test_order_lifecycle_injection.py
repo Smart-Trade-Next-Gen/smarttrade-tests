@@ -23,6 +23,7 @@ from broker_adapter_service.schemas.order_dtos import BasOrderPlaceRequest, BasO
 async def test_market_buy_full_fill(
     bas_client,
     mock_client,
+    mds_client,
     event_collector,
     assertions,
     test_account_id,

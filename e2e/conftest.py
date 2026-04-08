@@ -229,7 +229,7 @@ async def mds_client(
     config: TestConfig, auth_token: str, event_collector: EventCollector
 ) -> AsyncGenerator[MDSWebSocketClient, None]:
     """
-    Provide MDSWebSocketClient instance with subscription.
+    Provide MDSWebSocketClient instance with subscription and event streaming.
 
     Scope: function (fresh connection per test)
     """
@@ -241,8 +241,37 @@ async def mds_client(
     await client.connect()
     await client.subscribe_account(config.account_id)
 
+    # Start background task to stream events into event_collector
+    async def stream_to_collector():
+        try:
+            async for event in client.stream_events():
+                # Extract order_id from event data
+                event_data = event.get("data", {})
+                order_id = event_data.get("order_id") or event_data.get("broker_order_id")
+
+                if order_id:
+                    # Extract status from event
+                    status = event_data.get("status")
+                    event_dict = {
+                        "type": event.get("type"),
+                        "status": status,
+                        "data": event_data,
+                        "timestamp": event_data.get("timestamp"),
+                    }
+                    await event_collector.add_event(order_id, event_dict)
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"Error in stream_to_collector: {e}", exc_info=True)
+
+    stream_task = asyncio.create_task(stream_to_collector())
+
     yield client
 
+    stream_task.cancel()
+    try:
+        await stream_task
+    except asyncio.CancelledError:
+        pass
     await client.disconnect()
 
 

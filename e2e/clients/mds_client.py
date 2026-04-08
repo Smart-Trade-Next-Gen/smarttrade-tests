@@ -57,6 +57,7 @@ class MDSWebSocketClient:
         self._heartbeat_task: Optional[asyncio.Task] = None
         self._subscribed = False
         self._backoff = initial_backoff
+        self._event_queue: asyncio.Queue = asyncio.Queue(maxsize=1000)
 
     async def __aenter__(self) -> "MDSWebSocketClient":
         """Async context manager entry."""
@@ -192,7 +193,14 @@ class MDSWebSocketClient:
 
         while self.is_connected:
             try:
-                await asyncio.sleep(0.01)  # Prevent busy waiting
+                event = await asyncio.wait_for(
+                    self._event_queue.get(),
+                    timeout=1.0
+                )
+                yield event
+            except asyncio.TimeoutError:
+                # No event received, continue waiting
+                continue
             except asyncio.CancelledError:
                 break
 
@@ -294,7 +302,16 @@ class MDSWebSocketClient:
 
         elif msg_type in {"order.update", "trade.update", "position.update", "order_fill", "trade_exec", "position_update"}:
             log.debug(f"Event received: {msg_type}")
-            # Events are handled via stream_events()
+            # Add event to queue for stream_events() to yield
+            try:
+                self._event_queue.put_nowait(data)
+            except asyncio.QueueFull:
+                log.warning(f"Event queue full, dropping oldest event")
+                try:
+                    self._event_queue.get_nowait()
+                    self._event_queue.put_nowait(data)
+                except Exception as e:
+                    log.error(f"Failed to handle event queue: {e}")
 
         else:
             log.debug(f"Unknown message type: {msg_type}")
