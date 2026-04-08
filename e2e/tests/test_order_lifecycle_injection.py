@@ -12,6 +12,7 @@ All tests use INJECTION mode for deterministic execution.
 """
 
 import pytest
+import uuid
 from decimal import Decimal
 
 from smarttrade_common.schemas.types import OrderSide, OrderType, TimeInForce, PositionType
@@ -23,7 +24,6 @@ from broker_adapter_service.schemas.order_dtos import BasOrderPlaceRequest, BasO
 async def test_market_buy_full_fill(
     bas_client,
     mock_client,
-    mds_client,
     event_collector,
     assertions,
     test_account_id,
@@ -46,9 +46,9 @@ async def test_market_buy_full_fill(
     pre_funds = await bas_client.get_funds(broker_id, test_account_id)
     logger.info(f"Pre-state captured | Funds: {pre_funds.total_equity}")
 
-    # Act: Create and place order
+    # Act: Create and place order (use unique client_order_id to bypass idempotency cache)
     order_request = BasOrderPlaceRequest(
-        client_order_id=f"test_market_buy_{test_account_id}",
+        client_order_id=f"test_market_buy_{test_account_id}_{uuid.uuid4().hex[:8]}",
         position_type=PositionType.INTRADAY,
         legs=[
             BasOrderLeg(
