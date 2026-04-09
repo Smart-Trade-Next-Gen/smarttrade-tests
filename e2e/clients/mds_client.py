@@ -308,7 +308,7 @@ class MDSWebSocketClient:
         elif msg_type == "system":
             log.debug(f"System message: {data.get('status')}")
 
-        elif msg_type in {"order.update", "trade.update", "position.update", "order_fill", "trade_exec", "position_update"}:
+        elif msg_type in {"order.update", "trade.update", "position.update", "order_fill", "trade_exec", "position_update", "order_cancelled"}:
             log.debug(f"Event received: {msg_type}")
             # Add event to queue for stream_events() to yield
             try:

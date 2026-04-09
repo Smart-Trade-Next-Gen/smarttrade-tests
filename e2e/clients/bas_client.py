@@ -302,6 +302,14 @@ class BASClient:
         )
 
         response = await client.get(url, headers=headers)
+
+        # Handle 404 gracefully - no orders exist yet
+        if response.status_code == 404:
+            log.debug(
+                f"No orders found for {broker_id}/{account_id}"
+            )
+            return []
+
         response.raise_for_status()
 
         return [Order.model_validate(item) for item in response.json()]
@@ -333,6 +341,14 @@ class BASClient:
         )
 
         response = await client.get(url, headers=headers)
+
+        # Handle 404 gracefully - no trades exist yet
+        if response.status_code == 404:
+            log.debug(
+                f"No trades found for {broker_id}/{account_id}"
+            )
+            return []
+
         response.raise_for_status()
 
         return [Trade.model_validate(item) for item in response.json()]
@@ -406,6 +422,14 @@ class BASClient:
         )
 
         response = await client.get(url, headers=headers)
+
+        # Handle 404 gracefully - no positions exist yet
+        if response.status_code == 404:
+            log.debug(
+                f"No positions found for {broker_id}/{account_id}"
+            )
+            return []
+
         response.raise_for_status()
 
         return [Position.model_validate(item) for item in response.json()]
