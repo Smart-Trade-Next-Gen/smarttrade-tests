@@ -128,7 +128,7 @@ def _configure_test_timeout(request):
 
 
 @pytest.fixture(autouse=True)
-async def setup_trading_account(bas_client, test_account_id):
+async def setup_trading_account(bas_client, mock_client, test_account_id):
     """
     Create paper trading accounts (autouse).
 
@@ -158,6 +158,14 @@ async def setup_trading_account(bas_client, test_account_id):
             log.debug(f"✅ Paper trading account created: {broker_id}/{test_account_id}")
         except Exception as e:
             log.warning(f"⚠️ Paper account creation failed for {broker_id}/{test_account_id}: {e}")
+
+    # Clean up execution state in mock service (reset sequence tracking for fills)
+    for broker_id in ["fyers", "mock"]:
+        try:
+            await mock_client.cleanup_execution_state(broker_id, test_account_id)
+            log.debug(f"✅ Execution state cleared in mock service: {broker_id}/{test_account_id}")
+        except Exception as e:
+            log.warning(f"⚠️ Execution state cleanup failed for {broker_id}/{test_account_id}: {e}")
 
     # Yield control back to test
     yield
@@ -440,6 +448,41 @@ def scenario_engine() -> ScenarioEngine:
     Scope: function
     """
     return ScenarioEngine()
+
+
+@pytest.fixture
+async def place_and_sync_order(bas_client: BASClient, mock_client: MockClient, config: TestConfig):
+    """
+    Provide a helper function to place an order in BAS and sync it to mock service.
+
+    This ensures orders exist in mock service with correct instrument_id (from MDS)
+    before fill injection is attempted.
+
+    Usage in tests:
+        [order_resp] = await place_and_sync_order(broker_id, account_id, order_request)
+
+    Args (passed to helper):
+        broker_id: Broker identifier
+        account_id: Account identifier
+        order_request: BasOrderPlaceRequest
+
+    Returns:
+        List of order responses from BAS (same as place_order)
+
+    Scope: function
+    """
+    async def helper(broker_id: str, account_id: str, order_request):
+        # Step 1: Place order in BAS (returns order with instrument_id from MDS)
+        order_responses = await bas_client.place_order(broker_id, account_id, order_request)
+
+        # Step 2: Sync each order to mock service using instrument_id (not broker symbol)
+        for order_resp in order_responses:
+            await mock_client.sync_order(broker_id, account_id, order_resp.model_dump() if hasattr(order_resp, 'model_dump') else order_resp)
+            log.debug(f"Order synced: {order_resp.get('broker_order_id') if isinstance(order_resp, dict) else order_resp.broker_order_id}")
+
+        return order_responses
+
+    return helper
 
 
 # ────────────────────────────────────────────────────────────────────────────────

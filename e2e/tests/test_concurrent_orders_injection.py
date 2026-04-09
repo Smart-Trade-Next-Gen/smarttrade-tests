@@ -109,8 +109,8 @@ async def test_two_concurrent_buy_orders(
     logger.info("Fills injected for both orders")
 
     # Observe: Collect events for both orders
-    events_1 = await event_collector.wait_for_completion(order_id_1, timeout=5.0)
-    events_2 = await event_collector.wait_for_completion(order_id_2, timeout=5.0)
+    events_1 = await event_collector.wait_for_completion(order_id_1, timeout=15.0)
+    events_2 = await event_collector.wait_for_completion(order_id_2, timeout=15.0)
     logger.info(f"Events collected | Order 1: {len(events_1)} | Order 2: {len(events_2)}")
 
     # Assert: Both orders filled

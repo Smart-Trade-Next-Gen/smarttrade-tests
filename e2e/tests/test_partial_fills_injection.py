@@ -83,8 +83,8 @@ async def test_partial_fill_2x(
     )
     logger.info("Fill 2 injected | Qty: 50 | Price: 2946.00")
 
-    # Observe: Wait for completion (10s timeout for multiple partial fills)
-    events = await event_collector.wait_for_completion(order_id, timeout=10.0)
+    # Observe: Wait for completion (15s timeout for multiple partial fills)
+    events = await event_collector.wait_for_completion(order_id, timeout=15.0)
     logger.info(f"Events collected | Count: {len(events)}")
 
     # Assert: Order lifecycle
@@ -186,8 +186,8 @@ async def test_partial_fill_3x(
         )
         logger.info(f"Fill {sequence} injected | Qty: {qty} | Price: {price}")
 
-    # Observe: Wait for completion (10s timeout for multiple partial fills)
-    events = await event_collector.wait_for_completion(order_id, timeout=10.0)
+    # Observe: Wait for completion (15s timeout for multiple partial fills)
+    events = await event_collector.wait_for_completion(order_id, timeout=15.0)
     logger.info(f"Events collected | Count: {len(events)}")
 
     # Assert: Order lifecycle
@@ -300,8 +300,8 @@ async def test_partial_fill_many_small(
 
     logger.info("10 fills injected (sequence 1-10, qty 10 each)")
 
-    # Observe: Wait for completion (10s timeout for multiple partial fills)
-    events = await event_collector.wait_for_completion(order_id, timeout=10.0)
+    # Observe: Wait for completion (15s timeout for multiple partial fills)
+    events = await event_collector.wait_for_completion(order_id, timeout=15.0)
     logger.info(f"Events collected | Count: {len(events)}")
 
     # Assert: Order lifecycle

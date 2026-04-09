@@ -358,3 +358,152 @@ class MockClient:
         else:
             self._sequence_tracker.clear()
             log.debug("Reset all sequence trackers")
+
+    async def create_order(
+        self,
+        broker_id: str,
+        account_id: str,
+        order_request: dict,
+    ) -> dict:
+        """
+        Create an order in mock service.
+
+        Syncs order from BAS to mock service so fills can be injected.
+
+        Args:
+            broker_id: Broker identifier
+            account_id: Account identifier
+            order_request: Order creation request dict
+
+        Returns:
+            Response from mock service
+
+        Raises:
+            httpx.HTTPError: If request fails
+        """
+        client = self._get_client()
+        headers = self._get_headers()
+        url = f"/api/v1/order/{broker_id}/{account_id}"
+
+        try:
+            response = await client.post(
+                url,
+                json=order_request,
+                headers=headers,
+            )
+            response.raise_for_status()
+            log.debug(f"Order created in mock service | broker_id={broker_id} | account_id={account_id}")
+            return response.json()
+        except httpx.HTTPError as e:
+            log.error(f"Order creation in mock service failed: {e}")
+            raise
+
+    async def sync_order(
+        self,
+        broker_id: str,
+        account_id: str,
+        order_response: dict,
+    ) -> dict:
+        """
+        Sync a BAS order response to mock service.
+
+        Extracts order details from BAS response (with instrument_id from MDS)
+        and creates order in mock service for fill injection.
+
+        Follows MDS principle: instrument_id used throughout system (not broker symbols).
+
+        Args:
+            broker_id: Broker identifier (e.g., "fyers")
+            account_id: Account identifier
+            order_response: BasOrderPlaceResponse dict with broker_order_id, legs, etc.
+
+        Returns:
+            Response from mock service with created order
+
+        Raises:
+            httpx.HTTPError: If sync fails
+            ValueError: If response format is invalid
+        """
+        try:
+            # Extract order data from BAS response
+            order_id = order_response.get("broker_order_id")
+            if not order_id:
+                raise ValueError("order_response must have broker_order_id")
+
+            # Extract first leg (BAS returns multi-leg orders, but mock service uses single-instrument)
+            legs = order_response.get("legs", [])
+            if not legs:
+                raise ValueError("order_response must have at least one leg")
+
+            first_leg = legs[0]
+            instrument_id = first_leg.get("instrument_id")
+            if not instrument_id:
+                raise ValueError("leg must have instrument_id (from MDS)")
+
+            # Build order request for mock service with correct instrument_id
+            sync_request = {
+                "order_id": order_id,
+                "instrument_id": instrument_id,  # Use MDS instrument_id (NOT broker symbol)
+                "instrument_type": first_leg.get("instrument_type", "EQUITY"),
+                "side": first_leg.get("side"),
+                "qty": first_leg.get("qty"),
+                "order_type": order_response.get("order_type", "MARKET"),
+                "tif": order_response.get("tif", "DAY"),
+                "price": order_response.get("price"),
+            }
+
+            client = self._get_client()
+            headers = self._get_headers()
+            url = f"/api/v1/order/{broker_id}/{account_id}"
+
+            response = await client.post(
+                url,
+                json=sync_request,
+                headers=headers,
+            )
+            response.raise_for_status()
+            log.debug(
+                f"Order synced to mock service | order_id={order_id} | "
+                f"instrument_id={instrument_id} | broker_id={broker_id} | account_id={account_id}"
+            )
+            return response.json()
+        except httpx.HTTPError as e:
+            log.error(f"Order sync to mock service failed: {e}")
+            raise
+        except (ValueError, KeyError) as e:
+            log.error(f"Invalid order response format for sync: {e}")
+            raise
+
+    async def cleanup_execution_state(
+        self,
+        broker_id: str,
+        account_id: str,
+    ) -> dict:
+        """
+        Clear execution state for all orders in an account.
+
+        Resets sequence tracking in mock service database.
+        Used during test setup to ensure fresh fills start with sequence 1.
+
+        Args:
+            broker_id: Broker identifier
+            account_id: Account identifier
+
+        Returns:
+            Response with count of cleared execution state records
+
+        Raises:
+            httpx.HTTPError: If request fails
+        """
+        client = self._get_client()
+        headers = self._get_headers()
+        url = f"/api/v1/cleanup/execution_state/{broker_id}/{account_id}"
+
+        try:
+            response = await client.delete(url, headers=headers)
+            response.raise_for_status()
+            log.debug(f"Execution state cleared | broker_id={broker_id} | account_id={account_id}")
+            return response.json()
+        except httpx.HTTPError as e:
+            log.error(f"Execution state cleanup failed: {e}")
+            raise

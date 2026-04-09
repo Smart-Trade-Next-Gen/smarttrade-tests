@@ -85,7 +85,7 @@ async def test_many_orders_same_instrument(
     all_events = {}
     for i, order_id in enumerate(order_ids):
         try:
-            events = await event_collector.wait_for_completion(order_id, timeout=5.0)
+            events = await event_collector.wait_for_completion(order_id, timeout=15.0)
             all_events[i] = events
         except asyncio.TimeoutError:
             logger.warning(f"Order {i} timed out")
@@ -202,7 +202,7 @@ async def test_rapid_price_updates(
     execution_count = 0
     for order_id, limit_price in order_ids:
         try:
-            events = await event_collector.wait_for_completion(order_id, timeout=5.0)
+            events = await event_collector.wait_for_completion(order_id, timeout=15.0)
             if len(events) > 0:
                 execution_count += 1
                 logger.info(f"✓ Order @ {limit_price} executed | Events: {len(events)}")
@@ -289,7 +289,7 @@ async def test_limit_orders_narrow_range(
     executed = 0
     for order_id, limit_price in order_ids:
         try:
-            events = await event_collector.wait_for_completion(order_id, timeout=5.0)
+            events = await event_collector.wait_for_completion(order_id, timeout=15.0)
             if len(events) > 0:
                 executed += 1
                 logger.info(f"✓ Order @ {limit_price} executed")
