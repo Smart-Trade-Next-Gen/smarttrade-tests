@@ -17,6 +17,7 @@ Real Execution Mode (Phase 6):
 """
 
 import pytest
+import uuid
 from decimal import Decimal
 
 from smarttrade_common.schemas.types import OrderSide, OrderType, TimeInForce, PositionType
@@ -42,7 +43,7 @@ async def test_market_buy_executes_immediately(
     - Event sequence and order lifecycle
     - Position created with fill price
     """
-    broker_id = "mock"
+    broker_id = "fyers"
 
     # Arrange: Capture pre-state
     pre_funds = await bas_client.get_funds(broker_id, test_account_id)
@@ -50,7 +51,7 @@ async def test_market_buy_executes_immediately(
 
     # Act: Place market BUY order
     order_request = BasOrderPlaceRequest(
-        client_order_id=f"test_market_buy_real_{test_account_id}",
+        client_order_id=f"test_market_buy_real_{test_account_id}_{uuid.uuid4().hex[:8]}",
         position_type=PositionType.INTRADAY,
         legs=[
             BasOrderLeg(
@@ -118,12 +119,12 @@ async def test_limit_buy_triggers_on_price_cross(
     - Fills when price drops to ≤ 3800
     - Position reflects fill price (not order price)
     """
-    broker_id = "mock"
+    broker_id = "fyers"
 
     # Act: Place LIMIT BUY
     limit_price = Decimal("3800.00")
     order_request = BasOrderPlaceRequest(
-        client_order_id=f"test_limit_buy_real_{test_account_id}",
+        client_order_id=f"test_limit_buy_real_{test_account_id}_{uuid.uuid4().hex[:8]}",
         position_type=PositionType.INTRADAY,
         legs=[
             BasOrderLeg(
@@ -199,12 +200,12 @@ async def test_limit_sell_triggers_on_price_cross(
     - Fills when price rises to ≥ 3900
     - Short position created
     """
-    broker_id = "mock"
+    broker_id = "fyers"
 
     # Act: Place LIMIT SELL (short, intraday allowed)
     limit_price = Decimal("3900.00")
     order_request = BasOrderPlaceRequest(
-        client_order_id=f"test_limit_sell_real_{test_account_id}",
+        client_order_id=f"test_limit_sell_real_{test_account_id}_{uuid.uuid4().hex[:8]}",
         position_type=PositionType.INTRADAY,
         legs=[
             BasOrderLeg(
@@ -277,12 +278,12 @@ async def test_stop_buy_triggers_on_price_cross(
     - STOP BUY @ 2450 (activates when price ≥ 2450)
     - Executes as MARKET after trigger
     """
-    broker_id = "mock"
+    broker_id = "fyers"
 
     # Act: Place STOP BUY
     stop_price = Decimal("2450.00")
     order_request = BasOrderPlaceRequest(
-        client_order_id=f"test_stop_buy_real_{test_account_id}",
+        client_order_id=f"test_stop_buy_real_{test_account_id}_{uuid.uuid4().hex[:8]}",
         position_type=PositionType.INTRADAY,
         legs=[
             BasOrderLeg(

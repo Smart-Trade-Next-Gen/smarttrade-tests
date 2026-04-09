@@ -15,6 +15,7 @@ Real Execution Mode (Phase 6):
 """
 
 import pytest
+import uuid
 from decimal import Decimal
 
 from smarttrade_common.schemas.types import OrderSide, OrderType, TimeInForce, PositionType
@@ -41,12 +42,12 @@ async def test_partial_fill_streaming_prices_2x(
     - Final WAP: (50*2945 + 50*2946) / 100 = 2945.50
     - Position accumulates correctly across fills
     """
-    broker_id = "mock"
+    broker_id = "fyers"
     instrument_id = "INSTR_NSE_RELIANCE_EQ"
 
     # Act: Place MARKET BUY order for 100 shares
     order_request = BasOrderPlaceRequest(
-        client_order_id=f"test_streaming_2x_{test_account_id}",
+        client_order_id=f"test_streaming_2x_{test_account_id}_{uuid.uuid4().hex[:8]}",
         position_type=PositionType.INTRADAY,
         legs=[
             BasOrderLeg(
@@ -131,13 +132,13 @@ async def test_limit_order_partial_fills_on_price_movement(
     - Additional price movements trigger additional fills
     - Final position reflects all accumulated fills
     """
-    broker_id = "mock"
+    broker_id = "fyers"
     instrument_id = "INSTR_NSE_TCS_EQ"
 
     # Act: Place LIMIT BUY for 150 shares
     limit_price = Decimal("3800.00")
     order_request = BasOrderPlaceRequest(
-        client_order_id=f"test_limit_streaming_{test_account_id}",
+        client_order_id=f"test_limit_streaming_{test_account_id}_{uuid.uuid4().hex[:8]}",
         position_type=PositionType.INTRADAY,
         legs=[
             BasOrderLeg(
@@ -220,13 +221,13 @@ async def test_concurrent_orders_partial_fills(
     - Events remain isolated per order
     - Positions reflect both orders
     """
-    broker_id = "mock"
+    broker_id = "fyers"
     buy_instrument = "INSTR_NSE_AXIS_EQ"
     sell_instrument = "INSTR_NSE_INFY_EQ"
 
     # Act: Place BUY order
     buy_request = BasOrderPlaceRequest(
-        client_order_id=f"test_concurrent_buy_stream_{test_account_id}",
+        client_order_id=f"test_concurrent_buy_stream_{test_account_id}_{uuid.uuid4().hex[:8]}",
         position_type=PositionType.INTRADAY,
         legs=[
             BasOrderLeg(
@@ -246,7 +247,7 @@ async def test_concurrent_orders_partial_fills(
 
     # Place SELL order
     sell_request = BasOrderPlaceRequest(
-        client_order_id=f"test_concurrent_sell_stream_{test_account_id}",
+        client_order_id=f"test_concurrent_sell_stream_{test_account_id}_{uuid.uuid4().hex[:8]}",
         position_type=PositionType.INTRADAY,
         legs=[
             BasOrderLeg(
