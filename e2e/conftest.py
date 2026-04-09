@@ -41,6 +41,8 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "real_execution: real execution mode")
     config.addinivalue_line("markers", "resilience: network failures")
     config.addinivalue_line("markers", "chaos: chaos testing")
+    config.addinivalue_line("markers", "sequential: tests that must run sequentially")
+    config.addinivalue_line("markers", "slow: tests that need extended timeout")
 
     # Configure logging based on environment
     env = os.getenv("E2E_ENV", "dev").lower()
@@ -50,6 +52,29 @@ def pytest_configure(config):
     # Ensure reports directory exists
     reports_dir = Path(__file__).parent / "reports"
     reports_dir.mkdir(exist_ok=True)
+
+
+def pytest_collection_modifyitems(config, items):
+    """Mark problematic tests as sequential to avoid WebSocket connection contention."""
+    # Test classes/modules that have concurrent connection issues
+    problematic_patterns = [
+        "test_concurrent_orders_injection",
+        "test_partial_fills_injection",
+        "test_order_lifecycle_injection",
+        "test_market_buy_real_execution",
+        "test_partial_fills_real_execution",
+    ]
+
+    for item in items:
+        # Mark tests as sequential if they match problematic patterns
+        for pattern in problematic_patterns:
+            if pattern in item.nodeid:
+                item.add_marker(pytest.mark.sequential)
+                break
+
+        # Mark real execution tests as slow (they need more time)
+        if "real_execution" in item.nodeid:
+            item.add_marker(pytest.mark.slow)
 
 
 # ────────────────────────────────────────────────────────────────────────────────
@@ -80,6 +105,26 @@ def logger() -> logging.Logger:
     Scope: function
     """
     return logging.getLogger("e2e.test")
+
+
+@pytest.fixture(autouse=True)
+def _configure_test_timeout(request):
+    """
+    Dynamically adjust test timeout based on test type.
+
+    - Smoke tests: 30 seconds
+    - Injection tests: 20 seconds
+    - Real execution: 30 seconds (slower)
+    - Resilience: 30 seconds
+    - Sequential: 25 seconds
+    """
+    if request.node.get_closest_marker("smoke"):
+        request.node.timeout = 30
+    elif request.node.get_closest_marker("slow"):
+        request.node.timeout = 35
+    elif request.node.get_closest_marker("sequential"):
+        request.node.timeout = 25
+    # Default 60s from pytest.ini handles the rest
 
 
 @pytest.fixture(autouse=True)
