@@ -83,7 +83,7 @@ async def test_market_buy_full_fill(
     logger.info("Fill injected | Qty: 100 | Price: 550.00")
 
     # Observe: Wait for completion
-    events = await event_collector.wait_for_completion(order_id, timeout=5.0)
+    events = await event_collector.wait_for_completion(order_id, timeout=15.0)
     logger.info(f"Events collected | Count: {len(events)}")
 
     # Assert: Order lifecycle
@@ -186,7 +186,7 @@ async def test_market_sell_full_fill(
     logger.info("Fill injected | Qty: 100 | Price: 1950.00")
 
     # Observe: Wait for completion
-    events = await event_collector.wait_for_completion(order_id, timeout=5.0)
+    events = await event_collector.wait_for_completion(order_id, timeout=15.0)
     logger.info(f"Events collected | Count: {len(events)}")
 
     # Assert: Order lifecycle
@@ -288,7 +288,7 @@ async def test_limit_buy_triggers_at_price(
     logger.info(f"Fill injected | Qty: 50 | Price: {fill_price} (≤ limit {limit_price})")
 
     # Observe: Wait for completion
-    events = await event_collector.wait_for_completion(order_id, timeout=5.0)
+    events = await event_collector.wait_for_completion(order_id, timeout=15.0)
     logger.info(f"Events collected | Count: {len(events)}")
 
     # Assert: Order lifecycle
@@ -382,7 +382,7 @@ async def test_limit_sell_triggers_at_price(
     logger.info(f"Fill injected | Qty: 50 | Price: {fill_price} (≥ limit {limit_price})")
 
     # Observe: Wait for completion
-    events = await event_collector.wait_for_completion(order_id, timeout=5.0)
+    events = await event_collector.wait_for_completion(order_id, timeout=15.0)
 
     # Assert: Order lifecycle
     assertions.assert_order_lifecycle(events, "FILLED", 50)

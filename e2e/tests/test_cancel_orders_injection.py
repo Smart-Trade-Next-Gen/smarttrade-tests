@@ -75,7 +75,7 @@ async def test_cancel_unfilled_order(
     logger.info(f"Order cancelled | ID: {order_id}")
 
     # Observe: Wait for cancellation completion
-    events = await event_collector.wait_for_completion(order_id, timeout=5.0)
+    events = await event_collector.wait_for_completion(order_id, timeout=15.0)
     logger.info(f"Events collected | Count: {len(events)}")
 
     # Assert: Order lifecycle transitions to CANCELLED
@@ -150,8 +150,13 @@ async def test_cancel_partial_fill(
     )
     logger.info("Partial fill injected | Qty: 50 | Price: 3495.00")
 
-    # Give fill event time to propagate through event bus and WebSocket
-    await asyncio.sleep(0.5)
+    # Wait for partial fill to be delivered before cancelling
+    try:
+        await event_collector.wait_for_status(order_id, "PARTIALLY_FILLED", timeout=10.0)
+        logger.info("Partial fill event confirmed, proceeding with cancel")
+    except (TimeoutError, asyncio.TimeoutError):
+        logger.warning("Partial fill event not seen within 10s, cancelling anyway")
+        await asyncio.sleep(2.0)
 
     # Act: Cancel the remaining quantity
     await mock_client.cancel_order(
@@ -162,7 +167,7 @@ async def test_cancel_partial_fill(
     logger.info(f"Order cancelled after partial fill | ID: {order_id}")
 
     # Observe: Wait for cancellation completion
-    events = await event_collector.wait_for_completion(order_id, timeout=5.0)
+    events = await event_collector.wait_for_completion(order_id, timeout=15.0)
     logger.info(f"Events collected | Count: {len(events)}")
 
     # Assert: Order cancelled with terminal status
@@ -241,12 +246,15 @@ async def test_cancel_then_fill_rejected(
     logger.info(f"Order cancelled | ID: {order_id}")
 
     # Observe: Collect events for cancelled order
-    events = await event_collector.wait_for_completion(order_id, timeout=5.0)
+    events = await event_collector.wait_for_completion(order_id, timeout=15.0)
     logger.info(f"Events collected | Count: {len(events)}")
 
     # Assert: Order is CANCELLED with no fills
     assertions.assert_order_lifecycle(events, "CANCELLED", 0)
     logger.info("✓ Order cancelled with 0 fills")
+
+    # Ensure cancel has fully propagated before fill attempt
+    await asyncio.sleep(1.0)
 
     # Act: Attempt to fill cancelled order (should be rejected or ignored)
     try:

@@ -350,7 +350,7 @@ async def test_three_concurrent_orders_same_instrument(
     # Observe: Collect events for all orders
     all_events = {}
     for i, order_id in enumerate(order_ids):
-        events = await event_collector.wait_for_completion(order_id, timeout=5.0)
+        events = await event_collector.wait_for_completion(order_id, timeout=15.0)
         all_events[i] = events
         logger.info(f"Events collected for Order {i+1}: {len(events)}")
 

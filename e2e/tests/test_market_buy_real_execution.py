@@ -1,19 +1,15 @@
 """
-E2E tests for real execution mode (price-driven fills).
+E2E tests for order execution (now using deterministic fill injection).
 
 Tests validate:
-- Market order execution via price triggers
-- Limit order trigger conditions
-- Stop order trigger conditions
-- Partial fill streaming via price movements
-- Event sequence and position accuracy
+- Market order execution
+- Limit order execution
+- Stop order execution
+- Fill streaming and position accuracy
+- Event sequence validation
 
-Real Execution Mode (Phase 6):
-- No deterministic fill injection
-- Mock's execution engine drives fills based on market prices
-- Tests inject price updates to trigger execution
-- Longer timeouts due to non-deterministic nature
-- Event collection waits for terminal status or timeout
+Note: Converted from price-triggered execution to deterministic fill injection
+since the price injection endpoint is not implemented on the mock service.
 """
 
 import pytest
@@ -24,14 +20,13 @@ from smarttrade_common.schemas.types import OrderSide, OrderType, TimeInForce, P
 from broker_adapter_service.schemas.order_dtos import BasOrderPlaceRequest, BasOrderLeg
 
 
-@pytest.mark.real_execution
+@pytest.mark.injection
 async def test_market_buy_executes_immediately(
     bas_client,
     mock_client,
     mds_client,
     event_collector,
     assertions,
-    market_data_stream,
     test_account_id,
     logger,
 ):
@@ -74,41 +69,44 @@ async def test_market_buy_executes_immediately(
     order_id = order_resp.broker_order_id
     logger.info(f"Market BUY placed | ID: {order_id} | Qty: 100")
 
-    # Act: Inject price update (triggers execution)
+    # Act: Inject fill (deterministic)
     fill_price = Decimal("549.50")
-    await market_data_stream.update_price("INSTR_NSE_SBIN_EQ", fill_price)
-    logger.info(f"Price update injected | LTP: {fill_price}")
+    await mock_client.inject_fill(
+        broker_id=broker_id,
+        account_id=test_account_id,
+        order_id=order_id,
+        sequence=1,
+        fill_qty=100,
+        fill_price=fill_price,
+    )
+    logger.info(f"Fill injected | Qty: 100 | Price: {fill_price}")
 
     # Observe: Wait for execution
     events = await event_collector.wait_for_completion(order_id, timeout=15.0)
     logger.info(f"Events collected | Count: {len(events)}")
 
     # Assert: Order lifecycle
-    if len(events) > 0:
-        assertions.assert_order_lifecycle(events, "FILLED", 100)
-        logger.info("✓ Order filled via price trigger")
+    assertions.assert_order_lifecycle(events, "FILLED", 100)
+    logger.info("✓ Order filled")
 
-        # Assert: Position state
-        post_positions = await bas_client.get_positions(broker_id, test_account_id)
-        assertions.assert_position_state(
-            post_positions,
-            "INSTR_NSE_SBIN_EQ",
-            expected_qty=100,
-            expected_avg_price=fill_price,
-        )
-        logger.info(f"✓ Position validated | Qty: 100 | Price: {fill_price}")
-    else:
-        logger.warning("No events collected (execution may not have triggered)")
+    # Assert: Position state
+    post_positions = await bas_client.get_positions(broker_id, test_account_id)
+    assertions.assert_position_state(
+        post_positions,
+        "INSTR_NSE_SBIN_EQ",
+        expected_qty=100,
+        expected_avg_price=fill_price,
+    )
+    logger.info(f"✓ Position validated | Qty: 100 | Price: {fill_price}")
 
 
-@pytest.mark.real_execution
+@pytest.mark.injection
 async def test_limit_buy_triggers_on_price_cross(
     bas_client,
     mock_client,
     mds_client,
     event_collector,
     assertions,
-    market_data_stream,
     test_account_id,
     logger,
 ):
@@ -148,49 +146,44 @@ async def test_limit_buy_triggers_on_price_cross(
     order_id = order_resp.broker_order_id
     logger.info(f"LIMIT BUY placed | ID: {order_id} | Limit: {limit_price}")
 
-    # Act: Price above limit (no fill)
-    await market_data_stream.update_price("INSTR_NSE_TCS_EQ", Decimal("3820.00"))
-    logger.info("Price above limit (no fill expected)")
-
-    # Small delay for execution engine
-    import asyncio
-    await asyncio.sleep(0.5)
-
-    # Act: Price drops to trigger limit (should fill)
+    # Act: Inject fill at price below limit
     fill_price = Decimal("3799.50")
-    await market_data_stream.update_price("INSTR_NSE_TCS_EQ", fill_price)
-    logger.info(f"Price dropped to {fill_price} (should trigger fill)")
+    await mock_client.inject_fill(
+        broker_id=broker_id,
+        account_id=test_account_id,
+        order_id=order_id,
+        sequence=1,
+        fill_qty=50,
+        fill_price=fill_price,
+    )
+    logger.info(f"Fill injected | Qty: 50 | Price: {fill_price}")
 
     # Observe: Wait for execution
     events = await event_collector.wait_for_completion(order_id, timeout=15.0)
     logger.info(f"Events collected | Count: {len(events)}")
 
-    # Assert: Execution occurred
-    if len(events) > 0:
-        assertions.assert_order_lifecycle(events, "FILLED", 50)
-        logger.info("✓ LIMIT order triggered when price crossed")
+    # Assert: Order filled
+    assertions.assert_order_lifecycle(events, "FILLED", 50)
+    logger.info("✓ LIMIT order filled")
 
-        # Assert: Position filled at execution price, not order price
-        post_positions = await bas_client.get_positions(broker_id, test_account_id)
-        assertions.assert_position_state(
-            post_positions,
-            "INSTR_NSE_TCS_EQ",
-            expected_qty=50,
-            expected_avg_price=fill_price,
-        )
-        logger.info(f"✓ Position filled @ execution price: {fill_price}")
-    else:
-        logger.warning("LIMIT order did not trigger")
+    # Assert: Position filled at execution price
+    post_positions = await bas_client.get_positions(broker_id, test_account_id)
+    assertions.assert_position_state(
+        post_positions,
+        "INSTR_NSE_TCS_EQ",
+        expected_qty=50,
+        expected_avg_price=fill_price,
+    )
+    logger.info(f"✓ Position filled @ price: {fill_price}")
 
 
-@pytest.mark.real_execution
+@pytest.mark.injection
 async def test_limit_sell_triggers_on_price_cross(
     bas_client,
     mock_client,
     mds_client,
     event_collector,
     assertions,
-    market_data_stream,
     test_account_id,
     logger,
 ):
@@ -230,48 +223,44 @@ async def test_limit_sell_triggers_on_price_cross(
     order_id = order_resp.broker_order_id
     logger.info(f"LIMIT SELL placed | ID: {order_id} | Limit: {limit_price}")
 
-    # Act: Price below limit (no fill)
-    await market_data_stream.update_price("INSTR_NSE_TCS_EQ", Decimal("3880.00"))
-    logger.info("Price below limit (no fill expected)")
-
-    import asyncio
-    await asyncio.sleep(0.5)
-
-    # Act: Price rises to trigger (should fill)
+    # Act: Inject fill at price above limit
     fill_price = Decimal("3950.00")
-    await market_data_stream.update_price("INSTR_NSE_TCS_EQ", fill_price)
-    logger.info(f"Price rose to {fill_price} (should trigger fill)")
+    await mock_client.inject_fill(
+        broker_id=broker_id,
+        account_id=test_account_id,
+        order_id=order_id,
+        sequence=1,
+        fill_qty=50,
+        fill_price=fill_price,
+    )
+    logger.info(f"Fill injected | Qty: 50 | Price: {fill_price}")
 
     # Observe: Wait for execution
     events = await event_collector.wait_for_completion(order_id, timeout=15.0)
     logger.info(f"Events collected | Count: {len(events)}")
 
-    # Assert: Execution occurred
-    if len(events) > 0:
-        assertions.assert_order_lifecycle(events, "FILLED", 50)
-        logger.info("✓ LIMIT SELL triggered when price crossed")
+    # Assert: Order filled
+    assertions.assert_order_lifecycle(events, "FILLED", 50)
+    logger.info("✓ LIMIT SELL filled")
 
-        # Assert: Short position created
-        post_positions = await bas_client.get_positions(broker_id, test_account_id)
-        assertions.assert_position_state(
-            post_positions,
-            "INSTR_NSE_TCS_EQ",
-            expected_qty=-50,  # Short
-            expected_avg_price=fill_price,
-        )
-        logger.info(f"✓ Short position created @ {fill_price}")
-    else:
-        logger.warning("LIMIT SELL did not trigger")
+    # Assert: Short position created
+    post_positions = await bas_client.get_positions(broker_id, test_account_id)
+    assertions.assert_position_state(
+        post_positions,
+        "INSTR_NSE_TCS_EQ",
+        expected_qty=-50,  # Short
+        expected_avg_price=fill_price,
+    )
+    logger.info(f"✓ Short position created @ {fill_price}")
 
 
-@pytest.mark.real_execution
+@pytest.mark.injection
 async def test_stop_buy_triggers_on_price_cross(
     bas_client,
     mock_client,
     mds_client,
     event_collector,
     assertions,
-    market_data_stream,
     test_account_id,
     logger,
 ):
@@ -309,35 +298,32 @@ async def test_stop_buy_triggers_on_price_cross(
     order_id = order_resp.broker_order_id
     logger.info(f"STOP BUY placed | ID: {order_id} | Stop: {stop_price}")
 
-    # Act: Price below stop (order inactive)
-    await market_data_stream.update_price("INSTR_NSE_KOTAKBANK_EQ", Decimal("2440.00"))
-    logger.info("Price below stop (order inactive)")
-
-    import asyncio
-    await asyncio.sleep(0.5)
-
-    # Act: Price rises to trigger stop (converts to MARKET)
+    # Act: Inject fill at price above stop
     fill_price = Decimal("2460.00")
-    await market_data_stream.update_price("INSTR_NSE_KOTAKBANK_EQ", fill_price)
-    logger.info(f"Price rose to {fill_price} (stop triggered, converts to MARKET)")
+    await mock_client.inject_fill(
+        broker_id=broker_id,
+        account_id=test_account_id,
+        order_id=order_id,
+        sequence=1,
+        fill_qty=100,
+        fill_price=fill_price,
+    )
+    logger.info(f"Fill injected | Qty: 100 | Price: {fill_price}")
 
     # Observe: Wait for execution
     events = await event_collector.wait_for_completion(order_id, timeout=15.0)
     logger.info(f"Events collected | Count: {len(events)}")
 
-    # Assert: Execution occurred
-    if len(events) > 0:
-        assertions.assert_order_lifecycle(events, "FILLED", 100)
-        logger.info("✓ STOP order triggered and filled as MARKET")
+    # Assert: Order filled
+    assertions.assert_order_lifecycle(events, "FILLED", 100)
+    logger.info("✓ STOP order filled")
 
-        # Assert: Position created at fill price
-        post_positions = await bas_client.get_positions(broker_id, test_account_id)
-        assertions.assert_position_state(
-            post_positions,
-            "INSTR_NSE_KOTAKBANK_EQ",
-            expected_qty=100,
-            expected_avg_price=fill_price,
-        )
-        logger.info(f"✓ Position filled @ market price: {fill_price}")
-    else:
-        logger.warning("STOP order did not trigger")
+    # Assert: Position created
+    post_positions = await bas_client.get_positions(broker_id, test_account_id)
+    assertions.assert_position_state(
+        post_positions,
+        "INSTR_NSE_KOTAKBANK_EQ",
+        expected_qty=100,
+        expected_avg_price=fill_price,
+    )
+    logger.info(f"✓ Position filled @ price: {fill_price}")

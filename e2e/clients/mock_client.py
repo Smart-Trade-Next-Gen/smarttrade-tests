@@ -200,14 +200,23 @@ class MockClient:
             f"order_id={order_id} | sequence={sequence} | qty={fill_qty} | price={fill_price}"
         )
 
-        response = await client.post(
-            url,
-            json=execution_cmd.model_dump(mode="json"),
-            headers=headers,
-        )
-        response.raise_for_status()
-
-        return ExecutionResult.model_validate(response.json())
+        try:
+            response = await client.post(
+                url,
+                json=execution_cmd.model_dump(mode="json"),
+                headers=headers,
+            )
+            response.raise_for_status()
+            return ExecutionResult.model_validate(response.json())
+        except httpx.HTTPStatusError as e:
+            log.error(
+                f"inject_fill HTTP {e.response.status_code}: {e.response.text} | "
+                f"order_id={order_id} | sequence={sequence}"
+            )
+            raise
+        except httpx.HTTPError as e:
+            log.error(f"inject_fill connection error: {e} | order_id={order_id}")
+            raise
 
     async def inject_fills_sequence(
         self,
