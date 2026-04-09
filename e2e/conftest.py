@@ -92,27 +92,27 @@ async def setup_trading_account(bas_client, test_account_id):
 
     Scope: function
     """
-    broker_id = "fyers"
-
-    try:
-        # First delete any existing accounts with this ID (from prior test runs)
-        # This ensures we have a clean slate with the correct user_id
+    # Create trading accounts for both fyers and mock brokers (tests use either)
+    for broker_id in ["fyers", "mock"]:
         try:
-            await bas_client.delete_trading_account(broker_id, test_account_id)
-            log.debug(f"Deleted existing trading account: {broker_id}/{test_account_id}")
-        except Exception:
-            pass  # Account may not exist, that's fine
+            # First delete any existing accounts with this ID (from prior test runs)
+            # This ensures we have a clean slate with the correct user_id
+            try:
+                await bas_client.delete_trading_account(broker_id, test_account_id)
+                log.debug(f"Deleted existing trading account: {broker_id}/{test_account_id}")
+            except Exception:
+                pass  # Account may not exist, that's fine
 
-        # Create PAPER trading account
-        await bas_client.create_trading_account(
-            broker_id=broker_id,
-            account_id=test_account_id,
-            initial_funds=Decimal("1000000.00"),
-            account_type="PAPER",
-        )
-        log.debug(f"✅ Paper trading account created: {broker_id}/{test_account_id}")
-    except Exception as e:
-        log.warning(f"⚠️ Paper account creation failed for {broker_id}/{test_account_id}: {e}")
+            # Create PAPER trading account
+            await bas_client.create_trading_account(
+                broker_id=broker_id,
+                account_id=test_account_id,
+                initial_funds=Decimal("1000000.00"),
+                account_type="PAPER",
+            )
+            log.debug(f"✅ Paper trading account created: {broker_id}/{test_account_id}")
+        except Exception as e:
+            log.warning(f"⚠️ Paper account creation failed for {broker_id}/{test_account_id}: {e}")
 
     # Yield control back to test
     yield
