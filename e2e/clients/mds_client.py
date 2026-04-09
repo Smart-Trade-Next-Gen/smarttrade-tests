@@ -330,26 +330,26 @@ class MDSWebSocketClient:
 
     async def _cleanup_resources(self) -> None:
         """Cancel all background tasks and close connection."""
+        # Close connection first to interrupt any pending recv()
+        await self._cleanup_connection()
+
         # Cancel reader task
-        if self._reader_task:
+        if self._reader_task and not self._reader_task.done():
             self._reader_task.cancel()
             try:
-                await self._reader_task
-            except asyncio.CancelledError:
+                await asyncio.wait_for(self._reader_task, timeout=2.0)
+            except (asyncio.CancelledError, asyncio.TimeoutError):
                 pass
             self._reader_task = None
 
         # Cancel heartbeat task
-        if self._heartbeat_task:
+        if self._heartbeat_task and not self._heartbeat_task.done():
             self._heartbeat_task.cancel()
             try:
-                await self._heartbeat_task
-            except asyncio.CancelledError:
+                await asyncio.wait_for(self._heartbeat_task, timeout=2.0)
+            except (asyncio.CancelledError, asyncio.TimeoutError):
                 pass
             self._heartbeat_task = None
-
-        # Close connection
-        await self._cleanup_connection()
 
     async def _backoff_wait(self) -> None:
         """Wait with exponential backoff before retrying."""
