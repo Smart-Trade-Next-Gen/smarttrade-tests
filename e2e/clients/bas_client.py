@@ -519,3 +519,46 @@ class BASClient:
 
         response.raise_for_status()
         return response.json()
+
+    async def upsert_broker_connection(
+        self,
+        broker_id: str,
+        auth_type: str = "api_key",
+        credentials: dict = None,
+    ) -> dict:
+        """
+        Upsert broker connection with credentials for testing.
+
+        Args:
+            broker_id: Broker ID (e.g., "fyers")
+            auth_type: Authentication type (default: "api_key")
+            credentials: Dict with app_id, app_secret, etc.
+
+        Returns:
+            Response dict from the API
+
+        Raises:
+            httpx.HTTPError: On HTTP error
+        """
+        if credentials is None:
+            credentials = {
+                "app_id": "test_app_id",
+                "app_secret": "test_app_secret",
+            }
+
+        client = self._get_client()
+        headers = self._get_headers()
+
+        url = f"/api/v1/broker_connection/{broker_id}"
+        payload = {
+            "auth_type": auth_type,
+            "credentials": credentials,
+        }
+
+        log.debug(
+            f"Upserting broker connection | broker_id={broker_id} | auth_type={auth_type}"
+        )
+
+        response = await client.put(url, json=payload, headers=headers)
+        response.raise_for_status()
+        return response.json()

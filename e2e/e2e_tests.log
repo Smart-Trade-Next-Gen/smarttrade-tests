@@ -1,181 +1,161 @@
-2026-04-09 18:14:19 - asyncio - DEBUG - Using selector: EpollSelector
-2026-04-09 18:14:19 - e2e.clients.bas_client - DEBUG - Listing orders | broker_id=fyers | account_id=TEST_E2E_fb6869e9
-2026-04-09 18:14:19 - httpcore.connection - DEBUG - connect_tcp.started host='localhost' port=8005 local_address=None timeout=10.0 socket_options=None
-2026-04-09 18:14:19 - httpcore.connection - DEBUG - connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x7f33fcbc3e00>
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'GET']>
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - send_request_headers.complete
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'GET']>
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - send_request_body.complete
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'GET']>
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'date', b'Thu, 09 Apr 2026 12:44:19 GMT'), (b'server', b'uvicorn'), (b'content-length', b'11792'), (b'content-type', b'application/json'), (b'x-request-id', b'25b5d904-44c8-48da-9757-6548cb28ebf0'), (b'x-trace-id', b'292ad02b-567c-485c-ab07-19f65c064f25')])
-2026-04-09 18:14:19 - httpx - INFO - HTTP Request: GET http://localhost:8005/api/v1/orders/fyers/TEST_E2E_fb6869e9 "HTTP/1.1 200 OK"
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'GET']>
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - receive_response_body.complete
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - response_closed.started
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - response_closed.complete
-2026-04-09 18:14:19 - e2e.clients.bas_client - DEBUG - Deleting trading account | broker_id=fyers | account_id=TEST_E2E_fb6869e9
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'DELETE']>
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - send_request_headers.complete
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'DELETE']>
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - send_request_body.complete
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'DELETE']>
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'date', b'Thu, 09 Apr 2026 12:44:19 GMT'), (b'server', b'uvicorn'), (b'content-length', b'16'), (b'content-type', b'application/json'), (b'x-request-id', b'79338ad4-00e1-45d8-84b8-794f975c530d'), (b'x-trace-id', b'c99471fa-e7dd-446a-88ac-ccf71a1aa611')])
-2026-04-09 18:14:19 - httpx - INFO - HTTP Request: DELETE http://localhost:8005/api/v1/trading_account/fyers/TEST_E2E_fb6869e9 "HTTP/1.1 200 OK"
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'DELETE']>
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - receive_response_body.complete
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - response_closed.started
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - response_closed.complete
-2026-04-09 18:14:19 - e2e.conftest - DEBUG - Deleted existing trading account: fyers/TEST_E2E_fb6869e9
-2026-04-09 18:14:19 - e2e.clients.bas_client - DEBUG - Creating trading account | broker_id=fyers | account_id=TEST_E2E_fb6869e9 | initial_balance=1000000.00
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - send_request_headers.complete
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - send_request_body.complete
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'date', b'Thu, 09 Apr 2026 12:44:19 GMT'), (b'server', b'uvicorn'), (b'content-length', b'338'), (b'content-type', b'application/json'), (b'x-request-id', b'a34ec20a-28e7-45dd-818a-44d73db80a2e'), (b'x-trace-id', b'f74b39ac-1cdd-4485-9b6d-b2b3229f97eb')])
-2026-04-09 18:14:19 - httpx - INFO - HTTP Request: POST http://localhost:8005/api/v1/trading_account/fyers "HTTP/1.1 200 OK"
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - receive_response_body.complete
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - response_closed.started
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - response_closed.complete
-2026-04-09 18:14:19 - e2e.conftest - DEBUG - ✅ Paper trading account created: fyers/TEST_E2E_fb6869e9
-2026-04-09 18:14:19 - e2e.clients.bas_client - DEBUG - Deleting trading account | broker_id=mock | account_id=TEST_E2E_fb6869e9
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'DELETE']>
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - send_request_headers.complete
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'DELETE']>
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - send_request_body.complete
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'DELETE']>
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'date', b'Thu, 09 Apr 2026 12:44:19 GMT'), (b'server', b'uvicorn'), (b'content-length', b'16'), (b'content-type', b'application/json'), (b'x-request-id', b'30eeec99-a349-483b-87ed-1ce34dc37223'), (b'x-trace-id', b'2da7d961-21e5-43b2-9636-59b9c6f7fddd')])
-2026-04-09 18:14:19 - httpx - INFO - HTTP Request: DELETE http://localhost:8005/api/v1/trading_account/mock/TEST_E2E_fb6869e9 "HTTP/1.1 200 OK"
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'DELETE']>
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - receive_response_body.complete
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - response_closed.started
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - response_closed.complete
-2026-04-09 18:14:19 - e2e.conftest - DEBUG - Deleted existing trading account: mock/TEST_E2E_fb6869e9
-2026-04-09 18:14:19 - e2e.clients.bas_client - DEBUG - Creating trading account | broker_id=mock | account_id=TEST_E2E_fb6869e9 | initial_balance=1000000.00
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - send_request_headers.complete
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - send_request_body.complete
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'date', b'Thu, 09 Apr 2026 12:44:19 GMT'), (b'server', b'uvicorn'), (b'content-length', b'337'), (b'content-type', b'application/json'), (b'x-request-id', b'94ddd769-33e4-4721-8d9c-5442cb5c6727'), (b'x-trace-id', b'aa6f54e9-000c-4c2b-bfec-073b2a946c65')])
-2026-04-09 18:14:19 - httpx - INFO - HTTP Request: POST http://localhost:8005/api/v1/trading_account/mock "HTTP/1.1 200 OK"
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - receive_response_body.complete
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - response_closed.started
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - response_closed.complete
-2026-04-09 18:14:19 - e2e.conftest - DEBUG - ✅ Paper trading account created: mock/TEST_E2E_fb6869e9
-2026-04-09 18:14:19 - e2e.clients.mds_client - INFO - Connecting to MDS | ws_url=ws://localhost:8004/ws/fyers/ui | account_id=TEST_E2E_fb6869e9
-2026-04-09 18:14:19 - websockets.client - DEBUG - = connection is CONNECTING
-2026-04-09 18:14:19 - websockets.client - DEBUG - > GET /ws/fyers/ui?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDEiLCJyb2xlcyI6WyJ1c2VyIl0sInR5cGUiOiJhY2Nlc3MiLCJpYXQiOjE3NzU3MTg4NTksImV4cCI6MTc3NTgwNTI1OSwiaXNzIjoiYXV0aC1zZXJ2aWNlIiwiYXVkIjoic21hcnR0cmFkZS1zZXJ2aWNlcyJ9.LmLAgo9nLvAc8HoNjqHrxTdpdgrjRVQoV6BHjhYaOXI HTTP/1.1
-2026-04-09 18:14:19 - websockets.client - DEBUG - > Host: localhost:8004
-2026-04-09 18:14:19 - websockets.client - DEBUG - > Upgrade: websocket
-2026-04-09 18:14:19 - websockets.client - DEBUG - > Connection: Upgrade
-2026-04-09 18:14:19 - websockets.client - DEBUG - > Sec-WebSocket-Key: PBryb7UqGiAfNiOYqUauxA==
-2026-04-09 18:14:19 - websockets.client - DEBUG - > Sec-WebSocket-Version: 13
-2026-04-09 18:14:19 - websockets.client - DEBUG - > Sec-WebSocket-Extensions: permessage-deflate; client_max_window_bits
-2026-04-09 18:14:19 - websockets.client - DEBUG - > User-Agent: Python/3.14 websockets/16.0
-2026-04-09 18:14:19 - websockets.client - DEBUG - < HTTP/1.1 101 Switching Protocols
-2026-04-09 18:14:19 - websockets.client - DEBUG - < Upgrade: websocket
-2026-04-09 18:14:19 - websockets.client - DEBUG - < Connection: Upgrade
-2026-04-09 18:14:19 - websockets.client - DEBUG - < Sec-WebSocket-Accept: SDAbNoY/rgNbncmiRF142xGl8o0=
-2026-04-09 18:14:19 - websockets.client - DEBUG - < Sec-WebSocket-Extensions: permessage-deflate
-2026-04-09 18:14:19 - websockets.client - DEBUG - < date: Thu, 09 Apr 2026 12:44:18 GMT
-2026-04-09 18:14:19 - websockets.client - DEBUG - < server: uvicorn
-2026-04-09 18:14:19 - websockets.client - DEBUG - = connection is OPEN
-2026-04-09 18:14:19 - e2e.clients.mds_client - INFO - WebSocket connected to ws://localhost:8004/ws/fyers/ui
-2026-04-09 18:14:19 - e2e.clients.mds_client - DEBUG - Reader loop started
-2026-04-09 18:14:19 - e2e.clients.mds_client - DEBUG - Reader loop iteration - connection=True
-2026-04-09 18:14:19 - websockets.client - DEBUG - < TEXT '{"type":"system.connected","conn_id":"49232e30-...","consumer_type":"ui"}' [166 bytes]
-2026-04-09 18:14:19 - e2e.clients.mds_client - DEBUG - Reader loop received message type: system.connected
-2026-04-09 18:14:19 - e2e.clients.mds_client - DEBUG - Received system.connected from MDS
-2026-04-09 18:14:19 - e2e.clients.mds_client - DEBUG - Reader loop iteration - connection=True
-2026-04-09 18:14:19 - websockets.client - DEBUG - < TEXT '{"type":"system.heartbeat"}' [27 bytes]
-2026-04-09 18:14:19 - e2e.clients.mds_client - INFO - MDS connection established | account_id=TEST_E2E_fb6869e9
-2026-04-09 18:14:19 - e2e.clients.mds_client - INFO - Subscribing to account | account_id=TEST_E2E_fb6869e9
-2026-04-09 18:14:19 - websockets.client - DEBUG - > TEXT '{"action": "subscribe.account", "accounts": [{"... "TEST_E2E_fb6869e9"}]}' [82 bytes]
-2026-04-09 18:14:19 - e2e.clients.mds_client - INFO - Subscription confirmed | account_id=TEST_E2E_fb6869e9
-2026-04-09 18:14:19 - e2e.clients.mds_client - DEBUG - Reader loop received message type: system.heartbeat
-2026-04-09 18:14:19 - e2e.clients.mds_client - DEBUG - Unknown message type: system.heartbeat
-2026-04-09 18:14:19 - e2e.clients.mds_client - DEBUG - Reader loop iteration - connection=True
-2026-04-09 18:14:19 - e2e.clients.bas_client - DEBUG - Getting funds | broker_id=fyers | account_id=TEST_E2E_fb6869e9
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'GET']>
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - send_request_headers.complete
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'GET']>
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - send_request_body.complete
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'GET']>
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 404, b'Not Found', [(b'date', b'Thu, 09 Apr 2026 12:44:19 GMT'), (b'server', b'uvicorn'), (b'content-length', b'22'), (b'content-type', b'application/json'), (b'x-request-id', b'77125492-f000-46b6-b1b4-ba70ffb273ff'), (b'x-trace-id', b'0771eb67-1315-4bd9-9cd5-24a8f40d5b50')])
-2026-04-09 18:14:19 - httpx - INFO - HTTP Request: GET http://localhost:8005/api/v1/funds/fyers/TEST_E2E_fb6869e9 "HTTP/1.1 404 Not Found"
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'GET']>
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - receive_response_body.complete
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - response_closed.started
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - response_closed.complete
-2026-04-09 18:14:19 - e2e.clients.bas_client - INFO - Account TEST_E2E_fb6869e9 not found, returning default funds for testing
-2026-04-09 18:14:19 - e2e.test - INFO - Pre-state captured | Funds: 1000000.00
-2026-04-09 18:14:19 - e2e.clients.bas_client - DEBUG - Placing order | broker_id=fyers | account_id=TEST_E2E_fb6869e9 | idempotency_key=a138a69f-ea3d-475f-ad8d-ab4e4df3b66b
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - send_request_headers.complete
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - send_request_body.complete
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
-2026-04-09 18:14:19 - websockets.client - DEBUG - < TEXT '{"type":"error.event","error_code":"WS_INVALID"...st.","request_id":null}' [176 bytes]
-2026-04-09 18:14:19 - e2e.clients.mds_client - DEBUG - Reader loop received message type: error.event
-2026-04-09 18:14:19 - e2e.clients.mds_client - DEBUG - Unknown message type: error.event
-2026-04-09 18:14:19 - e2e.clients.mds_client - DEBUG - Reader loop iteration - connection=True
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'date', b'Thu, 09 Apr 2026 12:44:19 GMT'), (b'server', b'uvicorn'), (b'content-length', b'241'), (b'content-type', b'application/json'), (b'x-request-id', b'e45bacc6-8f55-49c2-9a94-e71de4239895'), (b'x-trace-id', b'673b35eb-808a-4c76-b41f-c317ab1d8786')])
-2026-04-09 18:14:19 - httpx - INFO - HTTP Request: POST http://localhost:8005/api/v1/orders/fyers/TEST_E2E_fb6869e9 "HTTP/1.1 200 OK"
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - receive_response_body.complete
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - response_closed.started
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - response_closed.complete
-2026-04-09 18:14:19 - e2e.test - INFO - Order placed | ID: 3448d6d4-bbaa-486b-ada3-c44b6c8bddef | Status: OrderStatus.PENDING
-2026-04-09 18:14:19 - e2e.clients.mock_client - DEBUG - Injecting fill | broker_id=fyers | account_id=TEST_E2E_fb6869e9 | order_id=3448d6d4-bbaa-486b-ada3-c44b6c8bddef | sequence=1 | qty=100 | price=550.00
-2026-04-09 18:14:19 - httpcore.connection - DEBUG - connect_tcp.started host='localhost' port=8002 local_address=None timeout=5.0 socket_options=None
-2026-04-09 18:14:19 - httpcore.connection - DEBUG - connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x7f33fc989590>
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - send_request_headers.complete
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - send_request_body.complete
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'date', b'Thu, 09 Apr 2026 12:44:19 GMT'), (b'server', b'uvicorn'), (b'content-length', b'1362'), (b'content-type', b'application/json'), (b'x-request-id', b'd96d4276-5754-4576-9e6c-c33fa1589b11'), (b'x-trace-id', b'8047b080-df6d-4f86-a9f4-31eee74b3186')])
-2026-04-09 18:14:19 - httpx - INFO - HTTP Request: POST http://localhost:8002/api/v1/execute/fyers/TEST_E2E_fb6869e9 "HTTP/1.1 200 OK"
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - receive_response_body.complete
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - response_closed.started
-2026-04-09 18:14:19 - httpcore.http11 - DEBUG - response_closed.complete
-2026-04-09 18:14:19 - e2e.test - INFO - Fill injected | Qty: 100 | Price: 550.00
-2026-04-09 18:14:23 - websockets.client - DEBUG - < TEXT '{"type":"order_fill","account_id":"TEST_E2E_fb6...04-09T12:44:23.495414"}' [561 bytes]
-2026-04-09 18:14:23 - e2e.clients.mds_client - DEBUG - Reader loop received message type: order_fill
-2026-04-09 18:14:23 - e2e.clients.mds_client - DEBUG - Event received: order_fill
-2026-04-09 18:14:23 - e2e.clients.mds_client - DEBUG - Reader loop iteration - connection=True
-2026-04-09 18:14:23 - e2e.conftest - DEBUG - Collected event: order_id=3448d6d4-bbaa-486b-ada3-c44b6c8bddef, type=order_fill, status=PARTIALLY_FILLED, qty=100
-2026-04-09 18:14:23 - websockets.client - DEBUG - < TEXT '{"type":"trade_exec","account_id":"TEST_E2E_fb6...04-09T12:44:23.496573"}' [565 bytes]
-2026-04-09 18:14:23 - e2e.clients.mds_client - DEBUG - Reader loop received message type: trade_exec
-2026-04-09 18:14:23 - e2e.clients.mds_client - DEBUG - Event received: trade_exec
-2026-04-09 18:14:23 - e2e.clients.mds_client - DEBUG - Reader loop iteration - connection=True
-2026-04-09 18:14:23 - e2e.conftest - DEBUG - Collected event: order_id=3448d6d4-bbaa-486b-ada3-c44b6c8bddef, type=trade_exec, status=None, qty=100
-2026-04-09 18:14:23 - websockets.client - DEBUG - < TEXT '{"type":"position_update","account_id":"TEST_E2...04-09T12:44:23.497745"}' [600 bytes]
-2026-04-09 18:14:23 - e2e.clients.mds_client - DEBUG - Reader loop received message type: position_update
-2026-04-09 18:14:23 - e2e.clients.mds_client - DEBUG - Event received: position_update
-2026-04-09 18:14:23 - e2e.clients.mds_client - DEBUG - Reader loop iteration - connection=True
-2026-04-09 18:14:23 - e2e.conftest - DEBUG - No order_id in event type=position_update, skipping
-2026-04-09 18:14:24 - websockets.client - DEBUG - < TEXT '{"type":"system.heartbeat"}' [27 bytes]
-2026-04-09 18:14:24 - e2e.clients.mds_client - DEBUG - Reader loop received message type: system.heartbeat
-2026-04-09 18:14:24 - e2e.clients.mds_client - DEBUG - Unknown message type: system.heartbeat
-2026-04-09 18:14:24 - e2e.clients.mds_client - DEBUG - Reader loop iteration - connection=True
-2026-04-09 18:14:29 - websockets.client - DEBUG - < TEXT '{"type":"system.heartbeat"}' [27 bytes]
-2026-04-09 18:14:29 - e2e.clients.mds_client - DEBUG - Reader loop received message type: system.heartbeat
-2026-04-09 18:14:29 - e2e.clients.mds_client - DEBUG - Unknown message type: system.heartbeat
-2026-04-09 18:14:29 - e2e.clients.mds_client - DEBUG - Reader loop iteration - connection=True
-2026-04-09 18:14:34 - websockets.client - DEBUG - < TEXT '{"type":"system.heartbeat"}' [27 bytes]
-2026-04-09 18:14:34 - e2e.clients.mds_client - DEBUG - Reader loop received message type: system.heartbeat
-2026-04-09 18:14:34 - e2e.clients.mds_client - DEBUG - Unknown message type: system.heartbeat
-2026-04-09 18:14:34 - e2e.clients.mds_client - DEBUG - Reader loop iteration - connection=True
-2026-04-09 18:14:34 - e2e.clients.mds_client - DEBUG - Error closing connection: 'ClientConnection' object has no attribute 'aclose'
-2026-04-09 18:14:34 - e2e.clients.mds_client - DEBUG - Reader loop cancelled
-2026-04-09 18:14:34 - e2e.clients.mds_client - INFO - MDS disconnected | account_id=TEST_E2E_fb6869e9
-2026-04-09 18:14:34 - e2e.harness.event_collector - DEBUG - Cleared all events
-2026-04-09 18:14:34 - httpcore.connection - DEBUG - close.started
-2026-04-09 18:14:34 - httpcore.connection - DEBUG - close.complete
-2026-04-09 18:14:34 - httpcore.connection - DEBUG - close.started
-2026-04-09 18:14:34 - httpcore.connection - DEBUG - close.complete
+2026-04-09 18:20:11 - asyncio - DEBUG - Using selector: EpollSelector
+2026-04-09 18:20:11 - e2e.clients.bas_client - DEBUG - Listing orders | broker_id=fyers | account_id=TEST_E2E_5f474ebf
+2026-04-09 18:20:11 - httpcore.connection - DEBUG - connect_tcp.started host='localhost' port=8005 local_address=None timeout=10.0 socket_options=None
+2026-04-09 18:20:11 - httpcore.connection - DEBUG - connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x7f04da838050>
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'GET']>
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_headers.complete
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'GET']>
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_body.complete
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'GET']>
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'date', b'Thu, 09 Apr 2026 12:50:11 GMT'), (b'server', b'uvicorn'), (b'content-length', b'966'), (b'content-type', b'application/json'), (b'x-request-id', b'f974662f-24c4-4930-a61a-9d5835274b0f'), (b'x-trace-id', b'd27d3453-5fd1-4f65-8e1d-90d23651988b')])
+2026-04-09 18:20:11 - httpx - INFO - HTTP Request: GET http://localhost:8005/api/v1/orders/fyers/TEST_E2E_5f474ebf "HTTP/1.1 200 OK"
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'GET']>
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_body.complete
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - response_closed.started
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - response_closed.complete
+2026-04-09 18:20:11 - e2e.clients.bas_client - DEBUG - Deleting trading account | broker_id=fyers | account_id=TEST_E2E_5f474ebf
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'DELETE']>
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_headers.complete
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'DELETE']>
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_body.complete
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'DELETE']>
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'date', b'Thu, 09 Apr 2026 12:50:11 GMT'), (b'server', b'uvicorn'), (b'content-length', b'16'), (b'content-type', b'application/json'), (b'x-request-id', b'cdbdd938-1f1c-4a6a-ae05-b24ceb35586a'), (b'x-trace-id', b'f1de4ba9-50fe-460a-857e-6685b13f1947')])
+2026-04-09 18:20:11 - httpx - INFO - HTTP Request: DELETE http://localhost:8005/api/v1/trading_account/fyers/TEST_E2E_5f474ebf "HTTP/1.1 200 OK"
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'DELETE']>
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_body.complete
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - response_closed.started
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - response_closed.complete
+2026-04-09 18:20:11 - e2e.conftest - DEBUG - Deleted existing trading account: fyers/TEST_E2E_5f474ebf
+2026-04-09 18:20:11 - e2e.clients.bas_client - DEBUG - Creating trading account | broker_id=fyers | account_id=TEST_E2E_5f474ebf | initial_balance=1000000.00
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_headers.complete
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_body.complete
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'date', b'Thu, 09 Apr 2026 12:50:11 GMT'), (b'server', b'uvicorn'), (b'content-length', b'338'), (b'content-type', b'application/json'), (b'x-request-id', b'4a8d54b2-a065-47f2-b097-967aa4efe8f4'), (b'x-trace-id', b'41140830-4cc8-4576-84f4-c4b36f7a86c0')])
+2026-04-09 18:20:11 - httpx - INFO - HTTP Request: POST http://localhost:8005/api/v1/trading_account/fyers "HTTP/1.1 200 OK"
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_body.complete
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - response_closed.started
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - response_closed.complete
+2026-04-09 18:20:11 - e2e.conftest - DEBUG - ✅ Paper trading account created: fyers/TEST_E2E_5f474ebf
+2026-04-09 18:20:11 - e2e.clients.bas_client - DEBUG - Deleting trading account | broker_id=mock | account_id=TEST_E2E_5f474ebf
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'DELETE']>
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_headers.complete
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'DELETE']>
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_body.complete
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'DELETE']>
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'date', b'Thu, 09 Apr 2026 12:50:11 GMT'), (b'server', b'uvicorn'), (b'content-length', b'16'), (b'content-type', b'application/json'), (b'x-request-id', b'967494a3-487a-42ad-8403-a025407f8bbc'), (b'x-trace-id', b'bdb5cbd2-9ede-42ac-bf53-c763f8b9ada3')])
+2026-04-09 18:20:11 - httpx - INFO - HTTP Request: DELETE http://localhost:8005/api/v1/trading_account/mock/TEST_E2E_5f474ebf "HTTP/1.1 200 OK"
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'DELETE']>
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_body.complete
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - response_closed.started
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - response_closed.complete
+2026-04-09 18:20:11 - e2e.conftest - DEBUG - Deleted existing trading account: mock/TEST_E2E_5f474ebf
+2026-04-09 18:20:11 - e2e.clients.bas_client - DEBUG - Creating trading account | broker_id=mock | account_id=TEST_E2E_5f474ebf | initial_balance=1000000.00
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_headers.complete
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_body.complete
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'date', b'Thu, 09 Apr 2026 12:50:11 GMT'), (b'server', b'uvicorn'), (b'content-length', b'337'), (b'content-type', b'application/json'), (b'x-request-id', b'3955c9fa-7fd8-4851-a3bf-b0f918b3af09'), (b'x-trace-id', b'82330196-6d07-4e85-bbd6-e1e0b76ecc46')])
+2026-04-09 18:20:11 - httpx - INFO - HTTP Request: POST http://localhost:8005/api/v1/trading_account/mock "HTTP/1.1 200 OK"
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_body.complete
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - response_closed.started
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - response_closed.complete
+2026-04-09 18:20:11 - e2e.conftest - DEBUG - ✅ Paper trading account created: mock/TEST_E2E_5f474ebf
+2026-04-09 18:20:11 - e2e.clients.mds_client - INFO - Connecting to MDS | ws_url=ws://localhost:8004/ws/fyers/ui | account_id=TEST_E2E_5f474ebf
+2026-04-09 18:20:11 - websockets.client - DEBUG - = connection is CONNECTING
+2026-04-09 18:20:11 - websockets.client - DEBUG - > GET /ws/fyers/ui?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDEiLCJyb2xlcyI6WyJ1c2VyIl0sInR5cGUiOiJhY2Nlc3MiLCJpYXQiOjE3NzU3MTkyMTEsImV4cCI6MTc3NTgwNTYxMSwiaXNzIjoiYXV0aC1zZXJ2aWNlIiwiYXVkIjoic21hcnR0cmFkZS1zZXJ2aWNlcyJ9.DgpYLpkXWhdVUQ7LTovPx_MIvqU6DJJ-RRsYm5FqsO8 HTTP/1.1
+2026-04-09 18:20:11 - websockets.client - DEBUG - > Host: localhost:8004
+2026-04-09 18:20:11 - websockets.client - DEBUG - > Upgrade: websocket
+2026-04-09 18:20:11 - websockets.client - DEBUG - > Connection: Upgrade
+2026-04-09 18:20:11 - websockets.client - DEBUG - > Sec-WebSocket-Key: 3Z7QkSmaynF1PmMXNPju3Q==
+2026-04-09 18:20:11 - websockets.client - DEBUG - > Sec-WebSocket-Version: 13
+2026-04-09 18:20:11 - websockets.client - DEBUG - > Sec-WebSocket-Extensions: permessage-deflate; client_max_window_bits
+2026-04-09 18:20:11 - websockets.client - DEBUG - > User-Agent: Python/3.14 websockets/16.0
+2026-04-09 18:20:11 - websockets.client - DEBUG - < HTTP/1.1 101 Switching Protocols
+2026-04-09 18:20:11 - websockets.client - DEBUG - < Upgrade: websocket
+2026-04-09 18:20:11 - websockets.client - DEBUG - < Connection: Upgrade
+2026-04-09 18:20:11 - websockets.client - DEBUG - < Sec-WebSocket-Accept: sNJTD7RcMG49mnyr85aEYRyNpRY=
+2026-04-09 18:20:11 - websockets.client - DEBUG - < Sec-WebSocket-Extensions: permessage-deflate
+2026-04-09 18:20:11 - websockets.client - DEBUG - < date: Thu, 09 Apr 2026 12:50:11 GMT
+2026-04-09 18:20:11 - websockets.client - DEBUG - < server: uvicorn
+2026-04-09 18:20:11 - websockets.client - DEBUG - = connection is OPEN
+2026-04-09 18:20:11 - e2e.clients.mds_client - INFO - WebSocket connected to ws://localhost:8004/ws/fyers/ui
+2026-04-09 18:20:11 - e2e.clients.mds_client - DEBUG - Reader loop started
+2026-04-09 18:20:11 - e2e.clients.mds_client - DEBUG - Reader loop iteration - connection=True
+2026-04-09 18:20:11 - websockets.client - DEBUG - < TEXT '{"type":"system.connected","conn_id":"a96b03a2-...","consumer_type":"ui"}' [166 bytes]
+2026-04-09 18:20:11 - websockets.client - DEBUG - < TEXT '{"type":"system.heartbeat"}' [27 bytes]
+2026-04-09 18:20:11 - e2e.clients.mds_client - DEBUG - Reader loop received message type: system.connected
+2026-04-09 18:20:11 - e2e.clients.mds_client - DEBUG - Received system.connected from MDS
+2026-04-09 18:20:11 - e2e.clients.mds_client - DEBUG - Reader loop iteration - connection=True
+2026-04-09 18:20:11 - e2e.clients.mds_client - DEBUG - Reader loop received message type: system.heartbeat
+2026-04-09 18:20:11 - e2e.clients.mds_client - DEBUG - Unknown message type: system.heartbeat
+2026-04-09 18:20:11 - e2e.clients.mds_client - DEBUG - Reader loop iteration - connection=True
+2026-04-09 18:20:11 - e2e.clients.mds_client - INFO - MDS connection established | account_id=TEST_E2E_5f474ebf
+2026-04-09 18:20:11 - e2e.clients.mds_client - INFO - Subscribing to account | account_id=TEST_E2E_5f474ebf
+2026-04-09 18:20:11 - websockets.client - DEBUG - > TEXT '{"action": "subscribe.account", "accounts": [{"... "TEST_E2E_5f474ebf"}]}' [82 bytes]
+2026-04-09 18:20:11 - e2e.clients.mds_client - INFO - Subscription confirmed | account_id=TEST_E2E_5f474ebf
+2026-04-09 18:20:11 - e2e.clients.bas_client - DEBUG - Placing order | broker_id=fyers | account_id=TEST_E2E_5f474ebf | idempotency_key=940339a2-1a5e-41c6-bed4-277ff7ec9956
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_headers.complete
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_body.complete
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'date', b'Thu, 09 Apr 2026 12:50:11 GMT'), (b'server', b'uvicorn'), (b'content-length', b'241'), (b'content-type', b'application/json'), (b'x-request-id', b'ce59d8d7-9baa-410a-a718-b6eab097c6e9'), (b'x-trace-id', b'a5057060-ea12-4d99-8e98-fb6556cd430a')])
+2026-04-09 18:20:11 - httpx - INFO - HTTP Request: POST http://localhost:8005/api/v1/orders/fyers/TEST_E2E_5f474ebf "HTTP/1.1 200 OK"
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_body.complete
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - response_closed.started
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - response_closed.complete
+2026-04-09 18:20:11 - e2e.test - INFO - Order placed | ID: c4f74c1f-b23e-472d-be3e-59dcee4e55e5 | Total Qty: 100
+2026-04-09 18:20:11 - e2e.clients.mock_client - DEBUG - Injecting fill | broker_id=fyers | account_id=TEST_E2E_5f474ebf | order_id=c4f74c1f-b23e-472d-be3e-59dcee4e55e5 | sequence=1 | qty=50 | price=2945.00
+2026-04-09 18:20:11 - httpcore.connection - DEBUG - connect_tcp.started host='localhost' port=8002 local_address=None timeout=5.0 socket_options=None
+2026-04-09 18:20:11 - httpcore.connection - DEBUG - connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x7f04da855310>
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_headers.complete
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_body.complete
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'date', b'Thu, 09 Apr 2026 12:50:11 GMT'), (b'server', b'uvicorn'), (b'content-length', b'141'), (b'content-type', b'application/json'), (b'x-request-id', b'70388827-e5f4-4ce7-9b51-badc63eccb51'), (b'x-trace-id', b'decea7e2-711c-4b7a-b4c4-17e703e2b83a')])
+2026-04-09 18:20:11 - httpx - INFO - HTTP Request: POST http://localhost:8002/api/v1/execute/fyers/TEST_E2E_5f474ebf "HTTP/1.1 200 OK"
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_body.complete
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - response_closed.started
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - response_closed.complete
+2026-04-09 18:20:11 - e2e.test - INFO - Fill 1 injected | Qty: 50 | Price: 2945.00
+2026-04-09 18:20:11 - e2e.clients.mock_client - DEBUG - Injecting fill | broker_id=fyers | account_id=TEST_E2E_5f474ebf | order_id=c4f74c1f-b23e-472d-be3e-59dcee4e55e5 | sequence=2 | qty=50 | price=2946.00
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_headers.complete
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_body.complete
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'date', b'Thu, 09 Apr 2026 12:50:11 GMT'), (b'server', b'uvicorn'), (b'content-length', b'141'), (b'content-type', b'application/json'), (b'x-request-id', b'5c67eb42-54fb-4a31-aab0-700bc4828dd5'), (b'x-trace-id', b'a0fcd156-cff3-46d8-8fcd-f87f2ae493c0')])
+2026-04-09 18:20:11 - httpx - INFO - HTTP Request: POST http://localhost:8002/api/v1/execute/fyers/TEST_E2E_5f474ebf "HTTP/1.1 200 OK"
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_body.complete
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - response_closed.started
+2026-04-09 18:20:11 - httpcore.http11 - DEBUG - response_closed.complete
+2026-04-09 18:20:11 - e2e.test - INFO - Fill 2 injected | Qty: 50 | Price: 2946.00
+2026-04-09 18:20:11 - websockets.client - DEBUG - < TEXT '{"type":"error.event","error_code":"WS_INVALID"...st.","request_id":null}' [176 bytes]
+2026-04-09 18:20:11 - e2e.clients.mds_client - DEBUG - Reader loop received message type: error.event
+2026-04-09 18:20:11 - e2e.clients.mds_client - DEBUG - Unknown message type: error.event
+2026-04-09 18:20:11 - e2e.clients.mds_client - DEBUG - Reader loop iteration - connection=True
+2026-04-09 18:20:16 - websockets.client - DEBUG - < TEXT '{"type":"system.heartbeat"}' [27 bytes]
+2026-04-09 18:20:16 - e2e.clients.mds_client - DEBUG - Reader loop received message type: system.heartbeat
+2026-04-09 18:20:16 - e2e.clients.mds_client - DEBUG - Unknown message type: system.heartbeat
+2026-04-09 18:20:16 - e2e.clients.mds_client - DEBUG - Reader loop iteration - connection=True
+2026-04-09 18:20:21 - websockets.client - DEBUG - < TEXT '{"type":"system.heartbeat"}' [27 bytes]
+2026-04-09 18:20:21 - e2e.clients.mds_client - DEBUG - Reader loop received message type: system.heartbeat
+2026-04-09 18:20:21 - e2e.clients.mds_client - DEBUG - Unknown message type: system.heartbeat
+2026-04-09 18:20:21 - e2e.clients.mds_client - DEBUG - Reader loop iteration - connection=True
+2026-04-09 18:20:21 - e2e.clients.mds_client - DEBUG - Error closing connection: 'ClientConnection' object has no attribute 'aclose'
+2026-04-09 18:20:21 - e2e.clients.mds_client - DEBUG - Reader loop cancelled
+2026-04-09 18:20:21 - e2e.clients.mds_client - INFO - MDS disconnected | account_id=TEST_E2E_5f474ebf
+2026-04-09 18:20:21 - e2e.harness.event_collector - DEBUG - Cleared all events
+2026-04-09 18:20:21 - httpcore.connection - DEBUG - close.started
+2026-04-09 18:20:21 - httpcore.connection - DEBUG - close.complete
+2026-04-09 18:20:21 - httpcore.connection - DEBUG - close.started
+2026-04-09 18:20:21 - httpcore.connection - DEBUG - close.complete

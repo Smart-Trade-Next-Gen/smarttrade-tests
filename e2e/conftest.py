@@ -165,6 +165,39 @@ async def setup_trading_account(bas_client, test_account_id):
     # Cleanup is optional - accounts can be reused
 
 
+@pytest.fixture(autouse=True)
+async def setup_broker_credentials(bas_client):
+    """
+    Seed broker credentials for MDS to use (autouse).
+
+    Creates broker connections with test credentials before each test.
+    MDS needs these credentials to validate trading accounts and initialize plugins.
+
+    Scope: function
+    """
+    # Create broker connections for fyers (MDS uses these when WebSocket connects)
+    for broker_id in ["fyers", "mock"]:
+        try:
+            # Upsert broker connection with test credentials
+            # These will be used by MDS when it needs to initialize broker plugins
+            await bas_client.upsert_broker_connection(
+                broker_id=broker_id,
+                auth_type="api_key",
+                credentials={
+                    "app_id": f"test_{broker_id}_app_id",
+                    "app_secret": f"test_{broker_id}_app_secret",
+                }
+            )
+            log.debug(f"✅ Broker credentials seeded: {broker_id}")
+        except Exception as e:
+            log.warning(f"⚠️ Broker credential seeding failed for {broker_id}: {e}")
+
+    # Yield control back to test
+    yield
+
+    # Cleanup is optional - credentials can be reused
+
+
 @pytest.fixture
 def test_account_id(request) -> str:
     """

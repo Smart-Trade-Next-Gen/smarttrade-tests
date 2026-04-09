@@ -12,6 +12,7 @@ from typing import AsyncIterator, Optional
 
 import websockets
 from websockets.asyncio.client import ClientConnection
+from websockets.exceptions import ConnectionClosed
 
 log = logging.getLogger(__name__)
 
@@ -235,6 +236,16 @@ class MDSWebSocketClient:
                 except json.JSONDecodeError as e:
                     log.warning(f"Malformed JSON message: {e}, skipping")
 
+                except ConnectionClosed as e:
+                    # Check if this is a "Replaced by new connection" close
+                    if e.rcvd and "Replaced by new connection" in str(e.rcvd.reason):
+                        log.info(f"Connection replaced by MDS (normal idempotency handling), stopping gracefully")
+                        self.is_connected = False
+                        break
+                    else:
+                        log.error(f"Reader error: Connection closed: {e}")
+                        await self._handle_disconnect()
+
                 except Exception as e:
                     log.error(f"Reader error: {e}")
                     await self._handle_disconnect()
@@ -323,7 +334,11 @@ class MDSWebSocketClient:
         """Close WebSocket connection safely."""
         if self.connection:
             try:
-                await self.connection.aclose()
+                self.connection.close()
+                try:
+                    await asyncio.wait_for(self.connection.wait_closed(), timeout=2.0)
+                except asyncio.TimeoutError:
+                    log.warning("Timeout waiting for WebSocket to close")
             except Exception as e:
                 log.debug(f"Error closing connection: {e}")
             self.connection = None
