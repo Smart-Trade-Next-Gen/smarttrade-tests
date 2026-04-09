@@ -41,7 +41,7 @@ async def test_many_orders_same_instrument(
     - No event loss or corruption
     - WAP calculation across all orders
     """
-    broker_id = "mock"
+    broker_id = "fyers"
     instrument_id = "INSTR_NSE_RELIANCE_EQ"
     num_orders = 10
     qty_per_order = 100
@@ -141,7 +141,7 @@ async def test_rapid_price_updates(
     - Event sequencing remains correct under load
     - No race conditions or event loss
     """
-    broker_id = "mock"
+    broker_id = "fyers"
     instrument_id = "INSTR_NSE_HDFC_EQ"
 
     # Act: Place LIMIT BUY orders at different prices
@@ -238,7 +238,7 @@ async def test_limit_orders_narrow_range(
     - Partial fills if price touches range multiple times
     - Event sequencing remains correct
     """
-    broker_id = "mock"
+    broker_id = "fyers"
     instrument_id = "INSTR_NSE_TCS_EQ"
 
     # Act: Place LIMIT BUY orders in narrow range

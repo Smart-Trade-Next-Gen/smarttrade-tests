@@ -35,7 +35,7 @@ async def test_partial_fill_2x(
     - Weighted average price calculation: (50*150.50 + 50*150.75) / 100 = 150.625
     - Cumulative fill tracking
     """
-    broker_id = "mock"
+    broker_id = "fyers"
 
     # Act: Create and place order for 100 shares
     order_request = BasOrderPlaceRequest(
@@ -134,7 +134,7 @@ async def test_partial_fill_3x(
     - Weighted average price: (50*2945 + 50*2946 + 50*2947) / 150 = 2946.00
     - Proper event sequencing (sequence 1, 2, 3)
     """
-    broker_id = "mock"
+    broker_id = "fyers"
 
     # Act: Create and place order for 150 shares
     order_request = BasOrderPlaceRequest(
@@ -237,7 +237,7 @@ async def test_partial_fill_many_small(
     - Sequence numbers 1..5
     - Cumulative tracking with many events
     """
-    broker_id = "mock"
+    broker_id = "fyers"
 
     # Act: Create and place order for 100 shares (10 fills of 10 each)
     order_request = BasOrderPlaceRequest(

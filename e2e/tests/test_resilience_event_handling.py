@@ -42,7 +42,7 @@ async def test_duplicate_fill_events_idempotent(
     - Order state reflects single fill, not double
     - Position qty is correct (not doubled)
     """
-    broker_id = "mock"
+    broker_id = "fyers"
 
     # Act: Place order
     order_request = BasOrderPlaceRequest(
@@ -130,7 +130,7 @@ async def test_partial_fill_then_missing_event(
     - Order state eventually shows correct cumulative fill
     - No stuck/orphaned orders
     """
-    broker_id = "mock"
+    broker_id = "fyers"
 
     # Act: Place order for 100 shares
     order_request = BasOrderPlaceRequest(
@@ -221,7 +221,7 @@ async def test_out_of_order_fill_events(
     - Final position state is correct
     - WAP calculation is accurate
     """
-    broker_id = "mock"
+    broker_id = "fyers"
 
     # Act: Place order
     order_request = BasOrderPlaceRequest(
@@ -327,7 +327,7 @@ async def test_recovery_after_event_stream_interruption(
     - Events resume after reconnection
     - No events are lost
     """
-    broker_id = "mock"
+    broker_id = "fyers"
 
     # Act: Place order
     order_request = BasOrderPlaceRequest(

@@ -35,7 +35,7 @@ async def test_zero_quantity_order_rejected(
     - No order is placed
     - No events are generated
     """
-    broker_id = "mock"
+    broker_id = "fyers"
 
     # Act: Attempt to place order with qty=0
     try:
@@ -87,7 +87,7 @@ async def test_negative_quantity_order_rejected(
     - Request validation catches negative qty
     - Pydantic/validation layer prevents negative values
     """
-    broker_id = "mock"
+    broker_id = "fyers"
 
     # Act: Attempt to place order with qty=-100
     try:
@@ -136,7 +136,7 @@ async def test_invalid_limit_price_zero(
     - Request validation catches invalid price
     - LIMIT orders require non-zero, positive price
     """
-    broker_id = "mock"
+    broker_id = "fyers"
 
     # Act: Attempt LIMIT order with price=0
     try:
@@ -185,7 +185,7 @@ async def test_overfill_rejected(
     - Second fill: 60 qty (exceeds order qty of 100, should be rejected or capped to 50)
     - Final filled qty ≤ order qty
     """
-    broker_id = "mock"
+    broker_id = "fyers"
 
     # Act: Place order for 100 shares
     order_request = BasOrderPlaceRequest(
@@ -275,7 +275,7 @@ async def test_sequence_violation_ignored(
     - Sequence 2 → (late, should be rejected if strict)
     - Final event sequence is monotonic
     """
-    broker_id = "mock"
+    broker_id = "fyers"
 
     # Act: Place order
     order_request = BasOrderPlaceRequest(

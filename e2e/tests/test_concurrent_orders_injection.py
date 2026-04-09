@@ -39,7 +39,7 @@ async def test_two_concurrent_buy_orders(
     - Final positions reflect both buys
     - No event cross-contamination
     """
-    broker_id = "mock"
+    broker_id = "fyers"
 
     # Act: Place two BUY orders concurrently
     order_request_1 = BasOrderPlaceRequest(
@@ -162,7 +162,7 @@ async def test_concurrent_buy_and_sell(
     - Positions reflect both (long + short)
     - Financial invariants: debit for BUY, credit for SELL
     """
-    broker_id = "mock"
+    broker_id = "fyers"
 
     # Act: Place BUY and SELL orders concurrently
     buy_request = BasOrderPlaceRequest(
@@ -304,7 +304,7 @@ async def test_three_concurrent_orders_same_instrument(
     - WAP calculated correctly from three fills
     - No event cross-contamination
     """
-    broker_id = "mock"
+    broker_id = "fyers"
 
     # Act: Place three BUY orders on same instrument
     order_ids = []

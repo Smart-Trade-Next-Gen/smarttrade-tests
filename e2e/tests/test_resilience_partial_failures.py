@@ -43,7 +43,7 @@ async def test_concurrent_orders_with_partial_failures(
     - Failed orders can be retried
     - Overall system recovers
     """
-    broker_id = "mock"
+    broker_id = "fyers"
 
     # Act: Place 5 concurrent orders
     order_requests = []
@@ -132,7 +132,7 @@ async def test_recovery_after_service_slowdown(
     - Service recovers and returns to normal
     - No orders are lost during slowdown
     """
-    broker_id = "mock"
+    broker_id = "fyers"
 
     # Phase 1: Normal operation
     logger.info("Phase 1: Normal operation")
@@ -217,7 +217,7 @@ async def test_invariants_preserved_under_partial_failures(
     - Sum of positions matches trades
     - WAP is mathematically correct
     """
-    broker_id = "mock"
+    broker_id = "fyers"
 
     # Arrange: Capture initial state
     pre_funds = await bas_client.get_funds(broker_id, test_account_id)

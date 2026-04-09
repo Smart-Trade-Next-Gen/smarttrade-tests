@@ -44,7 +44,7 @@ async def test_order_placement_under_mock_latency(
     - Order status is PENDING after placement
     - No partial orders created
     """
-    broker_id = "mock"
+    broker_id = "fyers"
 
     # Act: Attempt to place order while mock is slow
     order_request = BasOrderPlaceRequest(
@@ -106,7 +106,7 @@ async def test_fill_injection_retry_on_timeout(
     - Order eventually fills
     - No partial fills or duplicates
     """
-    broker_id = "mock"
+    broker_id = "fyers"
 
     # Act: Place order
     order_request = BasOrderPlaceRequest(
@@ -180,7 +180,7 @@ async def test_event_collection_with_delayed_delivery(
     - No events are lost despite delays
     - Event ordering preserved despite latency
     """
-    broker_id = "mock"
+    broker_id = "fyers"
 
     # Act: Place and fill order
     order_request = BasOrderPlaceRequest(
@@ -253,7 +253,7 @@ async def test_position_state_consistent_under_latency(
     - No data corruption from concurrent latency
     - Financial invariants preserved
     """
-    broker_id = "mock"
+    broker_id = "fyers"
 
     # Arrange: Capture pre-state
     pre_funds = await bas_client.get_funds(broker_id, test_account_id)
