@@ -60,8 +60,8 @@ class MDSWebSocketClient:
         self._heartbeat_task: Optional[asyncio.Task] = None
         self._subscribed = False
         self._backoff = initial_backoff
-        self._event_queue: asyncio.Queue = asyncio.Queue(maxsize=1000)
-        self._system_connected_event: asyncio.Event = asyncio.Event()
+        self._event_queue: Optional[asyncio.Queue] = None
+        self._system_connected_event: Optional[asyncio.Event] = None
 
     async def __aenter__(self) -> "MDSWebSocketClient":
         """Async context manager entry."""
@@ -92,6 +92,12 @@ class MDSWebSocketClient:
                     timeout=self.timeout,
                 )
                 log.info(f"WebSocket connected to {self.ws_url}")
+
+                # Initialize lazy resources (bound to current event loop)
+                if self._event_queue is None:
+                    self._event_queue = asyncio.Queue(maxsize=1000)
+                if self._system_connected_event is None:
+                    self._system_connected_event = asyncio.Event()
 
                 # Reset system connected event for new connection
                 self._system_connected_event.clear()
@@ -203,7 +209,7 @@ class MDSWebSocketClient:
         Raises:
             RuntimeError: If not connected
         """
-        if not self.is_connected:
+        if not self.is_connected or self._event_queue is None:
             raise RuntimeError("Not connected to MDS. Call connect() first.")
 
         while self.is_connected:
@@ -227,14 +233,18 @@ class MDSWebSocketClient:
         Routes messages to appropriate handlers (heartbeats, subscriptions, events).
         Handles reconnection on disconnect.
         """
+        log.debug("Reader loop started")
         try:
-            while self.is_connected and self.connection:
+            while self.connection:
+                log.debug(f"Reader loop iteration - connection={self.connection is not None}")
                 try:
                     message = await asyncio.wait_for(
                         self.connection.recv(),
                         timeout=self.timeout,
                     )
-                    await self._handle_message(json.loads(message))
+                    data = json.loads(message)
+                    log.debug(f"Reader loop received message type: {data.get('type')}")
+                    await self._handle_message(data)
 
                 except asyncio.TimeoutError:
                     log.warning(f"WebSocket receive timeout, reconnecting...")
@@ -284,7 +294,8 @@ class MDSWebSocketClient:
 
         if msg_type == "system.connected":
             log.debug("Received system.connected from MDS")
-            self._system_connected_event.set()
+            if self._system_connected_event:
+                self._system_connected_event.set()
 
         elif msg_type == "heartbeat":
             log.debug("Received heartbeat from MDS")
@@ -298,15 +309,16 @@ class MDSWebSocketClient:
         elif msg_type in {"order.update", "trade.update", "position.update", "order_fill", "trade_exec", "position_update", "order_cancelled"}:
             log.debug(f"Event received: {msg_type}")
             # Add event to queue for stream_events() to yield
-            try:
-                self._event_queue.put_nowait(data)
-            except asyncio.QueueFull:
-                log.warning(f"Event queue full, dropping oldest event")
+            if self._event_queue:
                 try:
-                    self._event_queue.get_nowait()
                     self._event_queue.put_nowait(data)
-                except Exception as e:
-                    log.error(f"Failed to handle event queue: {e}")
+                except asyncio.QueueFull:
+                    log.warning(f"Event queue full, dropping oldest event")
+                    try:
+                        self._event_queue.get_nowait()
+                        self._event_queue.put_nowait(data)
+                    except Exception as e:
+                        log.error(f"Failed to handle event queue: {e}")
 
         else:
             log.debug(f"Unknown message type: {msg_type}")
