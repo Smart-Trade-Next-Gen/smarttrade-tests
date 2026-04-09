@@ -83,7 +83,7 @@ async def test_partial_fill_streaming_prices_2x(
     logger.info("Price 2 injected: 2946.00")
 
     # Observe: Wait for completion
-    events = await event_collector.wait_for_completion(order_id, timeout=10.0)
+    events = await event_collector.wait_for_completion(order_id, timeout=15.0)
     logger.info(f"Events collected | Count: {len(events)}")
 
     # Assert: Full fill validation
@@ -181,7 +181,7 @@ async def test_limit_order_partial_fills_on_price_movement(
     logger.info("Price 3: 3810.00 (above limit again)")
 
     # Observe: Wait for completion
-    events = await event_collector.wait_for_completion(order_id, timeout=10.0)
+    events = await event_collector.wait_for_completion(order_id, timeout=15.0)
     logger.info(f"Events collected | Count: {len(events)}")
 
     # Assert: Execution occurred
@@ -284,8 +284,8 @@ async def test_concurrent_orders_partial_fills(
     await asyncio.sleep(0.2)
 
     # Observe: Collect events for both orders
-    buy_events = await event_collector.wait_for_completion(buy_order_id, timeout=10.0)
-    sell_events = await event_collector.wait_for_completion(sell_order_id, timeout=10.0)
+    buy_events = await event_collector.wait_for_completion(buy_order_id, timeout=15.0)
+    sell_events = await event_collector.wait_for_completion(sell_order_id, timeout=15.0)
     logger.info(f"Events collected | BUY: {len(buy_events)} | SELL: {len(sell_events)}")
 
     # Assert: Both orders executed

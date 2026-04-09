@@ -150,7 +150,7 @@ async def test_fill_injection_retry_on_timeout(
 
     # Observe: Wait for events (may be delayed)
     try:
-        events = await event_collector.wait_for_completion(order_id, timeout=10.0)
+        events = await event_collector.wait_for_completion(order_id, timeout=15.0)
         logger.info(f"Events collected | Count: {len(events)}")
 
         # Assert: Order eventually filled

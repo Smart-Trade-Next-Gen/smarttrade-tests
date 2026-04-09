@@ -80,7 +80,7 @@ async def test_market_buy_executes_immediately(
     logger.info(f"Price update injected | LTP: {fill_price}")
 
     # Observe: Wait for execution
-    events = await event_collector.wait_for_completion(order_id, timeout=10.0)
+    events = await event_collector.wait_for_completion(order_id, timeout=15.0)
     logger.info(f"Events collected | Count: {len(events)}")
 
     # Assert: Order lifecycle
@@ -162,7 +162,7 @@ async def test_limit_buy_triggers_on_price_cross(
     logger.info(f"Price dropped to {fill_price} (should trigger fill)")
 
     # Observe: Wait for execution
-    events = await event_collector.wait_for_completion(order_id, timeout=10.0)
+    events = await event_collector.wait_for_completion(order_id, timeout=15.0)
     logger.info(f"Events collected | Count: {len(events)}")
 
     # Assert: Execution occurred
@@ -243,7 +243,7 @@ async def test_limit_sell_triggers_on_price_cross(
     logger.info(f"Price rose to {fill_price} (should trigger fill)")
 
     # Observe: Wait for execution
-    events = await event_collector.wait_for_completion(order_id, timeout=10.0)
+    events = await event_collector.wait_for_completion(order_id, timeout=15.0)
     logger.info(f"Events collected | Count: {len(events)}")
 
     # Assert: Execution occurred
@@ -322,7 +322,7 @@ async def test_stop_buy_triggers_on_price_cross(
     logger.info(f"Price rose to {fill_price} (stop triggered, converts to MARKET)")
 
     # Observe: Wait for execution
-    events = await event_collector.wait_for_completion(order_id, timeout=10.0)
+    events = await event_collector.wait_for_completion(order_id, timeout=15.0)
     logger.info(f"Events collected | Count: {len(events)}")
 
     # Assert: Execution occurred

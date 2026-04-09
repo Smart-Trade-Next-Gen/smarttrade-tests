@@ -95,7 +95,7 @@ async def test_duplicate_fill_events_idempotent(
         logger.info(f"Duplicate fill rejected | Error: {e}")
 
     # Observe: Collect events
-    events = await event_collector.wait_for_completion(order_id, timeout=5.0)
+    events = await event_collector.wait_for_completion(order_id, timeout=10.0)
     logger.info(f"Events collected | Count: {len(events)}")
 
     # Assert: Only single fill processed

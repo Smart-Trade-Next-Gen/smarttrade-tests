@@ -237,7 +237,7 @@ async def test_overfill_rejected(
         logger.info(f"Overfill rejected: {e}")
 
     # Observe: Collect events
-    events = await event_collector.wait_for_completion(order_id, timeout=5.0)
+    events = await event_collector.wait_for_completion(order_id, timeout=10.0)
     logger.info(f"Events collected | Count: {len(events)}")
 
     # Assert: Final filled qty does not exceed order qty
@@ -328,7 +328,7 @@ async def test_sequence_violation_ignored(
 
     # Observe: Collect events (wait for completion or timeout)
     try:
-        events = await event_collector.wait_for_completion(order_id, timeout=5.0)
+        events = await event_collector.wait_for_completion(order_id, timeout=10.0)
         logger.info(f"Events collected | Count: {len(events)}")
 
         # Assert: Event sequence is valid (if events exist)

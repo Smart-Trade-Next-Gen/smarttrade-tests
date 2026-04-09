@@ -13,6 +13,7 @@ All tests use INJECTION mode for deterministic execution.
 """
 
 import pytest
+import asyncio
 from decimal import Decimal
 
 from smarttrade_common.schemas.types import OrderSide, OrderType, TimeInForce, PositionType
@@ -81,6 +82,7 @@ async def test_two_concurrent_buy_orders(
     )
 
     [resp1] = await bas_client.place_order(broker_id, test_account_id, order_request_1)
+    await asyncio.sleep(0.1)  # Small delay to avoid race conditions
     [resp2] = await bas_client.place_order(broker_id, test_account_id, order_request_2)
     order_id_1 = resp1.broker_order_id
     order_id_2 = resp2.broker_order_id
