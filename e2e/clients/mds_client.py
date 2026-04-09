@@ -28,6 +28,7 @@ class MDSWebSocketClient:
         self,
         ws_url: str,
         account_id: str,
+        token: str,
         timeout: float = 30.0,
         heartbeat_interval: float = 5.0,
         initial_backoff: float = 1.0,
@@ -39,6 +40,7 @@ class MDSWebSocketClient:
         Args:
             ws_url: WebSocket URL for MDS (e.g., ws://localhost:8004)
             account_id: Account ID for subscription
+            token: JWT token for authentication
             timeout: Connection timeout in seconds (default: 30.0)
             heartbeat_interval: Interval for responding to heartbeats (default: 5.0)
             initial_backoff: Initial reconnect backoff in seconds (default: 1.0)
@@ -46,6 +48,7 @@ class MDSWebSocketClient:
         """
         self.ws_url = ws_url.rstrip("/")
         self.account_id = account_id
+        self.token = token
         self.timeout = timeout
         self.heartbeat_interval = heartbeat_interval
         self.initial_backoff = initial_backoff
@@ -81,8 +84,10 @@ class MDSWebSocketClient:
                 log.info(
                     f"Connecting to MDS | ws_url={self.ws_url} | account_id={self.account_id}"
                 )
+                # Add token as query parameter for authentication
+                ws_url_with_token = f"{self.ws_url}?token={self.token}"
                 self.connection = await asyncio.wait_for(
-                    websockets.asyncio.client.connect(self.ws_url),
+                    websockets.asyncio.client.connect(ws_url_with_token),
                     timeout=self.timeout,
                 )
                 log.info(f"WebSocket connected to {self.ws_url}")
@@ -220,7 +225,7 @@ class MDSWebSocketClient:
             )
             data = json.loads(message)
 
-            if data.get("type") == "system" and data.get("status") == "connected":
+            if data.get("type") == "system.connected":
                 log.debug("Received system.connected from MDS")
                 return
 

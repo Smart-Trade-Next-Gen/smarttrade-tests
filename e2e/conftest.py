@@ -226,20 +226,24 @@ async def market_data_stream(mock_client: MockClient, config: TestConfig) -> Moc
 
 @pytest.fixture
 async def mds_client(
-    config: TestConfig, auth_token: str, event_collector: EventCollector
+    config: TestConfig, auth_token: str, event_collector: EventCollector, test_account_id: str
 ) -> AsyncGenerator[MDSWebSocketClient, None]:
     """
     Provide MDSWebSocketClient instance with subscription and event streaming.
 
     Scope: function (fresh connection per test)
     """
+    # Use "ui" consumer type to avoid auto-subscription issues (BAS would need trading accounts)
+    ws_url_with_path = f"{config.mds_ws_url}/ws/{config.broker_id}/ui"
+
     client = MDSWebSocketClient(
-        ws_url=config.mds_ws_url,
-        account_id=config.account_id,
+        ws_url=ws_url_with_path,
+        account_id=test_account_id,
+        token=auth_token,
         timeout=config.timeout_slow,
     )
     await client.connect()
-    await client.subscribe_account(config.account_id)
+    await client.subscribe_account(test_account_id)
 
     # Start background task to stream events into event_collector
     async def stream_to_collector():
