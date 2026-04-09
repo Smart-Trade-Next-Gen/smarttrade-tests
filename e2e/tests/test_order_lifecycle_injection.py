@@ -149,9 +149,9 @@ async def test_market_sell_full_fill(
     pre_funds = await bas_client.get_funds(broker_id, test_account_id)
     logger.info(f"Pre-state captured | Funds: {pre_funds.total_equity}")
 
-    # Act: Create and place order
+    # Act: Create and place order (use unique client_order_id to bypass idempotency cache)
     order_request = BasOrderPlaceRequest(
-        client_order_id=f"test_market_sell_{test_account_id}",
+        client_order_id=f"test_market_sell_{test_account_id}_{uuid.uuid4().hex[:8]}",
         position_type=PositionType.INTRADAY,
         legs=[
             BasOrderLeg(
@@ -242,10 +242,10 @@ async def test_limit_buy_triggers_at_price(
     pre_funds = await bas_client.get_funds(broker_id, test_account_id)
     logger.info(f"Pre-state captured | Funds: {pre_funds.total_equity}")
 
-    # Act: Create and place order
+    # Act: Create and place order (use unique client_order_id to bypass idempotency cache)
     limit_price = Decimal("3800.00")
     order_request = BasOrderPlaceRequest(
-        client_order_id=f"test_limit_buy_{test_account_id}",
+        client_order_id=f"test_limit_buy_{test_account_id}_{uuid.uuid4().hex[:8]}",
         position_type=PositionType.INTRADAY,
         legs=[
             BasOrderLeg(
@@ -329,10 +329,10 @@ async def test_limit_sell_triggers_at_price(
     # Arrange: Capture pre-state
     pre_funds = await bas_client.get_funds(broker_id, test_account_id)
 
-    # Act: Create and place order
+    # Act: Create and place order (use unique client_order_id to bypass idempotency cache)
     limit_price = Decimal("3900.00")
     order_request = BasOrderPlaceRequest(
-        client_order_id=f"test_limit_sell_{test_account_id}",
+        client_order_id=f"test_limit_sell_{test_account_id}_{uuid.uuid4().hex[:8]}",
         position_type=PositionType.INTRADAY,
         legs=[
             BasOrderLeg(
