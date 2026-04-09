@@ -153,7 +153,10 @@ class MDSWebSocketClient:
             raise RuntimeError("Not connected to MDS. Call connect() first.")
 
         account_id = account_id or self.account_id
-        subscribe_msg = {"type": "subscribe", "data": {"type": "account", "id": account_id}}
+        subscribe_msg = {
+            "action": "subscribe.account",
+            "accounts": [{"account_id": account_id}]
+        }
 
         try:
             log.info(f"Subscribing to account | account_id={account_id}")

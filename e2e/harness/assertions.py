@@ -522,10 +522,14 @@ class AssertionEngine:
         Extract fill information from events.
 
         Returns list of dicts with qty, price, side.
+
+        Note: Only counts order.filled / order_fill events, not trade.executed / trade_exec,
+        since trade_exec is a derived event from order_fill and would double-count the fill.
         """
         fills = []
         for event in events:
-            if event.get("type") in {"order.filled", "order_fill", "trade.executed", "trade_exec"}:
+            # Only count order fill events, not trade execution events (to avoid double-counting)
+            if event.get("type") in {"order.filled", "order_fill"}:
                 fill_data = event.get("data", event)
                 if "qty" in fill_data or "fill_qty" in fill_data:
                     fills.append({

@@ -249,19 +249,54 @@ async def mds_client(
     async def stream_to_collector():
         try:
             async for event in client.stream_events():
-                # Extract order_id from event data
-                event_data = event.get("data", {})
+                # Extract order_id from event data (check both "data" and "payload" fields)
+                event_data = event.get("data") or event.get("payload", {})
                 order_id = event_data.get("order_id") or event_data.get("broker_order_id")
 
                 if order_id:
-                    # Extract status from event
-                    status = event_data.get("status")
+                    # Extract status from event data, or infer from event type
+                    status = event_data.get("status") or event_data.get("order_status")
+                    event_type = event.get("type")
+
+                    # Infer terminal status from event type
+                    if event_type == "order_fill" and not status:
+                        status = "FILLED"
+                    elif event_type == "trade_exec" and not status:
+                        status = "FILLED"
+
+                    # Normalize event_data to have qty/price fields that assertion engine expects
+                    # The assertion engine's extract_fills looks for "qty" in event.get("data")
+                    normalized_data = dict(event_data)  # Copy event_data
+
+                    # Map broker-specific field names to assertion engine expectations
+                    # Multiple event types use different field names for quantity:
+                    # - OrderFilledV1: delta_quantity
+                    # - TradeExecutedV1: quantity
+                    # - Generic: qty, fill_qty
+                    if "delta_quantity" in normalized_data and "qty" not in normalized_data:
+                        normalized_data["qty"] = normalized_data["delta_quantity"]
+                    elif "quantity" in normalized_data and "qty" not in normalized_data:
+                        normalized_data["qty"] = normalized_data["quantity"]
+
+                    # Multiple event types use different field names for price:
+                    # - OrderFilledV1: average_price
+                    # - TradeExecutedV1: price
+                    if "average_price" in normalized_data and "price" not in normalized_data:
+                        normalized_data["price"] = float(normalized_data["average_price"]) if isinstance(normalized_data["average_price"], str) else normalized_data["average_price"]
+                    elif "price" in normalized_data and isinstance(normalized_data["price"], str):
+                        # Convert string prices to float for consistency
+                        normalized_data["price"] = float(normalized_data["price"])
+
+                    # Create event dict with normalized data
                     event_dict = {
-                        "type": event.get("type"),
+                        "type": event_type,
                         "status": status,
-                        "data": event_data,
-                        "timestamp": event_data.get("timestamp"),
+                        "data": normalized_data,  # Contains normalized qty/price for assertion engine
+                        "timestamp": event_data.get("timestamp") or event.get("timestamp"),
                     }
+
+                    qty = normalized_data.get("qty")
+                    log.debug(f"Collected event: order_id={order_id}, type={event_type}, status={status}, qty={qty}")
                     await event_collector.add_event(order_id, event_dict)
         except Exception as e:
             import logging
