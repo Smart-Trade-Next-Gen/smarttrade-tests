@@ -28,6 +28,7 @@ from broker_adapter_service.schemas.order_dtos import BasOrderPlaceRequest, BasO
 async def test_market_buy_executes_immediately(
     bas_client,
     mock_client,
+    mds_client,
     event_collector,
     assertions,
     market_data_stream,
@@ -104,6 +105,7 @@ async def test_market_buy_executes_immediately(
 async def test_limit_buy_triggers_on_price_cross(
     bas_client,
     mock_client,
+    mds_client,
     event_collector,
     assertions,
     market_data_stream,
@@ -185,6 +187,7 @@ async def test_limit_buy_triggers_on_price_cross(
 async def test_limit_sell_triggers_on_price_cross(
     bas_client,
     mock_client,
+    mds_client,
     event_collector,
     assertions,
     market_data_stream,
@@ -265,6 +268,7 @@ async def test_limit_sell_triggers_on_price_cross(
 async def test_stop_buy_triggers_on_price_cross(
     bas_client,
     mock_client,
+    mds_client,
     event_collector,
     assertions,
     market_data_stream,

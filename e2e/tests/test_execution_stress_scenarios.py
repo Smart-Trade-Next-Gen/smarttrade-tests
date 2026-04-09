@@ -24,6 +24,7 @@ from broker_adapter_service.schemas.order_dtos import BasOrderPlaceRequest, BasO
 async def test_many_orders_same_instrument(
     bas_client,
     mock_client,
+    mds_client,
     event_collector,
     assertions,
     market_data_stream,
@@ -124,6 +125,7 @@ async def test_many_orders_same_instrument(
 async def test_rapid_price_updates(
     bas_client,
     mock_client,
+    mds_client,
     event_collector,
     assertions,
     market_data_stream,
@@ -221,6 +223,7 @@ async def test_rapid_price_updates(
 async def test_limit_orders_narrow_range(
     bas_client,
     mock_client,
+    mds_client,
     event_collector,
     assertions,
     market_data_stream,
