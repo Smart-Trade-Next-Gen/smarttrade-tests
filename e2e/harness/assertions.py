@@ -78,8 +78,8 @@ class AssertionEngine:
 
     @staticmethod
     def assert_financial_invariants(
-        pre_funds: dict,
-        post_funds: dict,
+        pre_funds,
+        post_funds,
         side: str,
         qty: int,
         price: Decimal,
@@ -88,8 +88,8 @@ class AssertionEngine:
         Validate financial invariants (total = available + reserved, debits/credits).
 
         Args:
-            pre_funds: Pre-trade fund snapshot
-            post_funds: Post-trade fund snapshot
+            pre_funds: Pre-trade fund snapshot (dict or Pydantic model)
+            post_funds: Post-trade fund snapshot (dict or Pydantic model)
             side: BUY or SELL
             qty: Order quantity
             price: Execution price
@@ -99,6 +99,12 @@ class AssertionEngine:
         """
         if not pre_funds or not post_funds:
             raise AssertionError("Fund snapshots required for invariant validation")
+
+        # Convert Pydantic models to dicts if needed
+        if hasattr(pre_funds, 'model_dump'):
+            pre_funds = pre_funds.model_dump()
+        if hasattr(post_funds, 'model_dump'):
+            post_funds = post_funds.model_dump()
 
         # Extract key amounts
         pre_total = Decimal(str(pre_funds.get("total_equity", 0)))
