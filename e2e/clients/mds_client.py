@@ -61,6 +61,7 @@ class MDSWebSocketClient:
         self._subscribed = False
         self._backoff = initial_backoff
         self._event_queue: asyncio.Queue = asyncio.Queue(maxsize=1000)
+        self._system_connected_event: asyncio.Event = asyncio.Event()
 
     async def __aenter__(self) -> "MDSWebSocketClient":
         """Async context manager entry."""
@@ -92,12 +93,18 @@ class MDSWebSocketClient:
                 )
                 log.info(f"WebSocket connected to {self.ws_url}")
 
-                # Wait for system.connected message
-                await self._wait_for_system_connected()
+                # Reset system connected event for new connection
+                self._system_connected_event.clear()
 
-                # Start reader and heartbeat tasks
+                # Start reader and heartbeat tasks FIRST (reader will handle system.connected)
                 self._reader_task = asyncio.create_task(self._reader_loop())
                 self._heartbeat_task = asyncio.create_task(self._heartbeat_loop())
+
+                # Wait for system.connected to be signaled by reader loop
+                await asyncio.wait_for(
+                    self._system_connected_event.wait(),
+                    timeout=self.timeout
+                )
 
                 self.is_connected = True
                 self._backoff = self.initial_backoff
@@ -212,30 +219,6 @@ class MDSWebSocketClient:
             except asyncio.CancelledError:
                 break
 
-    async def _wait_for_system_connected(self) -> None:
-        """
-        Wait for system.connected message from MDS.
-
-        Raises:
-            TimeoutError: If system.connected not received
-        """
-        if not self.connection:
-            raise RuntimeError("Connection is None")
-
-        try:
-            message = await asyncio.wait_for(
-                self.connection.recv(), timeout=self.timeout
-            )
-            data = json.loads(message)
-
-            if data.get("type") == "system.connected":
-                log.debug("Received system.connected from MDS")
-                return
-
-            raise ValueError(f"Expected system.connected, got {data.get('type')}")
-
-        except asyncio.TimeoutError:
-            raise TimeoutError("system.connected not received within timeout")
 
     async def _reader_loop(self) -> None:
         """
@@ -299,7 +282,11 @@ class MDSWebSocketClient:
         """
         msg_type = data.get("type")
 
-        if msg_type == "heartbeat":
+        if msg_type == "system.connected":
+            log.debug("Received system.connected from MDS")
+            self._system_connected_event.set()
+
+        elif msg_type == "heartbeat":
             log.debug("Received heartbeat from MDS")
 
         elif msg_type == "ack":
