@@ -12,6 +12,7 @@ All tests use INJECTION mode for deterministic execution.
 """
 
 import pytest
+import uuid
 from decimal import Decimal
 
 from smarttrade_common.schemas.types import OrderSide, OrderType, TimeInForce, PositionType
@@ -37,11 +38,11 @@ async def test_cancel_unfilled_order(
     - No execution events after cancellation
     - No position created
     """
-    broker_id = "mock"
+    broker_id = "fyers"
 
-    # Act: Create and place order
+    # Act: Create and place order (use unique client_order_id to bypass idempotency cache)
     order_request = BasOrderPlaceRequest(
-        client_order_id=f"test_cancel_unfilled_{test_account_id}",
+        client_order_id=f"test_cancel_unfilled_{test_account_id}_{uuid.uuid4().hex[:8]}",
         position_type=PositionType.INTRADAY,
         legs=[
             BasOrderLeg(
@@ -109,11 +110,11 @@ async def test_cancel_partial_fill(
     - Final filled quantity is preserved
     - Position reflects only filled quantity
     """
-    broker_id = "mock"
+    broker_id = "fyers"
 
-    # Act: Create and place order for 100 shares
+    # Act: Create and place order for 100 shares (use unique client_order_id to bypass idempotency cache)
     order_request = BasOrderPlaceRequest(
-        client_order_id=f"test_cancel_partial_{test_account_id}",
+        client_order_id=f"test_cancel_partial_{test_account_id}_{uuid.uuid4().hex[:8]}",
         position_type=PositionType.INTRADAY,
         legs=[
             BasOrderLeg(
@@ -198,11 +199,11 @@ async def test_cancel_then_fill_rejected(
     - Attempting to fill a cancelled order fails gracefully
     - Final state remains CANCELLED with no fills
     """
-    broker_id = "mock"
+    broker_id = "fyers"
 
-    # Act: Create and place order
+    # Act: Create and place order (use unique client_order_id to bypass idempotency cache)
     order_request = BasOrderPlaceRequest(
-        client_order_id=f"test_cancel_then_fill_{test_account_id}",
+        client_order_id=f"test_cancel_then_fill_{test_account_id}_{uuid.uuid4().hex[:8]}",
         position_type=PositionType.INTRADAY,
         legs=[
             BasOrderLeg(

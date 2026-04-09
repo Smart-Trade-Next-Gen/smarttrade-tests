@@ -301,6 +301,41 @@ class MockClient:
             )
             return {"status": "not_implemented", "message": "Price injection not available"}
 
+    async def cancel_order(
+        self,
+        broker_id: str,
+        account_id: str,
+        order_id: str,
+    ) -> dict:
+        """
+        Cancel an order via mock service.
+
+        Args:
+            broker_id: Broker identifier (e.g., "fyers")
+            account_id: Account identifier
+            order_id: Order ID to cancel
+
+        Returns:
+            Response from mock service
+
+        Raises:
+            httpx.HTTPError: If request fails
+        """
+        url = f"{self.base_url}/api/v1/order/{broker_id}/{account_id}/{order_id}"
+        headers = self._get_headers()
+
+        try:
+            response = await self.client.delete(
+                url,
+                headers=headers,
+            )
+            response.raise_for_status()
+            log.debug(f"Cancel order request sent | broker_id={broker_id} | account_id={account_id} | order_id={order_id}")
+            return response.json()
+        except httpx.HTTPError as e:
+            log.error(f"Cancel order failed: {e}")
+            raise
+
     def reset_sequence(self, order_id: Optional[str] = None) -> None:
         """
         Reset sequence tracking for an order or all orders.
