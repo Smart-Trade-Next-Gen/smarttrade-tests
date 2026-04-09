@@ -120,36 +120,18 @@ class MDSWebSocketClient:
 
             except asyncio.TimeoutError:
                 log.error(f"Connection timeout after {self.timeout}s, retrying...")
-                await self._cleanup_connection()
+                await self._cleanup_resources()
                 await self._backoff_wait()
 
             except Exception as e:
                 log.error(f"Connection failed: {e}, retrying...")
-                await self._cleanup_connection()
+                await self._cleanup_resources()
                 await self._backoff_wait()
 
     async def disconnect(self) -> None:
         """Close WebSocket connection and cleanup resources."""
         self.is_connected = False
-
-        # Cancel tasks
-        if self._reader_task:
-            self._reader_task.cancel()
-            try:
-                await self._reader_task
-            except asyncio.CancelledError:
-                pass
-            self._reader_task = None
-
-        if self._heartbeat_task:
-            self._heartbeat_task.cancel()
-            try:
-                await self._heartbeat_task
-            except asyncio.CancelledError:
-                pass
-            self._heartbeat_task = None
-
-        await self._cleanup_connection()
+        await self._cleanup_resources()
         log.info(f"MDS disconnected | account_id={self.account_id}")
 
     async def subscribe_account(self, account_id: Optional[str] = None) -> None:
@@ -345,6 +327,29 @@ class MDSWebSocketClient:
             except Exception as e:
                 log.debug(f"Error closing connection: {e}")
             self.connection = None
+
+    async def _cleanup_resources(self) -> None:
+        """Cancel all background tasks and close connection."""
+        # Cancel reader task
+        if self._reader_task:
+            self._reader_task.cancel()
+            try:
+                await self._reader_task
+            except asyncio.CancelledError:
+                pass
+            self._reader_task = None
+
+        # Cancel heartbeat task
+        if self._heartbeat_task:
+            self._heartbeat_task.cancel()
+            try:
+                await self._heartbeat_task
+            except asyncio.CancelledError:
+                pass
+            self._heartbeat_task = None
+
+        # Close connection
+        await self._cleanup_connection()
 
     async def _backoff_wait(self) -> None:
         """Wait with exponential backoff before retrying."""
