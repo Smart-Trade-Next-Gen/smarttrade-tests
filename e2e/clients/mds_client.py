@@ -293,11 +293,63 @@ class MDSWebSocketClient:
         elif msg_type == "heartbeat":
             log.debug("Received heartbeat from MDS")
 
+        elif msg_type == "system.heartbeat":
+            # System heartbeat with explicit prefix
+            log.debug("Received system.heartbeat from MDS")
+
         elif msg_type == "ack":
             log.debug(f"Received ack: {data.get('data', {}).get('status')}")
 
         elif msg_type == "system":
             log.debug(f"System message: {data.get('status')}")
+
+        elif msg_type == "notification":
+            # System notification - extract inner event if present
+            notification_data = data.get("data", {})
+            log.warning(f"NOTIFICATION: Full structure: {json.dumps(data, default=str)}")
+
+            # Check if notification wraps an actual event (e.g., order fill, trade exec)
+            if "event_type" in notification_data:
+                inner_event_type = notification_data.get("event_type")
+                log.warning(f"Extracting event from notification: event_type={inner_event_type}")
+
+                # Map event_type to WebSocket message type
+                event_type_map = {
+                    "order_filled": "order_fill",
+                    "order_fill": "order_fill",
+                    "trade_executed": "trade_exec",
+                    "trade_exec": "trade_exec",
+                    "order_cancelled": "order_cancelled",
+                    "position_updated": "position_update",
+                    "position_update": "position_update",
+                }
+
+                mapped_type = event_type_map.get(inner_event_type, inner_event_type)
+
+                # Create event message with mapped type
+                inner_event = {
+                    "type": mapped_type,
+                    "data": notification_data,
+                    "timestamp": notification_data.get("timestamp") or data.get("timestamp"),
+                }
+
+                # Add to queue if it's a recognized event type
+                if mapped_type in {"order_fill", "trade_exec", "position_update", "order_cancelled", "order.update", "trade.update", "position.update"}:
+                    log.warning(f"Adding extracted event to queue: type={mapped_type}")
+                    if self._event_queue:
+                        try:
+                            self._event_queue.put_nowait(inner_event)
+                        except asyncio.QueueFull:
+                            log.warning(f"Event queue full, dropping oldest event")
+                            try:
+                                self._event_queue.get_nowait()
+                                self._event_queue.put_nowait(inner_event)
+                            except Exception as e:
+                                log.error(f"Failed to handle event queue: {e}")
+                else:
+                    log.warning(f"Unknown inner event type in notification: {mapped_type}")
+            else:
+                log.warning(f"System notification without event_type: {json.dumps(notification_data, default=str)}")
 
         elif msg_type in {"order.update", "trade.update", "position.update", "order_fill", "trade_exec", "position_update", "order_cancelled"}:
             log.debug(f"Event received: {msg_type}")
@@ -314,7 +366,7 @@ class MDSWebSocketClient:
                         log.error(f"Failed to handle event queue: {e}")
 
         else:
-            log.debug(f"Unknown message type: {msg_type}")
+            log.warning(f"Unknown message type: {msg_type} | Full message: {json.dumps(data, indent=2) if len(str(data)) < 1000 else str(data)[:1000]}")
 
     async def _handle_disconnect(self) -> None:
         """Handle WebSocket disconnect and trigger reconnection."""

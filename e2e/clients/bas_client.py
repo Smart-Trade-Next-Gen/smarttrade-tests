@@ -416,7 +416,7 @@ class BASClient:
         client = self._get_client()
         headers = self._get_headers()
 
-        url = f"/api/v1/positions/{broker_id}/{account_id}"
+        url = f"/api/v1/portfolio/{broker_id}/{account_id}/positions"
         log.debug(
             f"Listing positions | broker_id={broker_id} | account_id={account_id}"
         )
