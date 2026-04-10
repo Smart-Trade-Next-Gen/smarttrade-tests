@@ -112,7 +112,7 @@ def _get_default(key: str, env: str) -> str:
         "dev": {
             "BAS_URL": "http://localhost:8005",
             "MDS_WS_URL": "ws://localhost:8004",
-            "MOCK_URL": "http://localhost:8002",
+            "MOCK_URL": "http://localhost:8002",  # Paper Broker Service
             "AUTH_URL": "http://localhost:8001",
             "TEST_USER": "testuser@example.com",
             "TEST_PASSWORD": "testpassword123",
@@ -125,7 +125,7 @@ def _get_default(key: str, env: str) -> str:
         "staging": {
             "BAS_URL": "https://staging-bas.smarttrade.asia",
             "MDS_WS_URL": "wss://staging-mds.smarttrade.asia",
-            "MOCK_URL": "https://staging-mock.smarttrade.asia",
+            "MOCK_URL": "https://staging-mock.smarttrade.asia",  # Paper Broker Service
             "AUTH_URL": "https://staging-auth.smarttrade.asia",
             "TEST_USER": "staging-testuser@example.com",
             "TEST_PASSWORD": "staging-testpassword123",
@@ -138,7 +138,7 @@ def _get_default(key: str, env: str) -> str:
         "prod": {
             "BAS_URL": "https://api.smarttrade.asia/bas",
             "MDS_WS_URL": "wss://api.smarttrade.asia/mds",
-            "MOCK_URL": "https://api.smarttrade.asia/mock",
+            "MOCK_URL": "https://api.smarttrade.asia/mock",  # Paper Broker Service
             "AUTH_URL": "https://api.smarttrade.asia/auth",
             "TEST_USER": "prod-testuser@example.com",
             "TEST_PASSWORD": "prod-testpassword123",
