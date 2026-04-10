@@ -159,13 +159,21 @@ async def setup_trading_account(bas_client, mock_client, test_account_id):
         except Exception as e:
             log.warning(f"⚠️ Paper account creation failed for {broker_id}/{test_account_id}: {e}")
 
-    # Clean up execution state in mock service (reset sequence tracking for fills)
+    # Clean up execution state and positions in mock service
     for broker_id in ["fyers", "mock"]:
         try:
+            # Clear execution state (reset sequence tracking for fills)
             await mock_client.cleanup_execution_state(broker_id, test_account_id)
             log.debug(f"✅ Execution state cleared in mock service: {broker_id}/{test_account_id}")
         except Exception as e:
             log.warning(f"⚠️ Execution state cleanup failed for {broker_id}/{test_account_id}: {e}")
+
+        try:
+            # Clear positions (ensure fresh position state for each test)
+            await mock_client.cleanup_positions(broker_id, test_account_id)
+            log.debug(f"✅ Positions cleared in mock service: {broker_id}/{test_account_id}")
+        except Exception as e:
+            log.warning(f"⚠️ Positions cleanup failed for {broker_id}/{test_account_id}: {e}")
 
     # Yield control back to test
     yield

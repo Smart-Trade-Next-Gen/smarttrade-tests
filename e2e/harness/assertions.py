@@ -248,7 +248,9 @@ class AssertionEngine:
         """
         position = None
         for pos in positions:
-            if pos.get("instrument_id") == instrument_id:
+            # Handle both dict and Pydantic model
+            instrument_id_val = pos.get("instrument_id") if isinstance(pos, dict) else pos.instrument_id
+            if instrument_id_val == instrument_id:
                 position = pos
                 break
 
@@ -256,12 +258,18 @@ class AssertionEngine:
             if expected_qty == 0:
                 log.debug(f"Position closed for {instrument_id} (expected)")
                 return
+            # Get available instrument IDs (handle both dict and model)
+            available = [
+                (p.get('instrument_id') if isinstance(p, dict) else p.instrument_id)
+                for p in positions
+            ]
             raise AssertionError(
                 f"Position not found for instrument_id={instrument_id} | "
-                f"Available: {[p.get('instrument_id') for p in positions]}"
+                f"Available: {available}"
             )
 
-        actual_qty = position.get("net_qty", 0)
+        # Handle both dict and Pydantic model
+        actual_qty = position.get("net_qty", 0) if isinstance(position, dict) else position.net_qty
         if actual_qty != expected_qty:
             raise AssertionError(
                 f"Expected position quantity {expected_qty}, got {actual_qty} | "
@@ -269,7 +277,9 @@ class AssertionEngine:
             )
 
         if expected_avg_price is not None:
-            actual_avg = Decimal(str(position.get("avg_price", 0)))
+            # Handle both dict and Pydantic model
+            pos_avg = position.get("avg_price", 0) if isinstance(position, dict) else position.avg_price
+            actual_avg = Decimal(str(pos_avg or 0))
             expected_avg = Decimal(str(expected_avg_price))
             if abs(actual_avg - expected_avg) > DECIMAL_TOLERANCE:
                 raise AssertionError(
@@ -277,9 +287,11 @@ class AssertionEngine:
                     f"Difference: {abs(actual_avg - expected_avg)}"
                 )
 
+        # Handle both dict and Pydantic model for logging
+        display_avg = position.get('avg_price') if isinstance(position, dict) else position.avg_price
         log.debug(
             f"Position validated | instrument_id={instrument_id} | "
-            f"qty={actual_qty} | avg_price={position.get('avg_price')}"
+            f"qty={actual_qty} | avg_price={display_avg}"
         )
 
     @staticmethod

@@ -507,3 +507,37 @@ class MockClient:
         except httpx.HTTPError as e:
             log.error(f"Execution state cleanup failed: {e}")
             raise
+
+    async def cleanup_positions(
+        self,
+        broker_id: str,
+        account_id: str,
+    ) -> dict:
+        """
+        Clear all positions for an account.
+
+        Deletes all Position records for the account.
+        Used during test setup to ensure fresh position state for each test.
+
+        Args:
+            broker_id: Broker identifier
+            account_id: Account identifier
+
+        Returns:
+            Response with count of cleared position records
+
+        Raises:
+            httpx.HTTPError: If request fails
+        """
+        client = self._get_client()
+        headers = self._get_headers()
+        url = f"/api/v1/cleanup/positions/{broker_id}/{account_id}"
+
+        try:
+            response = await client.delete(url, headers=headers)
+            response.raise_for_status()
+            log.debug(f"Positions cleared | broker_id={broker_id} | account_id={account_id}")
+            return response.json()
+        except httpx.HTTPError as e:
+            log.error(f"Positions cleanup failed: {e}")
+            raise
