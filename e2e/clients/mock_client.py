@@ -15,7 +15,7 @@ from uuid import UUID
 import httpx
 
 if TYPE_CHECKING:
-    from mock_service.schemas import ExecutionCommand, ExecutionResult
+    from paper_broker_service.schemas import ExecutionCommand, ExecutionResult
 else:
     ExecutionCommand = None
     ExecutionResult = None
@@ -112,15 +112,15 @@ class MockClient:
             Tuple of (ExecutionCommand, ExecutionResult) classes
         """
         try:
-            from mock_service.schemas import ExecutionCommand, ExecutionResult
+            from paper_broker_service.schemas import ExecutionCommand, ExecutionResult
             return ExecutionCommand, ExecutionResult
         except ImportError:
-            # Try adding mock-service to path
-            mock_service_path = Path(__file__).parent.parent.parent.parent / "mock-service" / "src"
-            if mock_service_path.exists() and str(mock_service_path) not in sys.path:
-                sys.path.insert(0, str(mock_service_path))
+            # Try adding paper-broker-service to path
+            paper_broker_service_path = Path(__file__).parent.parent.parent.parent / "paper-broker-service" / "src"
+            if paper_broker_service_path.exists() and str(paper_broker_service_path) not in sys.path:
+                sys.path.insert(0, str(paper_broker_service_path))
 
-            from mock_service.schemas import ExecutionCommand, ExecutionResult
+            from paper_broker_service.schemas import ExecutionCommand, ExecutionResult
             return ExecutionCommand, ExecutionResult
 
     def _get_next_sequence(self, order_id: str) -> int:
