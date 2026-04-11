@@ -86,10 +86,10 @@ class MDSWebSocketClient:
                 log.info(
                     f"Connecting to MDS | ws_url={self.ws_url} | account_id={self.account_id}"
                 )
-                # Add token as query parameter for authentication
-                ws_url_with_token = f"{self.ws_url}?token={self.token}"
+                # Add token and account_id as query parameters for authentication and routing
+                ws_url_with_params = f"{self.ws_url}?token={self.token}&account_id={self.account_id}"
                 self.connection = await asyncio.wait_for(
-                    websockets.asyncio.client.connect(ws_url_with_token),
+                    websockets.asyncio.client.connect(ws_url_with_params),
                     timeout=self.timeout,
                 )
                 log.info(f"WebSocket connected to {self.ws_url}")
