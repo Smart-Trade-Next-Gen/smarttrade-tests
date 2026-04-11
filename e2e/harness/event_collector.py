@@ -9,6 +9,7 @@ event filtering capabilities. Implements ring-buffer overflow handling.
 import asyncio
 import logging
 from datetime import datetime
+from collections import deque
 from typing import Any, Optional
 
 log = logging.getLogger(__name__)
@@ -35,7 +36,7 @@ class EventCollector:
         """
         self.maxsize = maxsize
         self.queues: dict[str, asyncio.Queue] = {}
-        self.events: dict[str, list[dict]] = {}
+        self.events: dict[str, deque[dict]] = {}
         self.dropped_events_counts: dict[str, int] = {}
         self._lock = asyncio.Lock()
 
@@ -55,7 +56,7 @@ class EventCollector:
             # Initialize queue and events list if needed
             if order_id not in self.queues:
                 self.queues[order_id] = asyncio.Queue(maxsize=self.maxsize)
-                self.events[order_id] = []
+                self.events[order_id] = deque(maxlen=self.maxsize)
                 self.dropped_events_counts[order_id] = 0
 
             # Append to chronological event log (primary source of truth)
@@ -213,7 +214,7 @@ class EventCollector:
         Returns:
             List of events in chronological order
         """
-        return self.events.get(order_id, [])
+        return list(self.events.get(order_id, ()))
 
     def get_events_by_type(self, order_id: str, event_type: str) -> list[dict]:
         """
@@ -282,11 +283,26 @@ class EventCollector:
         if order_id:
             self.events.pop(order_id, None)
             self.dropped_events_counts.pop(order_id, None)
-            # Note: Don't clear queue as it may have waiting tasks
+            # Drain queue to prevent memory leak (items accumulate in asyncio.Queue)
+            if order_id in self.queues:
+                try:
+                    while True:
+                        self.queues[order_id].get_nowait()
+                except asyncio.QueueEmpty:
+                    pass
+                self.queues.pop(order_id, None)
             log.debug(f"Cleared events for order_id={order_id}")
         else:
             self.events.clear()
             self.dropped_events_counts.clear()
+            # Drain all queues to prevent memory leak
+            for order_id, queue in self.queues.items():
+                try:
+                    while True:
+                        queue.get_nowait()
+                except asyncio.QueueEmpty:
+                    pass
+            self.queues.clear()
             log.debug("Cleared all events")
 
     def get_summary(self, order_id: str) -> dict:

@@ -10,6 +10,7 @@ import logging
 from decimal import Decimal
 from typing import Optional, List
 from dataclasses import dataclass
+from collections import deque
 
 log = logging.getLogger(__name__)
 
@@ -53,7 +54,7 @@ class MockMarketDataStream:
         self.mock_client = mock_client
         self.broker_id = broker_id
         self._price_cache = {}  # instrument_id -> last_price
-        self._update_history = []  # For debugging
+        self._update_history = deque(maxlen=500)  # Bounded debug history
 
     async def update_price(
         self,
@@ -252,7 +253,7 @@ class MockMarketDataStream:
 
     def get_history(self) -> List[PriceUpdate]:
         """Get all price updates injected during test."""
-        return self._update_history.copy()
+        return list(self._update_history)
 
     def reset(self) -> None:
         """Reset cache and history."""

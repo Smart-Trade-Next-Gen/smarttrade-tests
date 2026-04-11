@@ -27,7 +27,7 @@ class OrderIdFilter(logging.Filter):
         return True
 
 
-def configure_logging(level: str = "DEBUG") -> None:
+def configure_logging(level: str = "INFO") -> None:
     """
     Configure pytest logging with correlation ID support.
 

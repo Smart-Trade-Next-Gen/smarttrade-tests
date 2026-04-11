@@ -5,6 +5,7 @@ set -e
 
 # Determine run mode
 MODE="${1:-full}"
+WORKERS="${E2E_PYTEST_WORKERS:-2}"
 
 # Colors for output
 GREEN='\033[0;32m'
@@ -45,9 +46,10 @@ case $MODE in
 
   "parallel")
     echo -e "${GREEN}Running PARALLEL mode (all tests, parallel where possible)...${NC}"
-    # Use pytest-xdist for parallelization with loadscope (same test class together)
+    # Use bounded pytest-xdist parallelization to avoid memory blow-ups.
     if command -v pytest-xdist &> /dev/null; then
-      python -m pytest e2e/tests/ -n auto --dist=loadscope -v --tb=line 2>&1 | tee e2e_tests.log
+      echo "Using $WORKERS worker(s)"
+      python -m pytest e2e/tests/ -n "$WORKERS" --dist=loadscope -v --tb=line 2>&1 | tee e2e_tests.log
     else
       echo "pytest-xdist not installed. Running without parallelization..."
       python -m pytest e2e/tests/ -v --tb=line 2>&1 | tee e2e_tests.log

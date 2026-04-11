@@ -46,8 +46,7 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "slow: tests that need extended timeout")
 
     # Configure logging based on environment
-    env = os.getenv("E2E_ENV", "dev").lower()
-    log_level = "DEBUG" if env == "dev" else "INFO"
+    log_level = os.getenv("E2E_LOG_LEVEL", "INFO").upper()
     configure_logging(log_level)
 
     # Ensure reports directory exists
@@ -351,7 +350,7 @@ async def mds_client(
 
     yield client
 
-    # Aggressive cleanup
+    # Aggressive cleanup to ensure full resource release
     try:
         await client.disconnect()
     except Exception as e:
@@ -363,6 +362,9 @@ async def mds_client(
             await client.ws.close()
         except Exception:
             pass
+
+    # Ensure client reference is released
+    client = None
 
 
 @pytest_asyncio.fixture
@@ -475,9 +477,12 @@ async def bas_ws_client(
     # Aggressive cleanup to ensure WebSocket is fully closed
     stream_task.cancel()
     try:
-        await stream_task
-    except asyncio.CancelledError:
+        await asyncio.wait_for(stream_task, timeout=2.0)
+    except (asyncio.CancelledError, asyncio.TimeoutError):
         pass
+
+    # Clear event collector reference to prevent memory leak
+    client._event_collector = None
 
     # Ensure WebSocket is fully disconnected
     try:
@@ -512,20 +517,31 @@ def event_collector(bas_ws_client) -> EventCollector:
     # Wire the collector to the bas_ws_client so it can stream events
     bas_ws_client._event_collector = collector
     yield collector
-    # Aggressive cleanup: clear all events after test (not just queues)
-    collector.clear()
+    # Aggressive cleanup: drain all queues, clear all events, and reset state
+    try:
+        collector.clear()  # Drains queues and clears events
+    except Exception as e:
+        log.warning(f"Error clearing event collector: {e}")
+    # Remove reference
+    collector = None
 
 
 @pytest_asyncio.fixture(autouse=True)
-async def cleanup_event_memory(event_collector):
+async def cleanup_event_memory(request):
     """
     Autouse fixture to ensure event_collector memory is fully cleared after test.
 
     Scope: function (runs after every test that uses event_collector)
     """
     yield
-    # After test, ensure event_collector is cleaned up
-    event_collector.clear()
+    # After test, ensure event_collector is cleaned up if it was used
+    # Only try to clear if event_collector fixture was actually requested
+    if 'event_collector' in request.fixturenames:
+        event_collector = request.getfixturevalue('event_collector')
+        try:
+            event_collector.clear()
+        except Exception as e:
+            log.warning(f"Error in cleanup_event_memory: {e}")
 
 
 @pytest.fixture

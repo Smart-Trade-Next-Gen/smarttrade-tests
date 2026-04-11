@@ -418,6 +418,15 @@ class MDSWebSocketClient:
                 pass
             self._heartbeat_task = None
 
+        # Drain event queue to prevent memory leak (items accumulate in asyncio.Queue)
+        if self._event_queue is not None:
+            try:
+                while True:
+                    self._event_queue.get_nowait()
+            except asyncio.QueueEmpty:
+                pass
+            self._event_queue = None
+
     async def _backoff_wait(self) -> None:
         """Wait with exponential backoff before retrying."""
         wait_time = min(self._backoff, self.max_backoff)
