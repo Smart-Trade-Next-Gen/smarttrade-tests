@@ -85,19 +85,24 @@ class ScenarioExecutor:
             order_id_mapping = {}  # order_name -> broker_order_id
 
             if scenario.concurrent:
-                # Concurrent placement
+                # Concurrent placement (bounded by semaphore to limit memory)
                 log.info(
                     f"Executing scenario '{scenario.name}' (CONCURRENT, mode={execution_mode})"
                 )
-                tasks = [
-                    ScenarioExecutor._place_order(
-                        bas_client,
-                        scenario.broker_id,
-                        scenario.account_id,
-                        order,
-                    )
-                    for order in scenario.orders
-                ]
+
+                # Limit concurrent orders to 10 to avoid unbounded memory growth
+                semaphore = asyncio.Semaphore(10)
+
+                async def bounded_place_order(order):
+                    async with semaphore:
+                        return await ScenarioExecutor._place_order(
+                            bas_client,
+                            scenario.broker_id,
+                            scenario.account_id,
+                            order,
+                        )
+
+                tasks = [bounded_place_order(order) for order in scenario.orders]
                 responses = await asyncio.gather(*tasks, return_exceptions=True)
 
                 for i, order in enumerate(scenario.orders):

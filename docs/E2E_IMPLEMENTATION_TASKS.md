@@ -2127,7 +2127,7 @@ Build docker-compose configuration for spinning up all services in correct depen
      mock:
        build:
          context: ..
-         dockerfile: mock-service/Dockerfile.test
+         dockerfile: paper-broker-service/Dockerfile.test
        ports:
          - "8002:8000"
        environment:

@@ -106,7 +106,7 @@ jobs:
         image: postgres:16-alpine
         env:
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: smarttrade_mock_service
+          POSTGRES_DB: smarttrade_paper_broker_service
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -147,7 +147,7 @@ jobs:
       - name: Health check services
         run: |
           echo "Checking PostgreSQL..."
-          until psql -h localhost -U postgres -d smarttrade_mock_service -c '\q' 2>/dev/null; do
+          until psql -h localhost -U postgres -d smarttrade_paper_broker_service -c '\q' 2>/dev/null; do
             echo "Waiting for PostgreSQL..."
             sleep 2
           done
@@ -200,7 +200,7 @@ jobs:
         image: postgres:16-alpine
         env:
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: smarttrade_mock_service
+          POSTGRES_DB: smarttrade_paper_broker_service
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -241,7 +241,7 @@ jobs:
       - name: Health check services
         run: |
           echo "Checking PostgreSQL..."
-          until psql -h localhost -U postgres -d smarttrade_mock_service -c '\q' 2>/dev/null; do
+          until psql -h localhost -U postgres -d smarttrade_paper_broker_service -c '\q' 2>/dev/null; do
             sleep 2
           done
 
@@ -282,7 +282,7 @@ jobs:
         image: postgres:16-alpine
         env:
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: smarttrade_mock_service
+          POSTGRES_DB: smarttrade_paper_broker_service
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -323,7 +323,7 @@ jobs:
       - name: Health check services
         run: |
           echo "Checking PostgreSQL..."
-          until psql -h localhost -U postgres -d smarttrade_mock_service -c '\q' 2>/dev/null; do
+          until psql -h localhost -U postgres -d smarttrade_paper_broker_service -c '\q' 2>/dev/null; do
             sleep 2
           done
 

@@ -1,8 +1,25 @@
 # E2E Test Categorization & CI/CD Strategy
 
+## Architecture: Dual WebSocket Streams
+
+Tests use the production WebSocket architecture with **two independent event streams**:
+
+| Stream | Service | Endpoint | Purpose |
+|--------|---------|----------|---------|
+| **Market Data** | MDS | `ws://mds:8004/ws` | Real-time market data (quotes, depth, candles) |
+| **Account Events** | BAS | `ws://bas:8005/api/v1/ws` | Trading events (orders, trades, positions) |
+
+**Event Collection Flow**:
+1. `bas_ws_client` connects to BAS WebSocket
+2. Subscribes to account events for test account
+3. Streams events (order.filled.v1, trade.executed.v1, position.updated.v1) to `event_collector`
+4. Tests observe via `event_collector.wait_for_completion(order_id, timeout)`
+
+**Rationale**: This separation ensures failure isolation and latency optimization—market data resilience is independent from trading event delivery.
+
 ## Overview
 
-The SmartTrade E2E testing framework spans **Phases 1-8** with **39 comprehensive tests** organized by execution mode and resilience focus.
+The SmartTrade E2E testing framework spans **Phases 5-7** with **39 comprehensive tests** organized by execution mode and resilience focus.
 
 ## Test Categories
 
@@ -272,7 +289,7 @@ services:
     image: postgres:16-alpine
     env:
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: smarttrade_mock_service
+      POSTGRES_DB: smarttrade_paper_broker_service
     health-check: pg_isready
 
   redis:

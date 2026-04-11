@@ -1,161 +1,205 @@
-2026-04-09 18:20:11 - asyncio - DEBUG - Using selector: EpollSelector
-2026-04-09 18:20:11 - e2e.clients.bas_client - DEBUG - Listing orders | broker_id=fyers | account_id=TEST_E2E_5f474ebf
-2026-04-09 18:20:11 - httpcore.connection - DEBUG - connect_tcp.started host='localhost' port=8005 local_address=None timeout=10.0 socket_options=None
-2026-04-09 18:20:11 - httpcore.connection - DEBUG - connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x7f04da838050>
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'GET']>
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_headers.complete
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'GET']>
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_body.complete
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'GET']>
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'date', b'Thu, 09 Apr 2026 12:50:11 GMT'), (b'server', b'uvicorn'), (b'content-length', b'966'), (b'content-type', b'application/json'), (b'x-request-id', b'f974662f-24c4-4930-a61a-9d5835274b0f'), (b'x-trace-id', b'd27d3453-5fd1-4f65-8e1d-90d23651988b')])
-2026-04-09 18:20:11 - httpx - INFO - HTTP Request: GET http://localhost:8005/api/v1/orders/fyers/TEST_E2E_5f474ebf "HTTP/1.1 200 OK"
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'GET']>
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_body.complete
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - response_closed.started
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - response_closed.complete
-2026-04-09 18:20:11 - e2e.clients.bas_client - DEBUG - Deleting trading account | broker_id=fyers | account_id=TEST_E2E_5f474ebf
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'DELETE']>
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_headers.complete
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'DELETE']>
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_body.complete
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'DELETE']>
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'date', b'Thu, 09 Apr 2026 12:50:11 GMT'), (b'server', b'uvicorn'), (b'content-length', b'16'), (b'content-type', b'application/json'), (b'x-request-id', b'cdbdd938-1f1c-4a6a-ae05-b24ceb35586a'), (b'x-trace-id', b'f1de4ba9-50fe-460a-857e-6685b13f1947')])
-2026-04-09 18:20:11 - httpx - INFO - HTTP Request: DELETE http://localhost:8005/api/v1/trading_account/fyers/TEST_E2E_5f474ebf "HTTP/1.1 200 OK"
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'DELETE']>
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_body.complete
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - response_closed.started
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - response_closed.complete
-2026-04-09 18:20:11 - e2e.conftest - DEBUG - Deleted existing trading account: fyers/TEST_E2E_5f474ebf
-2026-04-09 18:20:11 - e2e.clients.bas_client - DEBUG - Creating trading account | broker_id=fyers | account_id=TEST_E2E_5f474ebf | initial_balance=1000000.00
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_headers.complete
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_body.complete
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'date', b'Thu, 09 Apr 2026 12:50:11 GMT'), (b'server', b'uvicorn'), (b'content-length', b'338'), (b'content-type', b'application/json'), (b'x-request-id', b'4a8d54b2-a065-47f2-b097-967aa4efe8f4'), (b'x-trace-id', b'41140830-4cc8-4576-84f4-c4b36f7a86c0')])
-2026-04-09 18:20:11 - httpx - INFO - HTTP Request: POST http://localhost:8005/api/v1/trading_account/fyers "HTTP/1.1 200 OK"
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_body.complete
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - response_closed.started
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - response_closed.complete
-2026-04-09 18:20:11 - e2e.conftest - DEBUG - ✅ Paper trading account created: fyers/TEST_E2E_5f474ebf
-2026-04-09 18:20:11 - e2e.clients.bas_client - DEBUG - Deleting trading account | broker_id=mock | account_id=TEST_E2E_5f474ebf
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'DELETE']>
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_headers.complete
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'DELETE']>
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_body.complete
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'DELETE']>
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'date', b'Thu, 09 Apr 2026 12:50:11 GMT'), (b'server', b'uvicorn'), (b'content-length', b'16'), (b'content-type', b'application/json'), (b'x-request-id', b'967494a3-487a-42ad-8403-a025407f8bbc'), (b'x-trace-id', b'bdb5cbd2-9ede-42ac-bf53-c763f8b9ada3')])
-2026-04-09 18:20:11 - httpx - INFO - HTTP Request: DELETE http://localhost:8005/api/v1/trading_account/mock/TEST_E2E_5f474ebf "HTTP/1.1 200 OK"
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'DELETE']>
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_body.complete
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - response_closed.started
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - response_closed.complete
-2026-04-09 18:20:11 - e2e.conftest - DEBUG - Deleted existing trading account: mock/TEST_E2E_5f474ebf
-2026-04-09 18:20:11 - e2e.clients.bas_client - DEBUG - Creating trading account | broker_id=mock | account_id=TEST_E2E_5f474ebf | initial_balance=1000000.00
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_headers.complete
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_body.complete
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'date', b'Thu, 09 Apr 2026 12:50:11 GMT'), (b'server', b'uvicorn'), (b'content-length', b'337'), (b'content-type', b'application/json'), (b'x-request-id', b'3955c9fa-7fd8-4851-a3bf-b0f918b3af09'), (b'x-trace-id', b'82330196-6d07-4e85-bbd6-e1e0b76ecc46')])
-2026-04-09 18:20:11 - httpx - INFO - HTTP Request: POST http://localhost:8005/api/v1/trading_account/mock "HTTP/1.1 200 OK"
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_body.complete
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - response_closed.started
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - response_closed.complete
-2026-04-09 18:20:11 - e2e.conftest - DEBUG - ✅ Paper trading account created: mock/TEST_E2E_5f474ebf
-2026-04-09 18:20:11 - e2e.clients.mds_client - INFO - Connecting to MDS | ws_url=ws://localhost:8004/ws/fyers/ui | account_id=TEST_E2E_5f474ebf
-2026-04-09 18:20:11 - websockets.client - DEBUG - = connection is CONNECTING
-2026-04-09 18:20:11 - websockets.client - DEBUG - > GET /ws/fyers/ui?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDEiLCJyb2xlcyI6WyJ1c2VyIl0sInR5cGUiOiJhY2Nlc3MiLCJpYXQiOjE3NzU3MTkyMTEsImV4cCI6MTc3NTgwNTYxMSwiaXNzIjoiYXV0aC1zZXJ2aWNlIiwiYXVkIjoic21hcnR0cmFkZS1zZXJ2aWNlcyJ9.DgpYLpkXWhdVUQ7LTovPx_MIvqU6DJJ-RRsYm5FqsO8 HTTP/1.1
-2026-04-09 18:20:11 - websockets.client - DEBUG - > Host: localhost:8004
-2026-04-09 18:20:11 - websockets.client - DEBUG - > Upgrade: websocket
-2026-04-09 18:20:11 - websockets.client - DEBUG - > Connection: Upgrade
-2026-04-09 18:20:11 - websockets.client - DEBUG - > Sec-WebSocket-Key: 3Z7QkSmaynF1PmMXNPju3Q==
-2026-04-09 18:20:11 - websockets.client - DEBUG - > Sec-WebSocket-Version: 13
-2026-04-09 18:20:11 - websockets.client - DEBUG - > Sec-WebSocket-Extensions: permessage-deflate; client_max_window_bits
-2026-04-09 18:20:11 - websockets.client - DEBUG - > User-Agent: Python/3.14 websockets/16.0
-2026-04-09 18:20:11 - websockets.client - DEBUG - < HTTP/1.1 101 Switching Protocols
-2026-04-09 18:20:11 - websockets.client - DEBUG - < Upgrade: websocket
-2026-04-09 18:20:11 - websockets.client - DEBUG - < Connection: Upgrade
-2026-04-09 18:20:11 - websockets.client - DEBUG - < Sec-WebSocket-Accept: sNJTD7RcMG49mnyr85aEYRyNpRY=
-2026-04-09 18:20:11 - websockets.client - DEBUG - < Sec-WebSocket-Extensions: permessage-deflate
-2026-04-09 18:20:11 - websockets.client - DEBUG - < date: Thu, 09 Apr 2026 12:50:11 GMT
-2026-04-09 18:20:11 - websockets.client - DEBUG - < server: uvicorn
-2026-04-09 18:20:11 - websockets.client - DEBUG - = connection is OPEN
-2026-04-09 18:20:11 - e2e.clients.mds_client - INFO - WebSocket connected to ws://localhost:8004/ws/fyers/ui
-2026-04-09 18:20:11 - e2e.clients.mds_client - DEBUG - Reader loop started
-2026-04-09 18:20:11 - e2e.clients.mds_client - DEBUG - Reader loop iteration - connection=True
-2026-04-09 18:20:11 - websockets.client - DEBUG - < TEXT '{"type":"system.connected","conn_id":"a96b03a2-...","consumer_type":"ui"}' [166 bytes]
-2026-04-09 18:20:11 - websockets.client - DEBUG - < TEXT '{"type":"system.heartbeat"}' [27 bytes]
-2026-04-09 18:20:11 - e2e.clients.mds_client - DEBUG - Reader loop received message type: system.connected
-2026-04-09 18:20:11 - e2e.clients.mds_client - DEBUG - Received system.connected from MDS
-2026-04-09 18:20:11 - e2e.clients.mds_client - DEBUG - Reader loop iteration - connection=True
-2026-04-09 18:20:11 - e2e.clients.mds_client - DEBUG - Reader loop received message type: system.heartbeat
-2026-04-09 18:20:11 - e2e.clients.mds_client - DEBUG - Unknown message type: system.heartbeat
-2026-04-09 18:20:11 - e2e.clients.mds_client - DEBUG - Reader loop iteration - connection=True
-2026-04-09 18:20:11 - e2e.clients.mds_client - INFO - MDS connection established | account_id=TEST_E2E_5f474ebf
-2026-04-09 18:20:11 - e2e.clients.mds_client - INFO - Subscribing to account | account_id=TEST_E2E_5f474ebf
-2026-04-09 18:20:11 - websockets.client - DEBUG - > TEXT '{"action": "subscribe.account", "accounts": [{"... "TEST_E2E_5f474ebf"}]}' [82 bytes]
-2026-04-09 18:20:11 - e2e.clients.mds_client - INFO - Subscription confirmed | account_id=TEST_E2E_5f474ebf
-2026-04-09 18:20:11 - e2e.clients.bas_client - DEBUG - Placing order | broker_id=fyers | account_id=TEST_E2E_5f474ebf | idempotency_key=940339a2-1a5e-41c6-bed4-277ff7ec9956
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_headers.complete
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_body.complete
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'date', b'Thu, 09 Apr 2026 12:50:11 GMT'), (b'server', b'uvicorn'), (b'content-length', b'241'), (b'content-type', b'application/json'), (b'x-request-id', b'ce59d8d7-9baa-410a-a718-b6eab097c6e9'), (b'x-trace-id', b'a5057060-ea12-4d99-8e98-fb6556cd430a')])
-2026-04-09 18:20:11 - httpx - INFO - HTTP Request: POST http://localhost:8005/api/v1/orders/fyers/TEST_E2E_5f474ebf "HTTP/1.1 200 OK"
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_body.complete
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - response_closed.started
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - response_closed.complete
-2026-04-09 18:20:11 - e2e.test - INFO - Order placed | ID: c4f74c1f-b23e-472d-be3e-59dcee4e55e5 | Total Qty: 100
-2026-04-09 18:20:11 - e2e.clients.mock_client - DEBUG - Injecting fill | broker_id=fyers | account_id=TEST_E2E_5f474ebf | order_id=c4f74c1f-b23e-472d-be3e-59dcee4e55e5 | sequence=1 | qty=50 | price=2945.00
-2026-04-09 18:20:11 - httpcore.connection - DEBUG - connect_tcp.started host='localhost' port=8002 local_address=None timeout=5.0 socket_options=None
-2026-04-09 18:20:11 - httpcore.connection - DEBUG - connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x7f04da855310>
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_headers.complete
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_body.complete
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'date', b'Thu, 09 Apr 2026 12:50:11 GMT'), (b'server', b'uvicorn'), (b'content-length', b'141'), (b'content-type', b'application/json'), (b'x-request-id', b'70388827-e5f4-4ce7-9b51-badc63eccb51'), (b'x-trace-id', b'decea7e2-711c-4b7a-b4c4-17e703e2b83a')])
-2026-04-09 18:20:11 - httpx - INFO - HTTP Request: POST http://localhost:8002/api/v1/execute/fyers/TEST_E2E_5f474ebf "HTTP/1.1 200 OK"
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_body.complete
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - response_closed.started
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - response_closed.complete
-2026-04-09 18:20:11 - e2e.test - INFO - Fill 1 injected | Qty: 50 | Price: 2945.00
-2026-04-09 18:20:11 - e2e.clients.mock_client - DEBUG - Injecting fill | broker_id=fyers | account_id=TEST_E2E_5f474ebf | order_id=c4f74c1f-b23e-472d-be3e-59dcee4e55e5 | sequence=2 | qty=50 | price=2946.00
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_headers.complete
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - send_request_body.complete
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'date', b'Thu, 09 Apr 2026 12:50:11 GMT'), (b'server', b'uvicorn'), (b'content-length', b'141'), (b'content-type', b'application/json'), (b'x-request-id', b'5c67eb42-54fb-4a31-aab0-700bc4828dd5'), (b'x-trace-id', b'a0fcd156-cff3-46d8-8fcd-f87f2ae493c0')])
-2026-04-09 18:20:11 - httpx - INFO - HTTP Request: POST http://localhost:8002/api/v1/execute/fyers/TEST_E2E_5f474ebf "HTTP/1.1 200 OK"
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - receive_response_body.complete
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - response_closed.started
-2026-04-09 18:20:11 - httpcore.http11 - DEBUG - response_closed.complete
-2026-04-09 18:20:11 - e2e.test - INFO - Fill 2 injected | Qty: 50 | Price: 2946.00
-2026-04-09 18:20:11 - websockets.client - DEBUG - < TEXT '{"type":"error.event","error_code":"WS_INVALID"...st.","request_id":null}' [176 bytes]
-2026-04-09 18:20:11 - e2e.clients.mds_client - DEBUG - Reader loop received message type: error.event
-2026-04-09 18:20:11 - e2e.clients.mds_client - DEBUG - Unknown message type: error.event
-2026-04-09 18:20:11 - e2e.clients.mds_client - DEBUG - Reader loop iteration - connection=True
-2026-04-09 18:20:16 - websockets.client - DEBUG - < TEXT '{"type":"system.heartbeat"}' [27 bytes]
-2026-04-09 18:20:16 - e2e.clients.mds_client - DEBUG - Reader loop received message type: system.heartbeat
-2026-04-09 18:20:16 - e2e.clients.mds_client - DEBUG - Unknown message type: system.heartbeat
-2026-04-09 18:20:16 - e2e.clients.mds_client - DEBUG - Reader loop iteration - connection=True
-2026-04-09 18:20:21 - websockets.client - DEBUG - < TEXT '{"type":"system.heartbeat"}' [27 bytes]
-2026-04-09 18:20:21 - e2e.clients.mds_client - DEBUG - Reader loop received message type: system.heartbeat
-2026-04-09 18:20:21 - e2e.clients.mds_client - DEBUG - Unknown message type: system.heartbeat
-2026-04-09 18:20:21 - e2e.clients.mds_client - DEBUG - Reader loop iteration - connection=True
-2026-04-09 18:20:21 - e2e.clients.mds_client - DEBUG - Error closing connection: 'ClientConnection' object has no attribute 'aclose'
-2026-04-09 18:20:21 - e2e.clients.mds_client - DEBUG - Reader loop cancelled
-2026-04-09 18:20:21 - e2e.clients.mds_client - INFO - MDS disconnected | account_id=TEST_E2E_5f474ebf
-2026-04-09 18:20:21 - e2e.harness.event_collector - DEBUG - Cleared all events
-2026-04-09 18:20:21 - httpcore.connection - DEBUG - close.started
-2026-04-09 18:20:21 - httpcore.connection - DEBUG - close.complete
-2026-04-09 18:20:21 - httpcore.connection - DEBUG - close.started
-2026-04-09 18:20:21 - httpcore.connection - DEBUG - close.complete
+2026-04-11 08:21:08 - asyncio - DEBUG - Using selector: EpollSelector
+2026-04-11 08:21:08 - e2e.clients.bas_ws_client - INFO - Connecting to BAS WebSocket | ws_url=ws://localhost:8005/api/v1/ws | account_id=TEST_E2E_fb6869e9
+2026-04-11 08:21:08 - websockets.client - DEBUG - = connection is CONNECTING
+2026-04-11 08:21:08 - websockets.client - DEBUG - > GET /api/v1/ws?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDEiLCJyb2xlcyI6WyJ1c2VyIl0sInR5cGUiOiJhY2Nlc3MiLCJpYXQiOjE3NzU4NTYwNjgsImV4cCI6MTc3NTk0MjQ2OCwiaXNzIjoiYXV0aC1zZXJ2aWNlIiwiYXVkIjoic21hcnR0cmFkZS1zZXJ2aWNlcyJ9.WKJTU_v76vgzV6AObynYTjh93EoWNA7dCxq1_TvpFPk HTTP/1.1
+2026-04-11 08:21:08 - websockets.client - DEBUG - > Host: localhost:8005
+2026-04-11 08:21:08 - websockets.client - DEBUG - > Upgrade: websocket
+2026-04-11 08:21:08 - websockets.client - DEBUG - > Connection: Upgrade
+2026-04-11 08:21:08 - websockets.client - DEBUG - > Sec-WebSocket-Key: +xZ7Jri/w4A8MtquqS3SYA==
+2026-04-11 08:21:08 - websockets.client - DEBUG - > Sec-WebSocket-Version: 13
+2026-04-11 08:21:08 - websockets.client - DEBUG - > Sec-WebSocket-Extensions: permessage-deflate; client_max_window_bits
+2026-04-11 08:21:08 - websockets.client - DEBUG - > User-Agent: Python/3.14 websockets/16.0
+2026-04-11 08:21:08 - websockets.client - DEBUG - < HTTP/1.1 101 Switching Protocols
+2026-04-11 08:21:08 - websockets.client - DEBUG - < Upgrade: websocket
+2026-04-11 08:21:08 - websockets.client - DEBUG - < Connection: Upgrade
+2026-04-11 08:21:08 - websockets.client - DEBUG - < Sec-WebSocket-Accept: 0mk8pgW8JmV6JkG/kZQAwONsvNs=
+2026-04-11 08:21:08 - websockets.client - DEBUG - < Sec-WebSocket-Extensions: permessage-deflate
+2026-04-11 08:21:08 - websockets.client - DEBUG - < date: Sat, 11 Apr 2026 02:51:07 GMT
+2026-04-11 08:21:08 - websockets.client - DEBUG - < server: uvicorn
+2026-04-11 08:21:08 - websockets.client - DEBUG - = connection is OPEN
+2026-04-11 08:21:08 - websockets.client - DEBUG - < TEXT '{"type":"connection_ack","user_id":"00000000-00...04-11T02:51:08.229180"}' [138 bytes]
+2026-04-11 08:21:08 - e2e.clients.bas_ws_client - INFO - BAS WebSocket connected to ws://localhost:8005/api/v1/ws
+2026-04-11 08:21:08 - e2e.clients.bas_ws_client - DEBUG - BAS reader loop started
+2026-04-11 08:21:08 - e2e.clients.bas_ws_client - DEBUG - BAS reader loop iteration - connection=True
+2026-04-11 08:21:08 - e2e.clients.bas_ws_client - DEBUG - BAS reader loop received message type: connection_ack
+2026-04-11 08:21:08 - e2e.clients.bas_ws_client - DEBUG - BAS unknown message type: connection_ack | Full message: {
+  "type": "connection_ack",
+  "user_id": "00000000-0000-0000-0000-000000000001",
+  "account_id": "DEFAULT",
+  "timestamp": "2026-04-11T02:51:08.229180"
+}
+2026-04-11 08:21:08 - e2e.clients.bas_ws_client - DEBUG - BAS reader loop iteration - connection=True
+2026-04-11 08:21:28 - websockets.client - DEBUG - < PING a1 94 6b ab [binary, 4 bytes]
+2026-04-11 08:21:28 - websockets.client - DEBUG - > PONG a1 94 6b ab [binary, 4 bytes]
+2026-04-11 08:21:28 - websockets.client - DEBUG - > PING af fe 70 c5 [binary, 4 bytes]
+2026-04-11 08:21:28 - websockets.client - DEBUG - % sent keepalive ping
+2026-04-11 08:21:28 - websockets.client - DEBUG - < PONG af fe 70 c5 [binary, 4 bytes]
+2026-04-11 08:21:28 - websockets.client - DEBUG - % received keepalive pong
+2026-04-11 08:21:38 - e2e.clients.bas_ws_client - ERROR - Connection timeout after 30.0s, retrying...
+2026-04-11 08:21:38 - e2e.clients.bas_ws_client - WARNING - BAS WebSocket receive timeout, reconnecting...
+2026-04-11 08:21:38 - e2e.clients.bas_ws_client - WARNING - Disconnected from BAS WebSocket, attempting reconnection...
+2026-04-11 08:21:40 - e2e.clients.bas_ws_client - WARNING - BAS: Timeout waiting for WebSocket to close
+2026-04-11 08:21:40 - e2e.clients.bas_ws_client - DEBUG - BAS reader loop cancelled
+2026-04-11 08:21:40 - e2e.clients.bas_ws_client - INFO - BAS backoff wait: 1.0s before next reconnect attempt
+2026-04-11 08:21:41 - e2e.clients.bas_ws_client - INFO - Connecting to BAS WebSocket | ws_url=ws://localhost:8005/api/v1/ws | account_id=TEST_E2E_fb6869e9
+2026-04-11 08:21:41 - websockets.client - DEBUG - = connection is CONNECTING
+2026-04-11 08:21:41 - websockets.client - DEBUG - > GET /api/v1/ws?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDEiLCJyb2xlcyI6WyJ1c2VyIl0sInR5cGUiOiJhY2Nlc3MiLCJpYXQiOjE3NzU4NTYwNjgsImV4cCI6MTc3NTk0MjQ2OCwiaXNzIjoiYXV0aC1zZXJ2aWNlIiwiYXVkIjoic21hcnR0cmFkZS1zZXJ2aWNlcyJ9.WKJTU_v76vgzV6AObynYTjh93EoWNA7dCxq1_TvpFPk HTTP/1.1
+2026-04-11 08:21:41 - websockets.client - DEBUG - > Host: localhost:8005
+2026-04-11 08:21:41 - websockets.client - DEBUG - > Upgrade: websocket
+2026-04-11 08:21:41 - websockets.client - DEBUG - > Connection: Upgrade
+2026-04-11 08:21:41 - websockets.client - DEBUG - > Sec-WebSocket-Key: N7loxdCMU6FAfcduw9B8vw==
+2026-04-11 08:21:41 - websockets.client - DEBUG - > Sec-WebSocket-Version: 13
+2026-04-11 08:21:41 - websockets.client - DEBUG - > Sec-WebSocket-Extensions: permessage-deflate; client_max_window_bits
+2026-04-11 08:21:41 - websockets.client - DEBUG - > User-Agent: Python/3.14 websockets/16.0
+2026-04-11 08:21:41 - websockets.client - DEBUG - < HTTP/1.1 101 Switching Protocols
+2026-04-11 08:21:41 - websockets.client - DEBUG - < Upgrade: websocket
+2026-04-11 08:21:41 - websockets.client - DEBUG - < Connection: Upgrade
+2026-04-11 08:21:41 - websockets.client - DEBUG - < Sec-WebSocket-Accept: +fH/u592aRKLG1I9D1MM8XZODE4=
+2026-04-11 08:21:41 - websockets.client - DEBUG - < Sec-WebSocket-Extensions: permessage-deflate
+2026-04-11 08:21:41 - websockets.client - DEBUG - < date: Sat, 11 Apr 2026 02:51:40 GMT
+2026-04-11 08:21:41 - websockets.client - DEBUG - < server: uvicorn
+2026-04-11 08:21:41 - websockets.client - DEBUG - = connection is OPEN
+2026-04-11 08:21:41 - e2e.clients.bas_ws_client - INFO - BAS WebSocket connected to ws://localhost:8005/api/v1/ws
+2026-04-11 08:21:41 - e2e.clients.bas_ws_client - DEBUG - BAS reader loop started
+2026-04-11 08:21:41 - e2e.clients.bas_ws_client - DEBUG - BAS reader loop iteration - connection=True
+2026-04-11 08:21:41 - websockets.client - DEBUG - < TEXT '{"type":"connection_ack","user_id":"00000000-00...04-11T02:51:41.245102"}' [138 bytes]
+2026-04-11 08:21:41 - e2e.clients.bas_ws_client - DEBUG - BAS reader loop received message type: connection_ack
+2026-04-11 08:21:41 - e2e.clients.bas_ws_client - DEBUG - BAS unknown message type: connection_ack | Full message: {
+  "type": "connection_ack",
+  "user_id": "00000000-0000-0000-0000-000000000001",
+  "account_id": "DEFAULT",
+  "timestamp": "2026-04-11T02:51:41.245102"
+}
+2026-04-11 08:21:41 - e2e.clients.bas_ws_client - DEBUG - BAS reader loop iteration - connection=True
+2026-04-11 08:21:48 - websockets.client - DEBUG - < PING 94 1d df 91 [binary, 4 bytes]
+2026-04-11 08:21:48 - websockets.client - DEBUG - > PONG 94 1d df 91 [binary, 4 bytes]
+2026-04-11 08:21:48 - websockets.client - DEBUG - > PING '\x00ས' [text, 4 bytes]
+2026-04-11 08:21:48 - websockets.client - DEBUG - % sent keepalive ping
+2026-04-11 08:21:48 - websockets.client - DEBUG - < PONG '\x00ས' [text, 4 bytes]
+2026-04-11 08:21:48 - websockets.client - DEBUG - % received keepalive pong
+2026-04-11 08:22:01 - websockets.client - DEBUG - < PING ae e3 7c ec [binary, 4 bytes]
+2026-04-11 08:22:01 - websockets.client - DEBUG - > PONG ae e3 7c ec [binary, 4 bytes]
+2026-04-11 08:22:01 - websockets.client - DEBUG - > PING e5 75 80 a0 [binary, 4 bytes]
+2026-04-11 08:22:01 - websockets.client - DEBUG - % sent keepalive ping
+2026-04-11 08:22:01 - websockets.client - DEBUG - < PONG e5 75 80 a0 [binary, 4 bytes]
+2026-04-11 08:22:01 - websockets.client - DEBUG - % received keepalive pong
+2026-04-11 08:22:08 - websockets.client - DEBUG - < PING b0 2d c3 ea [binary, 4 bytes]
+2026-04-11 08:22:08 - websockets.client - DEBUG - > PONG b0 2d c3 ea [binary, 4 bytes]
+2026-04-11 08:22:08 - websockets.client - DEBUG - > PING 0a 2b d1 63 [binary, 4 bytes]
+2026-04-11 08:22:08 - websockets.client - DEBUG - % sent keepalive ping
+2026-04-11 08:22:08 - websockets.client - DEBUG - < PONG 0a 2b d1 63 [binary, 4 bytes]
+2026-04-11 08:22:08 - websockets.client - DEBUG - % received keepalive pong
+2026-04-11 08:22:11 - e2e.clients.bas_ws_client - ERROR - Connection timeout after 30.0s, retrying...
+2026-04-11 08:22:11 - e2e.clients.bas_ws_client - WARNING - BAS WebSocket receive timeout, reconnecting...
+2026-04-11 08:22:11 - e2e.clients.bas_ws_client - WARNING - Disconnected from BAS WebSocket, attempting reconnection...
+2026-04-11 08:22:13 - e2e.clients.bas_ws_client - WARNING - BAS: Timeout waiting for WebSocket to close
+2026-04-11 08:22:13 - e2e.clients.bas_ws_client - DEBUG - BAS reader loop cancelled
+2026-04-11 08:22:13 - e2e.clients.bas_ws_client - INFO - BAS backoff wait: 2.0s before next reconnect attempt
+2026-04-11 08:22:15 - e2e.clients.bas_ws_client - INFO - Connecting to BAS WebSocket | ws_url=ws://localhost:8005/api/v1/ws | account_id=TEST_E2E_fb6869e9
+2026-04-11 08:22:15 - websockets.client - DEBUG - = connection is CONNECTING
+2026-04-11 08:22:15 - websockets.client - DEBUG - > GET /api/v1/ws?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDEiLCJyb2xlcyI6WyJ1c2VyIl0sInR5cGUiOiJhY2Nlc3MiLCJpYXQiOjE3NzU4NTYwNjgsImV4cCI6MTc3NTk0MjQ2OCwiaXNzIjoiYXV0aC1zZXJ2aWNlIiwiYXVkIjoic21hcnR0cmFkZS1zZXJ2aWNlcyJ9.WKJTU_v76vgzV6AObynYTjh93EoWNA7dCxq1_TvpFPk HTTP/1.1
+2026-04-11 08:22:15 - websockets.client - DEBUG - > Host: localhost:8005
+2026-04-11 08:22:15 - websockets.client - DEBUG - > Upgrade: websocket
+2026-04-11 08:22:15 - websockets.client - DEBUG - > Connection: Upgrade
+2026-04-11 08:22:15 - websockets.client - DEBUG - > Sec-WebSocket-Key: gQeZq+RzQzh693Ljol5Xxw==
+2026-04-11 08:22:15 - websockets.client - DEBUG - > Sec-WebSocket-Version: 13
+2026-04-11 08:22:15 - websockets.client - DEBUG - > Sec-WebSocket-Extensions: permessage-deflate; client_max_window_bits
+2026-04-11 08:22:15 - websockets.client - DEBUG - > User-Agent: Python/3.14 websockets/16.0
+2026-04-11 08:22:15 - websockets.client - DEBUG - < HTTP/1.1 101 Switching Protocols
+2026-04-11 08:22:15 - websockets.client - DEBUG - < Upgrade: websocket
+2026-04-11 08:22:15 - websockets.client - DEBUG - < Connection: Upgrade
+2026-04-11 08:22:15 - websockets.client - DEBUG - < Sec-WebSocket-Accept: HmvnBnGfv7IY3T+fUDzXLzDCjJY=
+2026-04-11 08:22:15 - websockets.client - DEBUG - < Sec-WebSocket-Extensions: permessage-deflate
+2026-04-11 08:22:15 - websockets.client - DEBUG - < date: Sat, 11 Apr 2026 02:52:14 GMT
+2026-04-11 08:22:15 - websockets.client - DEBUG - < server: uvicorn
+2026-04-11 08:22:15 - websockets.client - DEBUG - = connection is OPEN
+2026-04-11 08:22:15 - e2e.clients.bas_ws_client - INFO - BAS WebSocket connected to ws://localhost:8005/api/v1/ws
+2026-04-11 08:22:15 - e2e.clients.bas_ws_client - DEBUG - BAS reader loop started
+2026-04-11 08:22:15 - e2e.clients.bas_ws_client - DEBUG - BAS reader loop iteration - connection=True
+2026-04-11 08:22:15 - websockets.client - DEBUG - < TEXT '{"type":"connection_ack","user_id":"00000000-00...04-11T02:52:15.255180"}' [138 bytes]
+2026-04-11 08:22:15 - e2e.clients.bas_ws_client - DEBUG - BAS reader loop received message type: connection_ack
+2026-04-11 08:22:15 - e2e.clients.bas_ws_client - DEBUG - BAS unknown message type: connection_ack | Full message: {
+  "type": "connection_ack",
+  "user_id": "00000000-0000-0000-0000-000000000001",
+  "account_id": "DEFAULT",
+  "timestamp": "2026-04-11T02:52:15.255180"
+}
+2026-04-11 08:22:15 - e2e.clients.bas_ws_client - DEBUG - BAS reader loop iteration - connection=True
+2026-04-11 08:22:21 - websockets.client - DEBUG - < PING b2 24 8c 19 [binary, 4 bytes]
+2026-04-11 08:22:21 - websockets.client - DEBUG - > PONG b2 24 8c 19 [binary, 4 bytes]
+2026-04-11 08:22:21 - websockets.client - DEBUG - > PING 77 b2 a1 20 [binary, 4 bytes]
+2026-04-11 08:22:21 - websockets.client - DEBUG - % sent keepalive ping
+2026-04-11 08:22:21 - websockets.client - DEBUG - < PONG 77 b2 a1 20 [binary, 4 bytes]
+2026-04-11 08:22:21 - websockets.client - DEBUG - % received keepalive pong
+2026-04-11 08:22:28 - websockets.client - DEBUG - < PING f7 7c dd 7b [binary, 4 bytes]
+2026-04-11 08:22:28 - websockets.client - DEBUG - > PONG f7 7c dd 7b [binary, 4 bytes]
+2026-04-11 08:22:28 - websockets.client - DEBUG - > PING a3 ec 8a 05 [binary, 4 bytes]
+2026-04-11 08:22:28 - websockets.client - DEBUG - % sent keepalive ping
+2026-04-11 08:22:28 - websockets.client - DEBUG - < PONG a3 ec 8a 05 [binary, 4 bytes]
+2026-04-11 08:22:28 - websockets.client - DEBUG - % received keepalive pong
+2026-04-11 08:22:35 - websockets.client - DEBUG - < PING 24 db 56 c0 [binary, 4 bytes]
+2026-04-11 08:22:35 - websockets.client - DEBUG - > PONG 24 db 56 c0 [binary, 4 bytes]
+2026-04-11 08:22:35 - websockets.client - DEBUG - > PING 3e 81 9b 3d [binary, 4 bytes]
+2026-04-11 08:22:35 - websockets.client - DEBUG - % sent keepalive ping
+2026-04-11 08:22:35 - websockets.client - DEBUG - < PONG 3e 81 9b 3d [binary, 4 bytes]
+2026-04-11 08:22:35 - websockets.client - DEBUG - % received keepalive pong
+2026-04-11 08:22:41 - websockets.client - DEBUG - < PING 3a b6 76 cf [binary, 4 bytes]
+2026-04-11 08:22:41 - websockets.client - DEBUG - > PONG 3a b6 76 cf [binary, 4 bytes]
+2026-04-11 08:22:41 - websockets.client - DEBUG - > PING ff 88 e3 57 [binary, 4 bytes]
+2026-04-11 08:22:41 - websockets.client - DEBUG - % sent keepalive ping
+2026-04-11 08:22:41 - websockets.client - DEBUG - < PONG ff 88 e3 57 [binary, 4 bytes]
+2026-04-11 08:22:41 - websockets.client - DEBUG - % received keepalive pong
+2026-04-11 08:22:45 - e2e.clients.bas_ws_client - ERROR - Connection timeout after 30.0s, retrying...
+2026-04-11 08:22:45 - e2e.clients.bas_ws_client - WARNING - BAS WebSocket receive timeout, reconnecting...
+2026-04-11 08:22:45 - e2e.clients.bas_ws_client - WARNING - Disconnected from BAS WebSocket, attempting reconnection...
+2026-04-11 08:22:47 - e2e.clients.bas_ws_client - WARNING - BAS: Timeout waiting for WebSocket to close
+2026-04-11 08:22:47 - e2e.clients.bas_ws_client - DEBUG - BAS reader loop cancelled
+2026-04-11 08:22:47 - e2e.clients.bas_ws_client - INFO - BAS backoff wait: 4.0s before next reconnect attempt
+2026-04-11 08:22:48 - websockets.client - DEBUG - < PING b4 34 04 e9 [binary, 4 bytes]
+2026-04-11 08:22:48 - websockets.client - DEBUG - > PONG b4 34 04 e9 [binary, 4 bytes]
+2026-04-11 08:22:48 - websockets.client - DEBUG - > PING bf 96 66 39 [binary, 4 bytes]
+2026-04-11 08:22:48 - websockets.client - DEBUG - % sent keepalive ping
+2026-04-11 08:22:48 - websockets.client - DEBUG - < PONG bf 96 66 39 [binary, 4 bytes]
+2026-04-11 08:22:48 - websockets.client - DEBUG - % received keepalive pong
+2026-04-11 08:22:51 - e2e.clients.bas_ws_client - INFO - Connecting to BAS WebSocket | ws_url=ws://localhost:8005/api/v1/ws | account_id=TEST_E2E_fb6869e9
+2026-04-11 08:22:51 - websockets.client - DEBUG - = connection is CONNECTING
+2026-04-11 08:22:51 - websockets.client - DEBUG - > GET /api/v1/ws?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDEiLCJyb2xlcyI6WyJ1c2VyIl0sInR5cGUiOiJhY2Nlc3MiLCJpYXQiOjE3NzU4NTYwNjgsImV4cCI6MTc3NTk0MjQ2OCwiaXNzIjoiYXV0aC1zZXJ2aWNlIiwiYXVkIjoic21hcnR0cmFkZS1zZXJ2aWNlcyJ9.WKJTU_v76vgzV6AObynYTjh93EoWNA7dCxq1_TvpFPk HTTP/1.1
+2026-04-11 08:22:51 - websockets.client - DEBUG - > Host: localhost:8005
+2026-04-11 08:22:51 - websockets.client - DEBUG - > Upgrade: websocket
+2026-04-11 08:22:51 - websockets.client - DEBUG - > Connection: Upgrade
+2026-04-11 08:22:51 - websockets.client - DEBUG - > Sec-WebSocket-Key: ppxo6lNoMX+KdxqABt2t1g==
+2026-04-11 08:22:51 - websockets.client - DEBUG - > Sec-WebSocket-Version: 13
+2026-04-11 08:22:51 - websockets.client - DEBUG - > Sec-WebSocket-Extensions: permessage-deflate; client_max_window_bits
+2026-04-11 08:22:51 - websockets.client - DEBUG - > User-Agent: Python/3.14 websockets/16.0
+2026-04-11 08:22:51 - websockets.client - DEBUG - < HTTP/1.1 101 Switching Protocols
+2026-04-11 08:22:51 - websockets.client - DEBUG - < Upgrade: websocket
+2026-04-11 08:22:51 - websockets.client - DEBUG - < Connection: Upgrade
+2026-04-11 08:22:51 - websockets.client - DEBUG - < Sec-WebSocket-Accept: ln3yRDtYpd4vYCAyN1u6eQz7JLw=
+2026-04-11 08:22:51 - websockets.client - DEBUG - < Sec-WebSocket-Extensions: permessage-deflate
+2026-04-11 08:22:51 - websockets.client - DEBUG - < date: Sat, 11 Apr 2026 02:52:50 GMT
+2026-04-11 08:22:51 - websockets.client - DEBUG - < server: uvicorn
+2026-04-11 08:22:51 - websockets.client - DEBUG - = connection is OPEN
+2026-04-11 08:22:51 - websockets.client - DEBUG - < TEXT '{"type":"connection_ack","user_id":"00000000-00...04-11T02:52:51.269229"}' [138 bytes]
+2026-04-11 08:22:51 - e2e.clients.bas_ws_client - INFO - BAS WebSocket connected to ws://localhost:8005/api/v1/ws
+2026-04-11 08:22:51 - e2e.clients.bas_ws_client - DEBUG - BAS reader loop started
+2026-04-11 08:22:51 - e2e.clients.bas_ws_client - DEBUG - BAS reader loop iteration - connection=True
+2026-04-11 08:22:51 - e2e.clients.bas_ws_client - DEBUG - BAS reader loop received message type: connection_ack
+2026-04-11 08:22:51 - e2e.clients.bas_ws_client - DEBUG - BAS unknown message type: connection_ack | Full message: {
+  "type": "connection_ack",
+  "user_id": "00000000-0000-0000-0000-000000000001",
+  "account_id": "DEFAULT",
+  "timestamp": "2026-04-11T02:52:51.269229"
+}
+2026-04-11 08:22:51 - e2e.clients.bas_ws_client - DEBUG - BAS reader loop iteration - connection=True
+2026-04-11 08:22:55 - websockets.client - DEBUG - < PING b2 75 81 d2 [binary, 4 bytes]
+2026-04-11 08:22:55 - websockets.client - DEBUG - > PONG b2 75 81 d2 [binary, 4 bytes]
+2026-04-11 08:22:55 - websockets.client - DEBUG - > PING a7 b2 b3 6d [binary, 4 bytes]
+2026-04-11 08:22:55 - websockets.client - DEBUG - % sent keepalive ping
+2026-04-11 08:22:55 - websockets.client - DEBUG - < PONG a7 b2 b3 6d [binary, 4 bytes]
+2026-04-11 08:22:55 - websockets.client - DEBUG - % received keepalive pong
+2026-04-11 08:23:01 - websockets.client - DEBUG - < PING 5b df ed e1 [binary, 4 bytes]
+2026-04-11 08:23:01 - websockets.client - DEBUG - > PONG 5b df ed e1 [binary, 4 bytes]
+2026-04-11 08:23:01 - websockets.client - DEBUG - > PING 2f cb 60 f8 [binary, 4 bytes]
+2026-04-11 08:23:01 - websockets.client - DEBUG - % sent keepalive ping
+2026-04-11 08:23:01 - websockets.client - DEBUG - < PONG 2f cb 60 f8 [binary, 4 bytes]
+2026-04-11 08:23:01 - websockets.client - DEBUG - % received keepalive pong

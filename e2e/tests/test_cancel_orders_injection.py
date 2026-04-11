@@ -24,7 +24,6 @@ from broker_adapter_service.schemas.order_dtos import BasOrderPlaceRequest, BasO
 async def test_cancel_unfilled_order(
     bas_client,
     mock_client,
-    mds_client,
     event_collector,
     assertions,
     test_account_id,
@@ -97,7 +96,6 @@ async def test_cancel_unfilled_order(
 async def test_cancel_partial_fill(
     bas_client,
     mock_client,
-    mds_client,
     event_collector,
     assertions,
     test_account_id,
@@ -197,7 +195,6 @@ async def test_cancel_partial_fill(
 async def test_cancel_then_fill_rejected(
     bas_client,
     mock_client,
-    mds_client,
     event_collector,
     assertions,
     test_account_id,

@@ -56,7 +56,7 @@ class ChaosEngine:
                 affected_service="mock",
             )
         ):
-            # Within this block, mock service requests timeout
+            # Within this block, paper broker service requests timeout
             # Test resilience and recovery
             ...
         # After exiting, failure is auto-cleaned up

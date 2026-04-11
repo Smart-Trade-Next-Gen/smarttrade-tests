@@ -27,7 +27,7 @@ class PriceUpdate:
 
 class MockMarketDataStream:
     """
-    Injects price updates into Mock service to drive execution.
+    Injects price updates into paper broker service to drive execution.
 
     Usage:
         # Gradually move price from 550 to 560
@@ -90,7 +90,7 @@ class MockMarketDataStream:
             f"Bid: {bid} | Ask: {ask}"
         )
 
-        # Send to mock service to trigger price-driven execution
+        # Send to paper broker service to trigger price-driven execution
         result = await self.mock_client.inject_price_update(
             broker_id=self.broker_id,
             instrument_id=instrument_id,

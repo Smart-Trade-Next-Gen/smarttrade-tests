@@ -9,7 +9,7 @@ Tests validate:
 - Event sequence validation
 
 Note: Converted from price-triggered execution to deterministic fill injection
-since the price injection endpoint is not implemented on the mock service.
+since the price injection endpoint is not implemented on the paper broker service.
 """
 
 import pytest
@@ -24,7 +24,6 @@ from broker_adapter_service.schemas.order_dtos import BasOrderPlaceRequest, BasO
 async def test_market_buy_executes_immediately(
     bas_client,
     mock_client,
-    mds_client,
     event_collector,
     assertions,
     test_account_id,
@@ -104,7 +103,6 @@ async def test_market_buy_executes_immediately(
 async def test_limit_buy_triggers_on_price_cross(
     bas_client,
     mock_client,
-    mds_client,
     event_collector,
     assertions,
     test_account_id,
@@ -181,7 +179,6 @@ async def test_limit_buy_triggers_on_price_cross(
 async def test_limit_sell_triggers_on_price_cross(
     bas_client,
     mock_client,
-    mds_client,
     event_collector,
     assertions,
     test_account_id,
@@ -258,7 +255,6 @@ async def test_limit_sell_triggers_on_price_cross(
 async def test_stop_buy_triggers_on_price_cross(
     bas_client,
     mock_client,
-    mds_client,
     event_collector,
     assertions,
     test_account_id,

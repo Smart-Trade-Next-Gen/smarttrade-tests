@@ -9,7 +9,7 @@ Tests validate:
 - Complete order lifecycle from place to partial to fully filled
 
 Note: Converted from price-triggered execution to deterministic fill injection
-since the price injection endpoint is not implemented on the mock service.
+since the price injection endpoint is not implemented on the paper broker service.
 """
 
 import pytest
@@ -24,7 +24,6 @@ from broker_adapter_service.schemas.order_dtos import BasOrderPlaceRequest, BasO
 async def test_partial_fill_streaming_prices_2x(
     bas_client,
     mock_client,
-    mds_client,
     event_collector,
     assertions,
     test_account_id,
@@ -125,7 +124,6 @@ async def test_partial_fill_streaming_prices_2x(
 async def test_limit_order_partial_fills_on_price_movement(
     bas_client,
     mock_client,
-    mds_client,
     event_collector,
     assertions,
     test_account_id,
@@ -202,7 +200,6 @@ async def test_limit_order_partial_fills_on_price_movement(
 async def test_concurrent_orders_partial_fills(
     bas_client,
     mock_client,
-    mds_client,
     event_collector,
     assertions,
     test_account_id,

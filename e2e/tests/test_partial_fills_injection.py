@@ -21,7 +21,6 @@ from broker_adapter_service.schemas.order_dtos import BasOrderPlaceRequest, BasO
 async def test_partial_fill_2x(
     bas_client,
     mock_client,
-    mds_client,
     event_collector,
     assertions,
     test_account_id,
@@ -128,7 +127,6 @@ async def test_partial_fill_2x(
 async def test_partial_fill_3x(
     bas_client,
     mock_client,
-    mds_client,
     event_collector,
     assertions,
     test_account_id,
@@ -244,7 +242,6 @@ async def test_partial_fill_3x(
 async def test_partial_fill_many_small(
     bas_client,
     mock_client,
-    mds_client,
     event_collector,
     assertions,
     test_account_id,

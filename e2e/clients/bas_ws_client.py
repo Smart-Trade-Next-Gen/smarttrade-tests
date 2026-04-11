@@ -317,6 +317,8 @@ class BASWebSocketClient:
                 event_type_map = {
                     "order_filled": "order.filled.v1",
                     "order_fill": "order.filled.v1",
+                    "order_cancelled": "order.cancelled.v1",
+                    "order_cancel": "order.cancelled.v1",
                     "trade_executed": "trade.executed.v1",
                     "trade_exec": "trade.executed.v1",
                     "position_updated": "position.updated.v1",
@@ -333,7 +335,7 @@ class BASWebSocketClient:
                 }
 
                 # Add to queue if it's a recognized event type
-                if mapped_type in {"order.filled.v1", "trade.executed.v1", "position.updated.v1"}:
+                if mapped_type in {"order.filled.v1", "trade.executed.v1", "position.updated.v1", "order.cancelled.v1", "order.placed.v1"}:
                     log.debug(f"Adding extracted BAS event to queue: type={mapped_type}")
                     if self._event_queue:
                         try:
@@ -346,7 +348,32 @@ class BASWebSocketClient:
                             except Exception as e:
                                 log.error(f"Failed to handle BAS event queue: {e}")
 
-        elif msg_type in {"order.filled.v1", "trade.executed.v1", "position.updated.v1"}:
+        elif msg_type == "event":
+            # Handle event message: {"type": "event", "event_name": "...", "data": {...}, "sequence": N, "timestamp": "..."}
+            event_name = data.get("event_name")
+            if event_name and event_name in {"order.filled.v1", "trade.executed.v1", "position.updated.v1", "order.cancelled.v1", "order.placed.v1"}:
+                log.debug(f"BAS event received: {event_name}")
+                # Convert to flat message structure for compatibility with client code
+                event_message = {
+                    "type": event_name,
+                    "data": data.get("data", {}),
+                    "sequence": data.get("sequence"),
+                    "timestamp": data.get("timestamp"),
+                }
+                if self._event_queue:
+                    try:
+                        self._event_queue.put_nowait(event_message)
+                    except asyncio.QueueFull:
+                        log.warning(f"BAS event queue full, dropping oldest event")
+                        try:
+                            self._event_queue.get_nowait()
+                            self._event_queue.put_nowait(event_message)
+                        except Exception as e:
+                            log.error(f"Failed to handle BAS event queue: {e}")
+            else:
+                log.debug(f"BAS event type not recognized: {event_name}")
+
+        elif msg_type in {"order.filled.v1", "trade.executed.v1", "position.updated.v1", "order.cancelled.v1", "order.placed.v1"}:
             log.debug(f"BAS event received: {msg_type}")
             # Add event to queue for stream_events() to yield
             if self._event_queue:

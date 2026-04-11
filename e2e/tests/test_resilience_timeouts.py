@@ -28,7 +28,6 @@ from e2e.fixtures.chaos_engine import ChaosEngine, ChaosConfig, FailureMode
 async def test_order_placement_under_mock_latency(
     bas_client,
     mock_client,
-    mds_client,
     event_collector,
     assertions,
     test_account_id,
@@ -36,7 +35,7 @@ async def test_order_placement_under_mock_latency(
     logger,
 ):
     """
-    Test: Order placement succeeds despite Mock service latency.
+    Test: Order placement succeeds despite paper broker service latency.
 
     Validates:
     - Client retries on timeout (if configured)
@@ -91,7 +90,6 @@ async def test_order_placement_under_mock_latency(
 async def test_fill_injection_retry_on_timeout(
     bas_client,
     mock_client,
-    mds_client,
     event_collector,
     assertions,
     test_account_id,
@@ -166,7 +164,6 @@ async def test_fill_injection_retry_on_timeout(
 async def test_event_collection_with_delayed_delivery(
     bas_client,
     mock_client,
-    mds_client,
     event_collector,
     assertions,
     test_account_id,
@@ -238,7 +235,6 @@ async def test_event_collection_with_delayed_delivery(
 async def test_position_state_consistent_under_latency(
     bas_client,
     mock_client,
-    mds_client,
     event_collector,
     assertions,
     test_account_id,

@@ -440,7 +440,7 @@ def generate_html_report(test_results_file="reports/e2e_results.json", output_fi
                     <span>Duration: 0.45s</span>
                 </div>
                 <div class="error-message">
-                    💡 Order is created successfully (mock-service returns OrderStatus.PENDING)<br>
+                    💡 Order is created successfully (paper-broker-service returns OrderStatus.PENDING)<br>
                     ⚠️ Response validation fails because OrderStatus enum is not properly serialized<br>
                     🔧 Fix: Ensure OrderStatus serializes to string in response<br>
                     ✅ Order placement itself works - just response parsing issue

@@ -27,7 +27,6 @@ from broker_adapter_service.schemas.order_dtos import BasOrderPlaceRequest, BasO
 async def test_duplicate_fill_events_idempotent(
     bas_client,
     mock_client,
-    mds_client,
     event_collector,
     assertions,
     test_account_id,
@@ -115,7 +114,6 @@ async def test_duplicate_fill_events_idempotent(
 async def test_partial_fill_then_missing_event(
     bas_client,
     mock_client,
-    mds_client,
     event_collector,
     assertions,
     test_account_id,
@@ -206,7 +204,6 @@ async def test_partial_fill_then_missing_event(
 async def test_out_of_order_fill_events(
     bas_client,
     mock_client,
-    mds_client,
     event_collector,
     assertions,
     test_account_id,
@@ -311,7 +308,6 @@ async def test_out_of_order_fill_events(
 async def test_recovery_after_event_stream_interruption(
     bas_client,
     mock_client,
-    mds_client,
     event_collector,
     assertions,
     test_account_id,

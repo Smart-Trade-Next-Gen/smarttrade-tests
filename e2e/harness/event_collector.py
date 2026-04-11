@@ -253,9 +253,28 @@ class EventCollector:
         """
         return self.dropped_events_counts.get(order_id, 0)
 
+    async def clear_completed_orders(self, terminal_orders: list[str]) -> None:
+        """
+        Clear events for orders that have reached terminal status.
+
+        This is called after test completes to free memory from completed orders.
+        Use this to prevent memory accumulation across multiple orders in a single test.
+
+        Args:
+            terminal_orders: List of order IDs that have completed
+        """
+        async with self._lock:
+            for order_id in terminal_orders:
+                if order_id in self.events:
+                    size_before = len(self.events[order_id])
+                    self.events.pop(order_id, None)
+                    self.dropped_events_counts.pop(order_id, None)
+                    # Don't clear queue to avoid race conditions with waiting tasks
+                    log.debug(f"Cleared {size_before} events for completed order_id={order_id}")
+
     def clear(self, order_id: Optional[str] = None) -> None:
         """
-        Clear events for an order or all orders.
+        Clear events for an order or all orders (blocking version).
 
         Args:
             order_id: Order ID to clear (if None, clears all)

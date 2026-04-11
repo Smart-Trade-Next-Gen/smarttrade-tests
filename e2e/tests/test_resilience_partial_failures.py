@@ -27,7 +27,6 @@ from broker_adapter_service.schemas.order_dtos import BasOrderPlaceRequest, BasO
 async def test_concurrent_orders_with_partial_failures(
     bas_client,
     mock_client,
-    mds_client,
     event_collector,
     assertions,
     test_account_id,
@@ -116,7 +115,6 @@ async def test_concurrent_orders_with_partial_failures(
 async def test_recovery_after_service_slowdown(
     bas_client,
     mock_client,
-    mds_client,
     event_collector,
     assertions,
     test_account_id,
@@ -200,7 +198,6 @@ async def test_recovery_after_service_slowdown(
 async def test_invariants_preserved_under_partial_failures(
     bas_client,
     mock_client,
-    mds_client,
     event_collector,
     assertions,
     test_account_id,

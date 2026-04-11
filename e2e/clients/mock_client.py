@@ -1,5 +1,5 @@
 """
-Mock Service REST API client.
+paper broker service REST API client.
 
 Provides deterministic fill injection for testing without relying on price-triggered execution.
 Used to create reproducible, controlled test scenarios.
@@ -25,7 +25,7 @@ log = logging.getLogger(__name__)
 
 class MockClient:
     """
-    Async REST client for Mock Service (execution injection).
+    Async REST client for paper broker service (execution injection).
 
     Enables deterministic fill injection for E2E testing.
     Validates sequence monotonicity to prevent duplicate or out-of-order executions.
@@ -41,7 +41,7 @@ class MockClient:
         Initialize MockClient.
 
         Args:
-            base_url: Base URL for Mock service (e.g., http://localhost:8002)
+            base_url: Base URL for paper broker service (e.g., http://localhost:8002)
             token: Bearer token for authentication
             timeout: Request timeout in seconds (default: 5.0)
 
@@ -106,7 +106,7 @@ class MockClient:
         Dynamically import ExecutionCommand and ExecutionResult.
 
         This is done at runtime to allow tests to discover without requiring
-        mock-service to be in the Python path at import time.
+        paper-broker-service to be in the Python path at import time.
 
         Returns:
             Tuple of (ExecutionCommand, ExecutionResult) classes
@@ -259,7 +259,7 @@ class MockClient:
         """
         Inject a price update to trigger price-driven execution.
 
-        This method sends a price update to the Mock Service, which triggers
+        This method sends a price update to the paper broker service, which triggers
         the PriceExecutionEngine to evaluate all open orders and execute
         any that match the trigger conditions.
 
@@ -317,7 +317,7 @@ class MockClient:
         order_id: str,
     ) -> dict:
         """
-        Cancel an order via mock service.
+        Cancel an order via paper broker service.
 
         Args:
             broker_id: Broker identifier (e.g., "fyers")
@@ -325,7 +325,7 @@ class MockClient:
             order_id: Order ID to cancel
 
         Returns:
-            Response from mock service
+            Response from paper broker service
 
         Raises:
             httpx.HTTPError: If request fails
@@ -366,9 +366,9 @@ class MockClient:
         order_request: dict,
     ) -> dict:
         """
-        Create an order in mock service.
+        Create an order in paper broker service.
 
-        Syncs order from BAS to mock service so fills can be injected.
+        Syncs order from BAS to paper broker service so fills can be injected.
 
         Args:
             broker_id: Broker identifier
@@ -376,7 +376,7 @@ class MockClient:
             order_request: Order creation request dict
 
         Returns:
-            Response from mock service
+            Response from paper broker service
 
         Raises:
             httpx.HTTPError: If request fails
@@ -392,10 +392,10 @@ class MockClient:
                 headers=headers,
             )
             response.raise_for_status()
-            log.debug(f"Order created in mock service | broker_id={broker_id} | account_id={account_id}")
+            log.debug(f"Order created in paper broker service | broker_id={broker_id} | account_id={account_id}")
             return response.json()
         except httpx.HTTPError as e:
-            log.error(f"Order creation in mock service failed: {e}")
+            log.error(f"Order creation in paper broker service failed: {e}")
             raise
 
     async def sync_order(
@@ -405,10 +405,10 @@ class MockClient:
         order_response: dict,
     ) -> dict:
         """
-        Sync a BAS order response to mock service.
+        Sync a BAS order response to paper broker service.
 
         Extracts order details from BAS response (with instrument_id from MDS)
-        and creates order in mock service for fill injection.
+        and creates order in paper broker service for fill injection.
 
         Follows MDS principle: instrument_id used throughout system (not broker symbols).
 
@@ -418,7 +418,7 @@ class MockClient:
             order_response: BasOrderPlaceResponse dict with broker_order_id, legs, etc.
 
         Returns:
-            Response from mock service with created order
+            Response from paper broker service with created order
 
         Raises:
             httpx.HTTPError: If sync fails
@@ -430,7 +430,7 @@ class MockClient:
             if not order_id:
                 raise ValueError("order_response must have broker_order_id")
 
-            # Extract first leg (BAS returns multi-leg orders, but mock service uses single-instrument)
+            # Extract first leg (BAS returns multi-leg orders, but paper broker service uses single-instrument)
             legs = order_response.get("legs", [])
             if not legs:
                 raise ValueError("order_response must have at least one leg")
@@ -440,7 +440,7 @@ class MockClient:
             if not instrument_id:
                 raise ValueError("leg must have instrument_id (from MDS)")
 
-            # Build order request for mock service with correct instrument_id
+            # Build order request for paper broker service with correct instrument_id
             sync_request = {
                 "order_id": order_id,
                 "instrument_id": instrument_id,  # Use MDS instrument_id (NOT broker symbol)
@@ -463,12 +463,12 @@ class MockClient:
             )
             response.raise_for_status()
             log.debug(
-                f"Order synced to mock service | order_id={order_id} | "
+                f"Order synced to paper broker service | order_id={order_id} | "
                 f"instrument_id={instrument_id} | broker_id={broker_id} | account_id={account_id}"
             )
             return response.json()
         except httpx.HTTPError as e:
-            log.error(f"Order sync to mock service failed: {e}")
+            log.error(f"Order sync to paper broker service failed: {e}")
             raise
         except (ValueError, KeyError) as e:
             log.error(f"Invalid order response format for sync: {e}")
@@ -482,7 +482,7 @@ class MockClient:
         """
         Clear execution state for all orders in an account.
 
-        Resets sequence tracking in mock service database.
+        Resets sequence tracking in paper broker service database.
         Used during test setup to ensure fresh fills start with sequence 1.
 
         Args:

@@ -18,6 +18,8 @@ class TestConfig:
 
     env: str
     bas_url: str
+    bas_ws_url: str
+    execution_updates_ws_url: str  # Paper-broker execution updates (for e2e tests)
     mds_ws_url: str
     mock_url: str
     auth_url: str
@@ -77,6 +79,8 @@ class TestConfig:
         return TestConfig(
             env=env,
             bas_url=get_setting("BAS_URL", "bas_url"),
+            bas_ws_url=get_setting("BAS_WS_URL", "bas_ws_url"),
+            execution_updates_ws_url=get_setting("EXECUTION_UPDATES_WS_URL", "execution_updates_ws_url"),
             mds_ws_url=get_setting("MDS_WS_URL", "mds_ws_url"),
             mock_url=get_setting("MOCK_URL", "mock_url"),
             auth_url=get_setting("AUTH_URL", "auth_url"),
@@ -94,6 +98,7 @@ class TestConfig:
         return {
             "env": self.env,
             "bas_url": self.bas_url,
+            "bas_ws_url": self.bas_ws_url,
             "mds_ws_url": self.mds_ws_url,
             "mock_url": self.mock_url,
             "auth_url": self.auth_url,
@@ -111,6 +116,8 @@ def _get_default(key: str, env: str) -> str:
     defaults = {
         "dev": {
             "BAS_URL": "http://localhost:8005",
+            "BAS_WS_URL": "ws://localhost:8005/api/v1/ws",
+            "EXECUTION_UPDATES_WS_URL": "ws://localhost:8002/internal/api/v1/execution-updates",
             "MDS_WS_URL": "ws://localhost:8004",
             "MOCK_URL": "http://localhost:8002",  # Paper Broker Service
             "AUTH_URL": "http://localhost:8001",
@@ -124,6 +131,8 @@ def _get_default(key: str, env: str) -> str:
         },
         "staging": {
             "BAS_URL": "https://staging-bas.smarttrade.asia",
+            "BAS_WS_URL": "wss://staging-bas.smarttrade.asia/api/v1/ws",
+            "EXECUTION_UPDATES_WS_URL": "wss://staging-mock.smarttrade.asia/internal/api/v1/execution-updates",
             "MDS_WS_URL": "wss://staging-mds.smarttrade.asia",
             "MOCK_URL": "https://staging-mock.smarttrade.asia",  # Paper Broker Service
             "AUTH_URL": "https://staging-auth.smarttrade.asia",
@@ -137,6 +146,8 @@ def _get_default(key: str, env: str) -> str:
         },
         "prod": {
             "BAS_URL": "https://api.smarttrade.asia/bas",
+            "BAS_WS_URL": "wss://api.smarttrade.asia/bas/api/v1/ws",
+            "EXECUTION_UPDATES_WS_URL": "wss://api.smarttrade.asia/mock/internal/api/v1/execution-updates",
             "MDS_WS_URL": "wss://api.smarttrade.asia/mds",
             "MOCK_URL": "https://api.smarttrade.asia/mock",  # Paper Broker Service
             "AUTH_URL": "https://api.smarttrade.asia/auth",

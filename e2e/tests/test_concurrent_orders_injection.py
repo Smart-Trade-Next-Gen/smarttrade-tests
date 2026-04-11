@@ -24,7 +24,6 @@ from broker_adapter_service.schemas.order_dtos import BasOrderPlaceRequest, BasO
 async def test_two_concurrent_buy_orders(
     bas_client,
     mock_client,
-    mds_client,
     event_collector,
     assertions,
     test_account_id,
@@ -149,7 +148,6 @@ async def test_two_concurrent_buy_orders(
 async def test_concurrent_buy_and_sell(
     bas_client,
     mock_client,
-    mds_client,
     event_collector,
     assertions,
     test_account_id,
@@ -290,7 +288,6 @@ async def test_concurrent_buy_and_sell(
 async def test_three_concurrent_orders_same_instrument(
     bas_client,
     mock_client,
-    mds_client,
     event_collector,
     assertions,
     test_account_id,

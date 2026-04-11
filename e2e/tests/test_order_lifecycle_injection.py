@@ -21,10 +21,10 @@ from broker_adapter_service.schemas.order_dtos import BasOrderPlaceRequest, BasO
 
 @pytest.mark.smoke
 @pytest.mark.injection
+@pytest.mark.asyncio
 async def test_market_buy_full_fill(
     bas_client,
     mock_client,
-    mds_client,
     event_collector,
     assertions,
     test_account_id,
@@ -109,7 +109,7 @@ async def test_market_buy_full_fill(
     # Assert: Position state
     # TODO: Fix positions API - currently returns 404 from paper plugin
     # Event delivery and order lifecycle are working correctly
-    # Positions are being created in mock service database but retrieval via API needs investigation
+    # Positions are being created in paper broker service database but retrieval via API needs investigation
     try:
         post_positions = await bas_client.get_positions(broker_id, test_account_id)
         assertions.assert_position_state(
@@ -127,10 +127,10 @@ async def test_market_buy_full_fill(
 
 @pytest.mark.smoke
 @pytest.mark.injection
+@pytest.mark.asyncio
 async def test_market_sell_full_fill(
     bas_client,
     mock_client,
-    mds_client,
     event_collector,
     assertions,
     test_account_id,
@@ -227,10 +227,10 @@ async def test_market_sell_full_fill(
 
 
 @pytest.mark.injection
+@pytest.mark.asyncio
 async def test_limit_buy_triggers_at_price(
     bas_client,
     mock_client,
-    mds_client,
     event_collector,
     assertions,
     test_account_id,
@@ -322,10 +322,10 @@ async def test_limit_buy_triggers_at_price(
 
 
 @pytest.mark.injection
+@pytest.mark.asyncio
 async def test_limit_sell_triggers_at_price(
     bas_client,
     mock_client,
-    mds_client,
     event_collector,
     assertions,
     test_account_id,

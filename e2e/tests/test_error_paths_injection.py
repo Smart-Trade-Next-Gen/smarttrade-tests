@@ -21,7 +21,6 @@ from broker_adapter_service.schemas.order_dtos import BasOrderPlaceRequest, BasO
 async def test_zero_quantity_order_rejected(
     bas_client,
     mock_client,
-    mds_client,
     event_collector,
     assertions,
     test_account_id,
@@ -74,7 +73,6 @@ async def test_zero_quantity_order_rejected(
 async def test_negative_quantity_order_rejected(
     bas_client,
     mock_client,
-    mds_client,
     event_collector,
     assertions,
     test_account_id,
@@ -123,7 +121,6 @@ async def test_negative_quantity_order_rejected(
 async def test_invalid_limit_price_zero(
     bas_client,
     mock_client,
-    mds_client,
     event_collector,
     assertions,
     test_account_id,
@@ -171,7 +168,6 @@ async def test_invalid_limit_price_zero(
 async def test_overfill_rejected(
     bas_client,
     mock_client,
-    mds_client,
     event_collector,
     assertions,
     test_account_id,
@@ -260,7 +256,6 @@ async def test_overfill_rejected(
 async def test_sequence_violation_ignored(
     bas_client,
     mock_client,
-    mds_client,
     event_collector,
     assertions,
     test_account_id,

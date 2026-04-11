@@ -50,8 +50,9 @@ e2e/
 ├── clients/
 │   ├── __init__.py
 │   ├── bas_client.py                 # Broker Adapter Service REST client
-│   ├── mock_client.py                # Mock Service client (fill injection)
-│   └── mds_websocket_client.py      # Market Data Service WebSocket client
+│   ├── bas_ws_client.py              # BAS WebSocket client (account events)
+│   ├── mds_client.py                 # Market Data Service WebSocket client
+│   └── mock_client.py                # Mock Service client (fill injection)
 ├── harness/
 │   ├── __init__.py
 │   ├── event_collector.py            # Async event collection per order_id
@@ -132,14 +133,32 @@ Total: **57 minutes** for full suite
 
 See [TEST_CATEGORIZATION.md](TEST_CATEGORIZATION.md) for strategy.
 
+## WebSocket Architecture
+
+E2E tests use **dual WebSocket streams** aligned with the production architecture:
+
+| WebSocket | Endpoint | Purpose | Events |
+|-----------|----------|---------|--------|
+| **MDS** | `ws://mds:8004/ws` | Market data only | Quotes, depth, candles |
+| **BAS** | `ws://bas:8005/api/v1/ws` | Trading events only | Orders, trades, positions |
+
+### Event Flow
+
+1. Test places order via `bas_client.place_order()`
+2. Mock service injects fill via `mock_client.inject_fill()`
+3. BAS WebSocket delivers account event (order.filled.v1, trade.executed.v1, etc.)
+4. `bas_ws_client` streams event to `event_collector`
+5. Test observes via `event_collector.wait_for_completion(order_id)`
+
 ## Key Fixtures
 
-- `bas_client`: BAS REST client
-- `mock_client`: Mock fill injection
-- `mds_client`: WebSocket events
-- `event_collector`: Async event collection
+- `bas_client`: BAS REST client (order placement, portfolio queries)
+- `bas_ws_client`: BAS WebSocket client (account event stream)
+- `mds_client`: MDS WebSocket client (market data stream)
+- `mock_client`: Mock service for deterministic fill injection
+- `event_collector`: Async event collection (depends on bas_ws_client)
 - `assertions`: Order/position validation
-- `test_account_id`: Unique test account
+- `test_account_id`: Unique test account per test
 - `chaos_engine`: Failure injection (Phase 7)
 
 ## Test Markers

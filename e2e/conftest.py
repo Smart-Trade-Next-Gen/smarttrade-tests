@@ -14,6 +14,7 @@ from pathlib import Path
 from decimal import Decimal
 
 import pytest
+import pytest_asyncio
 
 # Load .env file for JWT_SECRET_KEY and other environment variables
 try:
@@ -25,7 +26,7 @@ except ImportError:
     pass  # python-dotenv not available, rely on environment
 
 from e2e.config import TestConfig
-from e2e.clients import BASClient, MDSWebSocketClient, MockClient
+from e2e.clients import BASClient, BASWebSocketClient, MDSWebSocketClient, MockClient
 from e2e.harness import EventCollector, AssertionEngine, ScenarioEngine
 from e2e.fixtures.logging import configure_logging
 from e2e.fixtures.market_data_stream import MockMarketDataStream
@@ -127,7 +128,7 @@ def _configure_test_timeout(request):
     # Default 60s from pytest.ini handles the rest
 
 
-@pytest.fixture(autouse=True)
+@pytest_asyncio.fixture(autouse=True)
 async def setup_trading_account(bas_client, mock_client, test_account_id):
     """
     Create paper trading accounts (autouse).
@@ -137,43 +138,39 @@ async def setup_trading_account(bas_client, mock_client, test_account_id):
 
     Scope: function
     """
-    # Create trading accounts for both fyers and mock brokers (tests use either)
-    for broker_id in ["fyers", "mock"]:
-        try:
-            # First delete any existing accounts with this ID (from prior test runs)
-            # This ensures we have a clean slate with the correct user_id
-            try:
-                await bas_client.delete_trading_account(broker_id, test_account_id)
-                log.debug(f"Deleted existing trading account: {broker_id}/{test_account_id}")
-            except Exception:
-                pass  # Account may not exist, that's fine
+    broker_id = "fyers"  # Only setup primary broker (tests use fyers)
 
-            # Create PAPER trading account
-            await bas_client.create_trading_account(
-                broker_id=broker_id,
-                account_id=test_account_id,
-                initial_funds=Decimal("1000000.00"),
-                account_type="PAPER",
-            )
-            log.debug(f"✅ Paper trading account created: {broker_id}/{test_account_id}")
-        except Exception as e:
-            log.warning(f"⚠️ Paper account creation failed for {broker_id}/{test_account_id}: {e}")
-
-    # Clean up execution state and positions in mock service
-    for broker_id in ["fyers", "mock"]:
+    try:
+        # Delete any existing accounts (ensures clean slate)
         try:
-            # Clear execution state (reset sequence tracking for fills)
+            await bas_client.delete_trading_account(broker_id, test_account_id)
+        except Exception:
+            pass  # Account may not exist
+
+        # Create PAPER trading account
+        await bas_client.create_trading_account(
+            broker_id=broker_id,
+            account_id=test_account_id,
+            initial_funds=Decimal("1000000.00"),
+            account_type="PAPER",
+        )
+        log.debug(f"✅ Paper trading account created: {broker_id}/{test_account_id}")
+
+        # Clean up execution state and positions (batch these for efficiency)
+        try:
             await mock_client.cleanup_execution_state(broker_id, test_account_id)
-            log.debug(f"✅ Execution state cleared in mock service: {broker_id}/{test_account_id}")
+            log.debug(f"✅ Execution state cleared: {broker_id}/{test_account_id}")
         except Exception as e:
-            log.warning(f"⚠️ Execution state cleanup failed for {broker_id}/{test_account_id}: {e}")
+            log.warning(f"⚠️ Execution state cleanup failed: {e}")
 
         try:
-            # Clear positions (ensure fresh position state for each test)
             await mock_client.cleanup_positions(broker_id, test_account_id)
-            log.debug(f"✅ Positions cleared in mock service: {broker_id}/{test_account_id}")
+            log.debug(f"✅ Positions cleared: {broker_id}/{test_account_id}")
         except Exception as e:
-            log.warning(f"⚠️ Positions cleanup failed for {broker_id}/{test_account_id}: {e}")
+            log.warning(f"⚠️ Positions cleanup failed: {e}")
+
+    except Exception as e:
+        log.warning(f"⚠️ Paper account creation failed: {e}")
 
     # Yield control back to test
     yield
@@ -181,7 +178,7 @@ async def setup_trading_account(bas_client, mock_client, test_account_id):
     # Cleanup is optional - accounts can be reused
 
 
-@pytest.fixture(autouse=True)
+@pytest_asyncio.fixture(autouse=True)
 async def setup_broker_credentials(bas_client):
     """
     Seed broker credentials for MDS to use (autouse).
@@ -191,22 +188,22 @@ async def setup_broker_credentials(bas_client):
 
     Scope: function
     """
-    # Create broker connections for fyers (MDS uses these when WebSocket connects)
-    for broker_id in ["fyers", "mock"]:
-        try:
-            # Upsert broker connection with test credentials
-            # These will be used by MDS when it needs to initialize broker plugins
-            await bas_client.upsert_broker_connection(
-                broker_id=broker_id,
-                auth_type="api_key",
-                credentials={
-                    "app_id": f"test_{broker_id}_app_id",
-                    "app_secret": f"test_{broker_id}_app_secret",
-                }
-            )
-            log.debug(f"✅ Broker credentials seeded: {broker_id}")
-        except Exception as e:
-            log.warning(f"⚠️ Broker credential seeding failed for {broker_id}: {e}")
+    # Only setup fyers (primary broker)
+    broker_id = "fyers"
+
+    try:
+        # Upsert broker connection with test credentials
+        await bas_client.upsert_broker_connection(
+            broker_id=broker_id,
+            auth_type="api_key",
+            credentials={
+                "app_id": f"test_{broker_id}_app_id",
+                "app_secret": f"test_{broker_id}_app_secret",
+            }
+        )
+        log.debug(f"✅ Broker credentials seeded: {broker_id}")
+    except Exception as e:
+        log.warning(f"⚠️ Broker credential seeding failed: {e}")
 
     # Yield control back to test
     yield
@@ -233,7 +230,7 @@ def test_account_id(request) -> str:
 
 
 @pytest.fixture
-async def auth_token(config: TestConfig) -> str:
+def auth_token(config: TestConfig) -> str:
     """
     Get authentication token for service access.
 
@@ -245,9 +242,20 @@ async def auth_token(config: TestConfig) -> str:
     from jose import jwt
     from datetime import datetime, timedelta
 
+    # Load .env file again to ensure JWT_SECRET_KEY is available
+    try:
+        from dotenv import load_dotenv
+        env_file = Path(__file__).parent.parent.parent / ".env"
+        if env_file.exists():
+            load_dotenv(env_file, override=True)  # Force reload
+    except ImportError:
+        pass
+
     # Secret from environment (must match docker-compose JWT_SECRET_KEY)
-    # Falls back to env var or default if not set
-    secret = os.getenv("JWT_SECRET_KEY", "jIjETudRTwtHBE_Ez5uU_NeMvi_6zXrst8E3YmdgVxFz7D2Ij6c1rwVF_T9R_HMC")
+    secret = os.getenv("JWT_SECRET_KEY")
+    if not secret:
+        log.error("JWT_SECRET_KEY not found in environment. Check .env file or container environment.")
+        raise ValueError("JWT_SECRET_KEY required for test authentication")
 
     now = datetime.utcnow()
     # Use a fixed test user ID so all requests use the same user across the test
@@ -272,7 +280,7 @@ async def auth_token(config: TestConfig) -> str:
 # ────────────────────────────────────────────────────────────────────────────────
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def bas_client(config: TestConfig, auth_token: str) -> AsyncGenerator[BASClient, None]:
     """
     Provide BASClient instance with proper setup/teardown.
@@ -287,7 +295,7 @@ async def bas_client(config: TestConfig, auth_token: str) -> AsyncGenerator[BASC
         yield client
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def mock_client(
     config: TestConfig, auth_token: str
 ) -> AsyncGenerator[MockClient, None]:
@@ -304,7 +312,7 @@ async def mock_client(
         yield client
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def market_data_stream(mock_client: MockClient, config: TestConfig) -> MockMarketDataStream:
     """
     Provide MockMarketDataStream for real execution mode tests.
@@ -318,16 +326,18 @@ async def market_data_stream(mock_client: MockClient, config: TestConfig) -> Moc
     stream.reset()
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def mds_client(
-    config: TestConfig, auth_token: str, event_collector: EventCollector, test_account_id: str
+    config: TestConfig, auth_token: str, test_account_id: str
 ) -> AsyncGenerator[MDSWebSocketClient, None]:
     """
-    Provide MDSWebSocketClient instance with subscription and event streaming.
+    Provide MDSWebSocketClient instance for market data only.
 
     Scope: function (fresh connection per test)
+
+    Note: MDS WebSocket is now used for market data only (quotes, depth, candles).
+    Account events (orders, trades, positions) are handled by BAS WebSocket.
     """
-    # Use "ui" consumer type to avoid auto-subscription issues (BAS would need trading accounts)
     ws_url_with_path = f"{config.mds_ws_url}/ws/{config.broker_id}/ui"
 
     client = MDSWebSocketClient(
@@ -339,40 +349,89 @@ async def mds_client(
     await client.connect()
     await client.subscribe_account(test_account_id)
 
-    # Start background task to stream events into event_collector
-    async def stream_to_collector():
+    yield client
+
+    # Aggressive cleanup
+    try:
+        await client.disconnect()
+    except Exception as e:
+        log.warning(f"Error disconnecting MDS client: {e}")
+
+    # Force close underlying WebSocket
+    if hasattr(client, 'ws') and client.ws is not None:
+        try:
+            await client.ws.close()
+        except Exception:
+            pass
+
+
+@pytest_asyncio.fixture
+async def bas_ws_client(
+    config: TestConfig, auth_token: str, test_account_id: str, request
+) -> AsyncGenerator[BASWebSocketClient, None]:
+    """
+    Provide BASWebSocketClient instance for trading account events.
+
+    Scope: function (fresh connection per test)
+
+    Handles order fills, trades, and position updates.
+    Automatically streams events into the event_collector for test assertions.
+    """
+    client = BASWebSocketClient(
+        ws_url=config.bas_ws_url,
+        account_id=test_account_id,
+        token=auth_token,
+        timeout=config.timeout_slow,
+    )
+    await client.connect()
+    await client.subscribe_account(test_account_id)
+
+    # Get the event_collector fixture if it exists (it will be created after us)
+    # We store it on client so event_collector fixture can wire it up
+    client._event_collector = None
+
+    # Start background task to stream account events
+    async def stream_account_events():
         try:
             async for event in client.stream_events():
-                # Extract event data — PIE events use "payload" key, order.update uses "data" key
-                event_data = event.get("payload") or event.get("data") or {}
+                # Skip if collector not initialized (wait for next event)
+                if client._event_collector is None:
+                    continue
+
+                # Extract order_id early to avoid processing irrelevant events
+                event_data = event.get("data") or {}
                 order_id = event_data.get("order_id") or event_data.get("broker_order_id")
 
                 if not order_id:
-                    log.debug(f"No order_id in event type={event.get('type')}, skipping")
+                    log.debug(f"No order_id in BAS event type={event.get('type')}, skipping")
                     continue
 
                 # Extract status from event data
                 status = event_data.get("status") or event_data.get("order_status")
                 event_type = event.get("type")
 
+                # Map BAS event types to internal format
+                event_type_map = {
+                    "order.filled.v1": "order_fill",
+                    "trade.executed.v1": "trade_exec",
+                    "position.updated.v1": "position_update",
+                }
+                normalized_event_type = event_type_map.get(event_type, event_type)
+
                 # Infer terminal status from event type
-                if event_type == "order_fill" and not status:
+                if normalized_event_type == "order_fill" and not status:
                     try:
                         filled_pct = float(event_data.get("filled_percentage", 0))
                     except (TypeError, ValueError):
                         filled_pct = 0.0
                     status = "FILLED" if filled_pct >= 100.0 else "PARTIALLY_FILLED"
-                elif event_type == "order_cancelled" and not status:
+                elif normalized_event_type == "order_cancelled" and not status:
                     status = "CANCELLED"
-                # trade_exec: do NOT infer FILLED — it's a secondary event; wait for order_fill
 
                 # Normalize event_data to have qty/price fields that assertion engine expects
                 normalized_data = dict(event_data)
 
                 # Map broker-specific field names to assertion engine expectations
-                # Multiple event types use different field names for quantity:
-                # - OrderFilledV1: delta_quantity
-                # - TradeExecutedV1: quantity
                 if "delta_quantity" in normalized_data and "qty" not in normalized_data:
                     normalized_data["qty"] = normalized_data["delta_quantity"]
                     normalized_data["fill_qty"] = normalized_data["delta_quantity"]
@@ -380,9 +439,7 @@ async def mds_client(
                     normalized_data["qty"] = normalized_data["quantity"]
                     normalized_data["fill_qty"] = normalized_data["quantity"]
 
-                # Multiple event types use different field names for price:
-                # - OrderFilledV1: average_price
-                # - TradeExecutedV1: price
+                # Map price fields
                 if "average_price" in normalized_data and "price" not in normalized_data:
                     try:
                         normalized_data["price"] = float(normalized_data["average_price"])
@@ -396,29 +453,44 @@ async def mds_client(
 
                 # Create event dict with normalized data
                 event_dict = {
-                    "type": event_type,
+                    "type": normalized_event_type,
                     "status": status,
                     "data": normalized_data,
                     "timestamp": event_data.get("timestamp") or event.get("timestamp"),
                 }
 
                 qty = normalized_data.get("qty")
-                log.debug(f"Collected event: order_id={order_id}, type={event_type}, status={status}, qty={qty}")
-                await event_collector.add_event(order_id, event_dict)
+                log.debug(f"Collected BAS event: order_id={order_id}, type={normalized_event_type}, status={status}, qty={qty}")
+                await client._event_collector.add_event(order_id, event_dict)
+        except asyncio.CancelledError:
+            log.debug("BAS event streaming cancelled")
         except Exception as e:
             import logging
-            logging.getLogger(__name__).error(f"Error in stream_to_collector: {e}", exc_info=True)
+            logging.getLogger(__name__).error(f"Error in stream_account_events: {e}", exc_info=True)
 
-    stream_task = asyncio.create_task(stream_to_collector())
+    stream_task = asyncio.create_task(stream_account_events())
 
     yield client
 
+    # Aggressive cleanup to ensure WebSocket is fully closed
     stream_task.cancel()
     try:
         await stream_task
     except asyncio.CancelledError:
         pass
-    await client.disconnect()
+
+    # Ensure WebSocket is fully disconnected
+    try:
+        await client.disconnect()
+    except Exception as e:
+        log.warning(f"Error disconnecting BAS client: {e}")
+
+    # Force close the underlying WebSocket connection
+    if hasattr(client, 'ws') and client.ws is not None:
+        try:
+            await client.ws.close()
+        except Exception:
+            pass
 
 
 # ────────────────────────────────────────────────────────────────────────────────
@@ -427,15 +499,33 @@ async def mds_client(
 
 
 @pytest.fixture
-def event_collector() -> EventCollector:
+def event_collector(bas_ws_client) -> EventCollector:
     """
     Provide EventCollector instance for async event collection.
 
     Scope: function (fresh collector per test)
+
+    Wires itself to bas_ws_client so BAS events are streamed into this collector.
+    Memory is cleared after test completes.
     """
     collector = EventCollector(maxsize=1000)
+    # Wire the collector to the bas_ws_client so it can stream events
+    bas_ws_client._event_collector = collector
     yield collector
+    # Aggressive cleanup: clear all events after test (not just queues)
     collector.clear()
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def cleanup_event_memory(event_collector):
+    """
+    Autouse fixture to ensure event_collector memory is fully cleared after test.
+
+    Scope: function (runs after every test that uses event_collector)
+    """
+    yield
+    # After test, ensure event_collector is cleaned up
+    event_collector.clear()
 
 
 @pytest.fixture
@@ -458,12 +548,12 @@ def scenario_engine() -> ScenarioEngine:
     return ScenarioEngine()
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def place_and_sync_order(bas_client: BASClient, mock_client: MockClient, config: TestConfig):
     """
-    Provide a helper function to place an order in BAS and sync it to mock service.
+    Provide a helper function to place an order in BAS and sync it to paper broker service.
 
-    This ensures orders exist in mock service with correct instrument_id (from MDS)
+    This ensures orders exist in paper broker service with correct instrument_id (from MDS)
     before fill injection is attempted.
 
     Usage in tests:
@@ -483,7 +573,7 @@ async def place_and_sync_order(bas_client: BASClient, mock_client: MockClient, c
         # Step 1: Place order in BAS (returns order with instrument_id from MDS)
         order_responses = await bas_client.place_order(broker_id, account_id, order_request)
 
-        # Step 2: Sync each order to mock service using instrument_id (not broker symbol)
+        # Step 2: Sync each order to paper broker service using instrument_id (not broker symbol)
         for order_resp in order_responses:
             await mock_client.sync_order(broker_id, account_id, order_resp.model_dump() if hasattr(order_resp, 'model_dump') else order_resp)
             log.debug(f"Order synced: {order_resp.get('broker_order_id') if isinstance(order_resp, dict) else order_resp.broker_order_id}")
@@ -498,7 +588,7 @@ async def place_and_sync_order(bas_client: BASClient, mock_client: MockClient, c
 # ────────────────────────────────────────────────────────────────────────────────
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def pre_state(bas_client: BASClient, test_account_id: str, config: TestConfig) -> dict:
     """
     Capture funds and positions before test execution.
@@ -514,7 +604,7 @@ async def pre_state(bas_client: BASClient, test_account_id: str, config: TestCon
         return {"funds": None, "positions": None}
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def post_state(bas_client: BASClient, test_account_id: str, config: TestConfig):
     """
     Capture funds and positions after test execution.
@@ -540,37 +630,48 @@ async def post_state(bas_client: BASClient, test_account_id: str, config: TestCo
 # ────────────────────────────────────────────────────────────────────────────────
 
 
-@pytest.fixture(autouse=True)
+@pytest_asyncio.fixture(autouse=True)
 async def reset_test_account(
     bas_client: BASClient, test_account_id: str, config: TestConfig
 ) -> None:
     """
     Reset account state before each test for isolation.
 
-    This is an autouse fixture that runs for every test.
-    Attempts to cancel all open orders before test execution.
+    Attempts to cancel all open orders before test execution (with timeout).
 
     Scope: function (autouse)
     """
     try:
-        # Try to cancel all open orders for this account
-        orders = await bas_client.get_orders(config.broker_id, test_account_id)
-        for order in orders:
+        # Timeout get_orders to avoid hanging on slow connections
+        orders = await asyncio.wait_for(
+            bas_client.get_orders(config.broker_id, test_account_id),
+            timeout=5.0,
+        )
+        # Cancel open orders in parallel (bounded by 5 concurrent cancellations)
+        cancel_semaphore = asyncio.Semaphore(5)
+
+        async def cancel_if_open(order):
             status = order.status.upper() if hasattr(order, 'status') else order.get('status', '')
             if status not in ["FILLED", "CANCELLED", "REJECTED", "EXPIRED"]:
                 try:
                     order_id = order.exchange_order_id if hasattr(order, 'exchange_order_id') else order.get('broker_order_id')
                     if order_id:
-                        await bas_client.cancel_order(config.broker_id, test_account_id, order_id)
+                        async with cancel_semaphore:
+                            await bas_client.cancel_order(config.broker_id, test_account_id, order_id)
                 except Exception:
                     pass  # Ignore cancellation errors
+
+        if orders:
+            await asyncio.gather(*[cancel_if_open(order) for order in orders], return_exceptions=True)
+    except asyncio.TimeoutError:
+        log.debug(f"Timeout resetting account {test_account_id}, skipping order cancellations")
     except Exception:
         pass  # Account may not exist yet, that's ok
 
     yield  # Run test
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def cleanup_test_account(
     bas_client: BASClient, test_account_id: str, config: TestConfig
 ) -> None:
