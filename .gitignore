@@ -1,7 +1,11 @@
 results/
 *.xml
+*.log
 .DS_Store
 node_modules/
 test-results/
 playwright-report/
 .playwright-cache/
+*_tests.log
+e2e_tests.log
+e2e_*.log
