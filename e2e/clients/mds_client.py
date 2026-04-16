@@ -306,12 +306,12 @@ class MDSWebSocketClient:
         elif msg_type == "notification":
             # System notification - extract inner event if present
             notification_data = data.get("data", {})
-            log.warning(f"NOTIFICATION: Full structure: {json.dumps(data, default=str)}")
+            log.debug(f"NOTIFICATION: {json.dumps(data, default=str)[:500]}")
 
             # Check if notification wraps an actual event (e.g., order fill, trade exec)
             if "event_type" in notification_data:
                 inner_event_type = notification_data.get("event_type")
-                log.warning(f"Extracting event from notification: event_type={inner_event_type}")
+                log.debug(f"Extracting event from notification: event_type={inner_event_type}")
 
                 # Map event_type to WebSocket message type
                 event_type_map = {
@@ -335,7 +335,7 @@ class MDSWebSocketClient:
 
                 # Add to queue if it's a recognized event type
                 if mapped_type in {"order_fill", "trade_exec", "position_update", "order_cancelled", "order.update", "trade.update", "position.update"}:
-                    log.warning(f"Adding extracted event to queue: type={mapped_type}")
+                    log.debug(f"Adding extracted event to queue: type={mapped_type}")
                     if self._event_queue:
                         try:
                             self._event_queue.put_nowait(inner_event)
@@ -347,9 +347,9 @@ class MDSWebSocketClient:
                             except Exception as e:
                                 log.error(f"Failed to handle event queue: {e}")
                 else:
-                    log.warning(f"Unknown inner event type in notification: {mapped_type}")
+                    log.debug(f"Unknown inner event type in notification: {mapped_type}")
             else:
-                log.warning(f"System notification without event_type: {json.dumps(notification_data, default=str)}")
+                log.debug(f"System notification without event_type")
 
         elif msg_type in {"order.update", "trade.update", "position.update", "order_fill", "trade_exec", "position_update", "order_cancelled"}:
             log.debug(f"Event received: {msg_type}")
