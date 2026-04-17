@@ -9,3 +9,8 @@ playwright-report/
 *_tests.log
 e2e_tests.log
 e2e_*.log
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+*.egg-info/
