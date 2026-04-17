@@ -55,18 +55,20 @@ test.describe("Core Trading - Authentication", () => {
     const dashboard = page.getByRole("heading", { name: "Dashboard" });
     await expect(dashboard).toBeVisible({ timeout: 10000 });
 
-    // Reload page
-    const reloadPromise = page.reload({ waitUntil: "domcontentloaded" });
-    await reloadPromise.catch(() => null); // Ignore any redirect during reload
+    // Reload page (auth service now sets httpOnly refresh_token cookie)
+    await page.reload({ waitUntil: "networkidle" });
 
-    // After reload, page may show login or dashboard
-    // Check that page has loaded (has significant content)
-    await page.waitForTimeout(500);
-    const pageContent = await page.content();
+    // After reload, useAuthInit should restore session via silent refresh
+    // Dashboard should still be visible (no redirect to /login)
+    const dashboardAfterReload = page.getByRole("heading", { name: "Dashboard" });
+    const isVisible = await dashboardAfterReload.isVisible({ timeout: 15000 }).catch(() => false);
 
-    // Page should have meaningful content (not stuck on error)
-    // Either dashboard rendered or login form rendered
-    expect(pageContent.length > 1000).toBeTruthy();
+    // Session should be maintained (dashboard renders, not login page)
+    expect(isVisible).toBeTruthy();
+
+    // Verify we're not on login page
+    const url = page.url();
+    expect(url).not.toContain("/login");
   });
 });
 
