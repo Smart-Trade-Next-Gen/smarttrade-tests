@@ -61,11 +61,12 @@ test.describe("Core Trading - Authentication", () => {
     expect(refreshTokenCookie).toBeTruthy();
     expect(refreshTokenCookie?.httpOnly).toBe(true);
 
-    // Reload page (auth service sets httpOnly refresh_token cookie for silent refresh)
-    // Infrastructure is in place; timing of silent refresh is handled by frontend
+    // Reload page
+    // Frontend now uses isInitializing guard in RequireAuth to wait for silent refresh
+    // while useAuthInit attempts to restore session via /auth/refresh with httpOnly cookie
     await page.reload({ waitUntil: "domcontentloaded" });
 
-    // Page should have loaded and rehydrated
+    // Page should have loaded
     const pageContent = await page.content();
     expect(pageContent.length > 200).toBeTruthy();
   });
