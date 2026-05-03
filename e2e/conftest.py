@@ -9,12 +9,14 @@ import asyncio
 import hashlib
 import logging
 import os
+import time
 from typing import AsyncGenerator
 from pathlib import Path
 from decimal import Decimal
 
 import pytest
 import pytest_asyncio
+import httpx
 
 # Load .env file for JWT_SECRET_KEY and other environment variables
 try:
@@ -26,13 +28,55 @@ except ImportError:
     pass  # python-dotenv not available, rely on environment
 
 from e2e.config import TestConfig
-from e2e.clients import BASClient, BASWebSocketClient, MDSWebSocketClient, MockClient
+from e2e.clients import (
+    BASClient,
+    BASWebSocketClient,
+    MDSWebSocketClient,
+    MockClient,
+    MDSRestClient,
+    PortfolioClient,
+    JournalClient,
+)
 from e2e.harness import EventCollector, AssertionEngine, ScenarioEngine
+from e2e.harness.redis_observer import RedisStreamObserver
 from e2e.fixtures.logging import configure_logging
 from e2e.fixtures.market_data_stream import MockMarketDataStream
 from e2e.fixtures.chaos_engine import ChaosEngine
+from e2e.fixtures.instruments import InstrumentCatalog
+from e2e.fixtures.quote_injection import QuoteInjector
 
 log = logging.getLogger(__name__)
+
+
+async def wait_for_portfolio_service_listeners(portfolio_client: PortfolioClient, timeout: int = 30) -> None:
+    """
+    Wait for Portfolio Service event listeners to be fully subscribed.
+
+    Polls the Portfolio Service health endpoint to ensure event consumers are ready.
+    This prevents the race condition where tests publish events before listeners are subscribed.
+
+    Args:
+        portfolio_client: Portfolio Service client for health checks
+        timeout: Maximum wait time in seconds
+
+    Raises:
+        TimeoutError: If listeners are not ready within timeout
+    """
+    start_time = time.time()
+    while time.time() - start_time < timeout:
+        try:
+            # Make a simple request to trigger service startup completion
+            # Once we get a 200 response, the service is ready
+            await portfolio_client._client.get("/ready")
+            log.info("✅ Portfolio Service listeners ready")
+            # Give an extra 2 seconds to ensure Redis connections are fully established
+            await asyncio.sleep(2)
+            return
+        except Exception as e:
+            log.debug(f"Portfolio Service not ready yet: {e}")
+            await asyncio.sleep(1)
+
+    raise TimeoutError(f"Portfolio Service listeners not ready after {timeout}s")
 
 
 def pytest_configure(config):
@@ -44,6 +88,9 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "chaos: chaos testing")
     config.addinivalue_line("markers", "sequential: tests that must run sequentially")
     config.addinivalue_line("markers", "slow: tests that need extended timeout")
+    config.addinivalue_line("markers", "live_ws: live WebSocket separation tests")
+    config.addinivalue_line("markers", "event_bus: direct Redis stream observation tests")
+    config.addinivalue_line("markers", "architecture: architecture boundary tests")
 
     # Configure logging based on environment
     log_level = os.getenv("E2E_LOG_LEVEL", "INFO").upper()
@@ -52,6 +99,41 @@ def pytest_configure(config):
     # Ensure reports directory exists
     reports_dir = Path(__file__).parent / "reports"
     reports_dir.mkdir(exist_ok=True)
+
+
+def pytest_sessionstart(session):
+    """Wait for all services to be fully ready before running tests."""
+    config = TestConfig.from_env()
+
+    # Wait for Portfolio Service and other services to be ready
+    async def wait_services():
+        log.info("Waiting for services to be fully initialized...")
+
+        # Create a simple client to check readiness
+        async with httpx.AsyncClient() as client:
+            # Wait for Portfolio Service
+            start = time.time()
+            while time.time() - start < 60:
+                try:
+                    response = await client.get(f"{config.portfolio_url}/ready")
+                    if response.status_code == 200:
+                        log.info("✅ Portfolio Service is ready")
+                        # Long wait to ensure all event listeners are fully subscribed and ready
+                        log.info("Waiting for event listeners to initialize (10s)...")
+                        await asyncio.sleep(10)
+                        return
+                except Exception as e:
+                    log.debug(f"Portfolio Service not ready: {e}")
+                    await asyncio.sleep(1)
+
+            raise TimeoutError("Portfolio Service did not become ready in time")
+
+    # Run the async function
+    try:
+        asyncio.run(wait_services())
+    except Exception as e:
+        log.error(f"Failed to wait for services: {e}")
+        log.warning("Proceeding with tests despite service readiness issues")
 
 
 def pytest_collection_modifyitems(config, items):
@@ -90,6 +172,106 @@ def config() -> TestConfig:
     Scope: session (loaded once per test run)
     """
     return TestConfig.from_env()
+
+
+# ────────────────────────────────────────────────────────────────────────────────
+# SESSION-SCOPED FIXTURES: INSTRUMENT CATALOG & CLIENTS
+# ────────────────────────────────────────────────────────────────────────────────
+
+
+@pytest.fixture(scope="session")
+def mds_rest_client(config: TestConfig) -> MDSRestClient:
+    """
+    Provide MDSRestClient for fetching instruments from MDS.
+
+    Scope: session (created once per test run)
+    Note: Not async-scoped to avoid pytest-asyncio scope mismatch issues
+    """
+    return MDSRestClient(base_url=config.mds_url)
+
+
+@pytest.fixture(scope="session")
+def instrument_catalog(mds_rest_client: MDSRestClient, config: TestConfig) -> InstrumentCatalog:
+    """
+    Provide session-scoped instrument catalog.
+
+    Loads all instruments from MDS once and caches in memory.
+    Scope: session (loaded once per test run)
+    Note: Not async-scoped to avoid pytest-asyncio scope mismatch issues.
+    Uses asyncio.run() to execute the async load operation.
+    """
+    catalog = InstrumentCatalog(mds_rest_client)
+    asyncio.run(catalog.load())
+    log.info(f"✅ Instrument catalog ready: {catalog.count()} instruments")
+
+    # Seed instruments to BAS database for lazy-cache access
+    try:
+        import subprocess
+        import json
+
+        mds_instruments = catalog.list_all()
+        log.info(f"Seeding {len(mds_instruments)} instruments to BAS database")
+
+        for instr in mds_instruments:
+            # Use psql directly via Docker exec to avoid driver issues
+            isin_val = f"'{instr.get('isin')}'" if instr.get('isin') else 'NULL'
+
+            # Create broker_instruments mapping for Fyers
+            # Fyers trading symbol format: NSE:SBIN (symbol prefixed with exchange)
+            exchange = instr.get("exchange", "NSE")
+            symbol = instr.get("symbol", "")
+            fyers_trading_symbol = f"{exchange}:{symbol}"
+
+            broker_instruments_json = json.dumps([{
+                "broker_id": "fyers",
+                "trading_symbol": fyers_trading_symbol,
+                "broker_token": symbol,  # Simplified token for testing
+            }])
+
+            sql = f"""
+                INSERT INTO instruments
+                (id, symbol, name, exchange, segment, instrument_type, isin, lot_size, tick_size, status, version, instrument_checksum, broker_instruments, created_at, updated_at)
+                VALUES
+                ('{instr.get("id")}',
+                 '{instr.get("symbol")}',
+                 '{instr.get("name", instr.get("symbol", ""))}',
+                 '{instr.get("exchange", "NSE")}',
+                 '{instr.get("segment", "EQ")}',
+                 '{instr.get("type", "EQUITY")}',
+                 {isin_val},
+                 {instr.get('lot_size', 1)},
+                 {instr.get('tick_size', 0.01)},
+                 'ACTIVE',
+                 1,
+                 '',
+                 '{broker_instruments_json.replace(chr(39), chr(39)+chr(39))}',
+                 NOW(),
+                 NOW())
+                ON CONFLICT (id) DO UPDATE SET
+                    symbol = EXCLUDED.symbol,
+                    broker_instruments = EXCLUDED.broker_instruments,
+                    updated_at = NOW();
+            """
+
+            try:
+                # Execute via psql in the docker container
+                proc = subprocess.run(
+                    ["docker-compose", "-f", "../docker-compose.e2e.yml", "exec", "-T", "postgres",
+                     "psql", "-U", "postgres", "-d", "smarttrade_broker_adapter_service", "-c", sql],
+                    cwd="/home/amit/Work/Smart-Trade/smarttrade-tests/e2e",
+                    capture_output=True,
+                    timeout=5,
+                )
+                if proc.returncode != 0:
+                    log.debug(f"Could not insert {instr.get('id')}: {proc.stderr.decode()}")
+            except Exception as e:
+                log.debug(f"Could not insert {instr.get('id')}: {e}")
+
+        log.info("✅ Instruments seeded to BAS database")
+    except Exception as e:
+        log.warning(f"⚠️ Failed to seed instruments: {e}")
+
+    return catalog
 
 
 # ────────────────────────────────────────────────────────────────────────────────
@@ -312,6 +494,36 @@ async def mock_client(
 
 
 @pytest_asyncio.fixture
+async def portfolio_client(config: TestConfig, auth_token: str) -> AsyncGenerator[PortfolioClient, None]:
+    """
+    Provide PortfolioClient for testing Portfolio Service async aggregation.
+
+    Scope: function (fresh client per test)
+    """
+    async with PortfolioClient(
+        base_url=config.portfolio_url,
+        token=auth_token,
+        timeout=config.timeout_medium,
+    ) as client:
+        yield client
+
+
+@pytest_asyncio.fixture
+async def journal_client(config: TestConfig, auth_token: str) -> AsyncGenerator[JournalClient, None]:
+    """
+    Provide JournalClient for testing Journal Service audit trail.
+
+    Scope: function (fresh client per test)
+    """
+    async with JournalClient(
+        base_url=config.journal_url,
+        token=auth_token,
+        timeout=config.timeout_medium,
+    ) as client:
+        yield client
+
+
+@pytest_asyncio.fixture
 async def market_data_stream(mock_client: MockClient, config: TestConfig) -> MockMarketDataStream:
     """
     Provide MockMarketDataStream for real execution mode tests.
@@ -323,6 +535,41 @@ async def market_data_stream(mock_client: MockClient, config: TestConfig) -> Moc
     stream = MockMarketDataStream(mock_client, broker_id=config.broker_id)
     yield stream
     stream.reset()
+
+
+@pytest_asyncio.fixture
+async def redis_observer(config: TestConfig) -> AsyncGenerator[RedisStreamObserver, None]:
+    """
+    Provide RedisStreamObserver for direct Redis stream observation.
+
+    Allows tests to validate events by reading directly from Redis streams.
+    Uses separate consumer group to avoid interfering with production event flow.
+
+    Scope: function (fresh observer per test)
+    """
+    observer = RedisStreamObserver(redis_url=config.redis_url)
+    await observer.start()
+    yield observer
+    # Cleanup: delete observer consumer groups
+    for event_type in ["order.filled.v1", "trade.executed.v1", "position.updated.v1"]:
+        await observer.delete_consumer_group(event_type)
+    await observer.stop()
+
+
+@pytest_asyncio.fixture
+async def quote_injector(config: TestConfig, mock_client: MockClient) -> AsyncGenerator[QuoteInjector, None]:
+    """
+    Provide QuoteInjector for two-level quote injection.
+
+    Injects quotes at both:
+    1. Redis stream (BAS QuoteStore)
+    2. PBS price endpoint (price-driven execution)
+
+    Scope: function (fresh injector per test)
+    """
+    injector = QuoteInjector(redis_url=config.redis_url, mock_client=mock_client)
+    yield injector
+    await injector.close()
 
 
 @pytest_asyncio.fixture
@@ -524,24 +771,6 @@ def event_collector(bas_ws_client) -> EventCollector:
         log.warning(f"Error clearing event collector: {e}")
     # Remove reference
     collector = None
-
-
-@pytest_asyncio.fixture(autouse=True)
-async def cleanup_event_memory(request):
-    """
-    Autouse fixture to ensure event_collector memory is fully cleared after test.
-
-    Scope: function (runs after every test that uses event_collector)
-    """
-    yield
-    # After test, ensure event_collector is cleaned up if it was used
-    # Only try to clear if event_collector fixture was actually requested
-    if 'event_collector' in request.fixturenames:
-        event_collector = request.getfixturevalue('event_collector')
-        try:
-            event_collector.clear()
-        except Exception as e:
-            log.warning(f"Error in cleanup_event_memory: {e}")
 
 
 @pytest.fixture

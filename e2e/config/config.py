@@ -20,9 +20,13 @@ class TestConfig:
     bas_url: str
     bas_ws_url: str
     execution_updates_ws_url: str  # Paper-broker execution updates (for e2e tests)
+    mds_url: str  # NEW: MDS REST API for instrument fetching
     mds_ws_url: str
     mock_url: str
     auth_url: str
+    portfolio_url: str  # NEW: Portfolio Service for async aggregation tests
+    journal_url: str  # NEW: Journal Service for audit trail tests
+    redis_url: str  # NEW: Redis for direct stream observation
     test_user: str
     test_password: str
     broker_id: str
@@ -81,9 +85,13 @@ class TestConfig:
             bas_url=get_setting("BAS_URL", "bas_url"),
             bas_ws_url=get_setting("BAS_WS_URL", "bas_ws_url"),
             execution_updates_ws_url=get_setting("EXECUTION_UPDATES_WS_URL", "execution_updates_ws_url"),
+            mds_url=get_setting("MDS_URL", "mds_url"),
             mds_ws_url=get_setting("MDS_WS_URL", "mds_ws_url"),
             mock_url=get_setting("MOCK_URL", "mock_url"),
             auth_url=get_setting("AUTH_URL", "auth_url"),
+            portfolio_url=get_setting("PORTFOLIO_URL", "portfolio_url"),
+            journal_url=get_setting("JOURNAL_URL", "journal_url"),
+            redis_url=get_setting("REDIS_URL", "redis_url"),
             test_user=get_setting("TEST_USER", "test_user"),
             test_password=get_setting("TEST_PASSWORD", "test_password"),
             broker_id=get_setting("BROKER_ID", "broker_id"),
@@ -118,9 +126,13 @@ def _get_default(key: str, env: str) -> str:
             "BAS_URL": "http://localhost:8005",
             "BAS_WS_URL": "ws://localhost:8005/api/v1/ws",
             "EXECUTION_UPDATES_WS_URL": "ws://localhost:8002/internal/api/v1/execution-updates",
+            "MDS_URL": "http://localhost:8004",
             "MDS_WS_URL": "ws://localhost:8004",
             "MOCK_URL": "http://localhost:8002",  # Paper Broker Service
             "AUTH_URL": "http://localhost:8001",
+            "PORTFOLIO_URL": "http://localhost:8008",
+            "JOURNAL_URL": "http://localhost:8007",
+            "REDIS_URL": "redis://localhost:6379/0",
             "TEST_USER": "testuser@example.com",
             "TEST_PASSWORD": "testpassword123",
             "BROKER_ID": "fyers",
@@ -133,9 +145,13 @@ def _get_default(key: str, env: str) -> str:
             "BAS_URL": "https://staging-bas.smarttrade.asia",
             "BAS_WS_URL": "wss://staging-bas.smarttrade.asia/api/v1/ws",
             "EXECUTION_UPDATES_WS_URL": "wss://staging-mock.smarttrade.asia/internal/api/v1/execution-updates",
+            "MDS_URL": "https://staging-mds.smarttrade.asia",
             "MDS_WS_URL": "wss://staging-mds.smarttrade.asia",
             "MOCK_URL": "https://staging-mock.smarttrade.asia",  # Paper Broker Service
             "AUTH_URL": "https://staging-auth.smarttrade.asia",
+            "PORTFOLIO_URL": "https://staging-portfolio.smarttrade.asia",
+            "JOURNAL_URL": "https://staging-journal.smarttrade.asia",
+            "REDIS_URL": "redis://staging-redis:6379/0",
             "TEST_USER": "staging-testuser@example.com",
             "TEST_PASSWORD": "staging-testpassword123",
             "BROKER_ID": "fyers",
@@ -148,9 +164,13 @@ def _get_default(key: str, env: str) -> str:
             "BAS_URL": "https://api.smarttrade.asia/bas",
             "BAS_WS_URL": "wss://api.smarttrade.asia/bas/api/v1/ws",
             "EXECUTION_UPDATES_WS_URL": "wss://api.smarttrade.asia/mock/internal/api/v1/execution-updates",
+            "MDS_URL": "https://api.smarttrade.asia/mds",
             "MDS_WS_URL": "wss://api.smarttrade.asia/mds",
             "MOCK_URL": "https://api.smarttrade.asia/mock",  # Paper Broker Service
             "AUTH_URL": "https://api.smarttrade.asia/auth",
+            "PORTFOLIO_URL": "https://api.smarttrade.asia/portfolio",
+            "JOURNAL_URL": "https://api.smarttrade.asia/journal",
+            "REDIS_URL": "redis://prod-redis:6379/0",
             "TEST_USER": "prod-testuser@example.com",
             "TEST_PASSWORD": "prod-testpassword123",
             "BROKER_ID": "fyers",

@@ -31,6 +31,10 @@ structlog==24.1.0
 faker==21.0.0  # Generate test data
 freezegun==1.4.0  # Time mocking
 
+# Redis stream observation and event validation
+redis==5.0.1
+jsonschema==4.21.1
+
 # Linting and formatting (optional, for CI)
 ruff==0.2.0
 mypy==1.7.1

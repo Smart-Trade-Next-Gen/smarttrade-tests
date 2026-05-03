@@ -29,6 +29,9 @@ env:
   PYTHON_VERSION: '3.12'
   E2E_ENV: 'ci'
   CI: true
+  COMPOSE_FILE: ./docker-compose.e2e.yml
+  JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY || 'test-jwt-secret-key-ci-only' }}
+  TOKEN_ENCRYPTION_KEY: ${{ secrets.TOKEN_ENCRYPTION_KEY || 'test-encryption-key-ci-only' }}
 
 concurrency:
   group: ${{ github.ref }}-e2e
@@ -93,37 +96,13 @@ jobs:
               body: `## E2E Smoke Tests: ${result}\n\nRun [details](${context.payload.pull_request.html_url}/checks)`
             });
 
-  # Stage 2: Injection mode tests (deterministic)
-  injection-tests:
-    name: Injection Mode Tests (Phase 5)
+  # Stage 2: Injection mode tests (deterministic) + Event Bus + Architecture
+  injection-and-integration-tests:
+    name: Injection, Event Bus & Architecture Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     needs: smoke-tests
     if: success() || github.event_name == 'workflow_dispatch'
-
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: smarttrade_paper_broker_service
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
-
-      redis:
-        image: redis:7-alpine
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 6379:6379
 
     steps:
       - name: Checkout code
@@ -134,6 +113,9 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
+      - name: Set up Docker
+        uses: docker/setup-buildx-action@v2
+
       - name: Cache pip dependencies
         uses: actions/cache@v3
         with:
@@ -142,32 +124,65 @@ jobs:
 
       - name: Install dependencies
         run: |
-          cd e2e && pip install -r requirements.txt
+          cd smarttrade-tests && pip install -r e2e/requirements.txt
 
-      - name: Health check services
+      - name: Start services with docker-compose
         run: |
-          echo "Checking PostgreSQL..."
-          until psql -h localhost -U postgres -d smarttrade_paper_broker_service -c '\q' 2>/dev/null; do
-            echo "Waiting for PostgreSQL..."
-            sleep 2
-          done
-          echo "PostgreSQL is ready"
+          cd smarttrade-tests
+          docker-compose -f docker-compose.e2e.yml up -d
+          echo "Docker Compose services starting..."
+          sleep 5
 
-          echo "Checking Redis..."
-          until redis-cli -h localhost ping 2>/dev/null | grep -q PONG; do
-            echo "Waiting for Redis..."
-            sleep 2
+      - name: Wait for services to be healthy
+        timeout-minutes: 3
+        run: |
+          cd smarttrade-tests
+          echo "Waiting for postgres..."
+          docker-compose -f docker-compose.e2e.yml exec -T postgres pg_isready -U postgres || true
+
+          echo "Waiting for redis..."
+          docker-compose -f docker-compose.e2e.yml exec -T redis redis-cli ping || true
+
+          echo "Waiting for all app services..."
+          for service in auth-service market-data-service paper-broker-service broker-adapter-service portfolio-service journal-service; do
+            echo "Checking $service..."
+            until docker-compose -f docker-compose.e2e.yml exec -T $service python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/ready')" 2>/dev/null; do
+              echo "Waiting for $service..."
+              sleep 3
+            done
+            echo "$service is ready"
           done
-          echo "Redis is ready"
 
       - name: Run injection mode tests
         id: injection
         run: |
-          cd e2e
+          cd smarttrade-tests/e2e
           pytest tests/ -m injection -v --tb=short --maxfail=3 \
-            --html=../test-results/injection-report.html --self-contained-html \
-            --junit-xml=../test-results/injection-junit.xml \
+            --html=../../test-results/injection-report.html --self-contained-html \
+            --junit-xml=../../test-results/injection-junit.xml \
             --cov=e2e --cov-report=xml --cov-report=html || true
+
+      - name: Run event bus validation tests
+        id: event_bus
+        run: |
+          cd smarttrade-tests/e2e
+          pytest tests/ -m event_bus -v --tb=short --maxfail=2 \
+            --html=../../test-results/event-bus-report.html --self-contained-html \
+            --junit-xml=../../test-results/event-bus-junit.xml || true
+
+      - name: Run architecture boundary tests
+        id: architecture
+        run: |
+          cd smarttrade-tests/e2e
+          pytest tests/ -m architecture -v --tb=short --maxfail=2 \
+            --html=../../test-results/architecture-report.html --self-contained-html \
+            --junit-xml=../../test-results/architecture-junit.xml || true
+
+      - name: Cleanup docker-compose
+        if: always()
+        run: |
+          cd smarttrade-tests
+          docker-compose -f docker-compose.e2e.yml down -v || true
 
       - name: Upload injection test report
         if: always()
@@ -354,7 +369,7 @@ jobs:
   test-summary:
     name: Test Summary
     runs-on: ubuntu-latest
-    needs: [smoke-tests, injection-tests, real-execution-tests, resilience-tests]
+    needs: [smoke-tests, injection-and-integration-tests, real-execution-tests, resilience-tests]
     if: always()
     timeout-minutes: 5
 
@@ -371,18 +386,18 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
 
           smoke_pass=${{ needs.smoke-tests.result == 'success' && '✅' || '❌' }}
-          injection_pass=${{ needs.injection-tests.result == 'success' && '✅' || '❌' }}
+          injection_pass=${{ needs.injection-and-integration-tests.result == 'success' && '✅' || '❌' }}
           real_exec_pass=${{ needs.real-execution-tests.result == 'success' && '✅' || '❌' }}
           resilience_pass=${{ needs.resilience-tests.result == 'success' && '✅' || '❌' }}
 
           echo "| Stage | Result | Details |" >> $GITHUB_STEP_SUMMARY
           echo "|-------|--------|---------|" >> $GITHUB_STEP_SUMMARY
           echo "| Smoke (Phase 5) | ${smoke_pass} | 2 critical path tests |" >> $GITHUB_STEP_SUMMARY
-          echo "| Injection (Phase 5) | ${injection_pass} | 18 deterministic tests |" >> $GITHUB_STEP_SUMMARY
+          echo "| Injection + Event Bus + Architecture | ${injection_pass} | 18 injection + 5 event_bus + 5 architecture tests |" >> $GITHUB_STEP_SUMMARY
           echo "| Real Execution (Phase 6) | ${real_exec_pass} | 10 price-driven tests |" >> $GITHUB_STEP_SUMMARY
           echo "| Resilience (Phase 7) | ${resilience_pass} | 11 chaos/recovery tests |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Total**: 41 E2E tests" >> $GITHUB_STEP_SUMMARY
+          echo "**Total**: 51 E2E tests (41 original + 10 new)" >> $GITHUB_STEP_SUMMARY
 
       - name: Upload all test reports
         uses: actions/upload-artifact@v3
@@ -395,7 +410,7 @@ jobs:
         id: conclusion
         run: |
           if [ "${{ needs.smoke-tests.result }}" = "success" ] && \
-             [ "${{ needs.injection-tests.result }}" = "success" ] && \
+             [ "${{ needs.injection-and-integration-tests.result }}" = "success" ] && \
              [ "${{ needs.real-execution-tests.result }}" = "success" ] && \
              [ "${{ needs.resilience-tests.result }}" = "success" ]; then
             echo "all_passed=true" >> $GITHUB_OUTPUT

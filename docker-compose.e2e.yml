@@ -1,0 +1,313 @@
+version: "3.9"
+
+# ============================================================================
+# SmartTrade E2E Test Docker Compose Configuration
+# ============================================================================
+# Minimal, self-contained setup for comprehensive E2E testing
+# - All services needed for E2E tests
+# - Test-specific database and Redis isolation
+# - Pre-built images (no source volumes) for CI compatibility
+# ============================================================================
+
+x-common-env: &common-env
+  PYTHONPATH: /app/smarttrade-common/src
+  JWT_SECRET_KEY: ${JWT_SECRET_KEY:-247ede858cd1b034a2c8594452088c660b5a63b8cc89944ad3fe802ac7f2ae30}
+  TOKEN_ENCRYPTION_KEY: ${TOKEN_ENCRYPTION_KEY:-tS6WpC3SY9qaBY3AJLNPuqj3Wf060ObJH5RXTONfW4g=}
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  ENV: ${ENV:-local}
+  EVENT_BUS: ${EVENT_BUS:-redis}
+  REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+  ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-1440}
+  FYERS_APP_ID: ${FYERS_APP_ID:-test_app_id}
+  FYERS_MDS_ACCESS_TOKEN: ${FYERS_MDS_ACCESS_TOKEN:-mock_token_for_testing}
+  UV_PROJECT_ENVIRONMENT: ${UV_PROJECT_ENVIRONMENT:-/opt/venv}
+  UV_INDEX_URL: ${UV_INDEX_URL:-https://pypi.org/simple}
+  UV_LINK_MODE: ${UV_LINK_MODE:-copy}
+
+services:
+
+  # ──────────────────────────────────────────────────────────────────────
+  # PostgreSQL Database (Test Isolation)
+  # ──────────────────────────────────────────────────────────────────────
+  postgres:
+    container_name: postgres-e2e-test
+    image: timescale/timescaledb:latest-pg16
+    restart: unless-stopped
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_preload_libraries=timescaledb"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_INITDB_ARGS: "-E UTF8 --locale=en_US.UTF-8"
+    volumes:
+      # Use named volume for test isolation (no state leakage between CI runs)
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+    networks:
+      - smarttrade-e2e
+
+  # ──────────────────────────────────────────────────────────────────────
+  # Redis Event Bus & Cache (Test Isolation)
+  # ──────────────────────────────────────────────────────────────────────
+  redis:
+    container_name: redis-e2e-test
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "no", "--maxmemory", "256mb"]
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 2s
+      retries: 20
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - smarttrade-e2e
+
+  # ──────────────────────────────────────────────────────────────────────
+  # Authentication Service (Port 8001)
+  # ──────────────────────────────────────────────────────────────────────
+  auth-service:
+    container_name: auth-service-e2e
+    image: smarttrade/authentication-service:latest
+    restart: unless-stopped
+    ports:
+      - "8001:8000"
+    environment:
+      <<: *common-env
+      SERVICE_NAME: auth-service
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/smarttrade_authentication_service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/ready')"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 30s
+    networks:
+      - smarttrade-e2e
+
+  # ──────────────────────────────────────────────────────────────────────
+  # Market Data Service (Port 8004)
+  # ──────────────────────────────────────────────────────────────────────
+  market-data-service:
+    container_name: market-data-service-e2e
+    image: smarttrade/market-data-service:latest
+    restart: unless-stopped
+    ports:
+      - "8004:8000"
+    environment:
+      <<: *common-env
+      SERVICE_NAME: market-data-service
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/smarttrade_market_data_service
+      PAPER_BROKER_SERVICE_URL: http://paper-broker-service:8000
+      PAPER_BROKER_SERVICE_WEBSOCKET_URL: ws://paper-broker-service:8000
+      BROKER_ADAPTER_SERVICE_URL: http://broker-adapter-service:8000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/ready')"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 30s
+    networks:
+      - smarttrade-e2e
+
+  # ──────────────────────────────────────────────────────────────────────
+  # Paper Broker Service (Port 8002)
+  # ──────────────────────────────────────────────────────────────────────
+  paper-broker-service:
+    container_name: paper-broker-service-e2e
+    image: smarttrade/paper-broker-service:latest
+    restart: unless-stopped
+    ports:
+      - "8002:8000"
+    environment:
+      <<: *common-env
+      SERVICE_NAME: paper-broker-service
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/smarttrade_paper_broker_service
+      MARKET_DATA_SERVICE_URL: http://market-data-service:8000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      market-data-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/ready')"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 30s
+    networks:
+      - smarttrade-e2e
+
+  # ──────────────────────────────────────────────────────────────────────
+  # User Settings Service (Port 8009) - Required by BAS
+  # ──────────────────────────────────────────────────────────────────────
+  user-setting-service:
+    container_name: user-setting-service-e2e
+    image: smarttrade/user-setting-service:latest
+    restart: unless-stopped
+    ports:
+      - "8009:8000"
+    environment:
+      <<: *common-env
+      SERVICE_NAME: user-setting-service
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/smarttrade_user_setting_service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/ready')"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 30s
+    networks:
+      - smarttrade-e2e
+
+  # ──────────────────────────────────────────────────────────────────────
+  # Broker Adapter Service (Port 8005)
+  # ──────────────────────────────────────────────────────────────────────
+  broker-adapter-service:
+    container_name: broker-adapter-service-e2e
+    image: smarttrade/broker-adapter-service:latest
+    restart: unless-stopped
+    ports:
+      - "8005:8000"
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    environment:
+      <<: *common-env
+      SERVICE_NAME: broker-adapter-service
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/smarttrade_broker_adapter_service
+      MARKET_DATA_SERVICE_URL: http://market-data-service:8000
+      PAPER_BROKER_SERVICE_URL: http://paper-broker-service:8000
+      PORTFOLIO_SERVICE_URL: http://portfolio-service:8000
+      BROKER_REDIRECT_URI: ${BROKER_REDIRECT_URI:-http://localhost/}
+      FYERS_APP_SECRET: ${FYERS_APP_SECRET:-test_app_secret}
+      RISK_VALIDATION_ENABLED: ${RISK_VALIDATION_ENABLED:-true}
+      USE_OUTBOX_PATTERN: false
+    depends_on:
+      postgres:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+      market-data-service:
+        condition: service_healthy
+      paper-broker-service:
+        condition: service_healthy
+      user-setting-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/ready')"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 40s
+    networks:
+      - smarttrade-e2e
+
+  # ──────────────────────────────────────────────────────────────────────
+  # Portfolio Service (Port 8008)
+  # ──────────────────────────────────────────────────────────────────────
+  portfolio-service:
+    container_name: portfolio-service-e2e
+    image: smarttrade/portfolio-service:latest
+    restart: unless-stopped
+    ports:
+      - "8008:8000"
+    environment:
+      <<: *common-env
+      SERVICE_NAME: portfolio-service
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/smarttrade_portfolio_service
+      MARKET_DATA_SERVICE_URL: http://market-data-service:8000
+      BROKER_ADAPTER_SERVICE_URL: http://broker-adapter-service:8000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      market-data-service:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+      broker-adapter-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/ready')"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 30s
+    networks:
+      - smarttrade-e2e
+
+  # ──────────────────────────────────────────────────────────────────────
+  # Journal Service (Port 8007)
+  # ──────────────────────────────────────────────────────────────────────
+  journal-service:
+    container_name: journal-service-e2e
+    image: smarttrade/journal-service:latest
+    restart: unless-stopped
+    ports:
+      - "8007:8000"
+    environment:
+      <<: *common-env
+      SERVICE_NAME: journal-service
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/smarttrade_journal_service
+      MARKET_DATA_SERVICE_URL: http://market-data-service:8000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      market-data-service:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/ready')"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 30s
+    networks:
+      - smarttrade-e2e
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  smarttrade-e2e:
+    driver: bridge
+
+# Note: Volumes use named volumes for test isolation
+# Each CI run gets a fresh database with no state leakage

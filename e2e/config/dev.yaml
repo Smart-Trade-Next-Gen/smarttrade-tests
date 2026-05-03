@@ -3,9 +3,13 @@
 
 env: dev
 bas_url: http://localhost:8005
+mds_url: http://localhost:8004
 mds_ws_url: ws://localhost:8004
 mock_url: http://localhost:8002
 auth_url: http://localhost:8001
+portfolio_url: http://localhost:8008
+journal_url: http://localhost:8007
+redis_url: redis://localhost:6379/0
 
 # Test credentials
 test_user: testuser@example.com

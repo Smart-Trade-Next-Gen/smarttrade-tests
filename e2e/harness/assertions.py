@@ -49,11 +49,20 @@ class AssertionEngine:
         if not events:
             raise AssertionError("No events found for order")
 
-        final_event = events[-1]
+        # Look for order.filled event which has the status field
+        filled_event = None
+        for event in events:
+            if event.get("type") == "order_fill" or event.get("data", {}).get("event_type") == "order.filled.v1":
+                filled_event = event
+                break
+
+        if not filled_event:
+            raise AssertionError(f"No order.filled event found | Events: {len(events)}")
+
         final_status = (
-            final_event.get("status")
-            or final_event.get("data", {}).get("status")
-            or final_event.get("order_status")
+            filled_event.get("status")
+            or filled_event.get("data", {}).get("status")
+            or filled_event.get("order_status")
         )
 
         if final_status != expected_status:
