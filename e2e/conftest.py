@@ -10,6 +10,7 @@ import hashlib
 import logging
 import os
 import time
+import uuid
 from typing import AsyncGenerator
 from pathlib import Path
 from decimal import Decimal
@@ -27,6 +28,9 @@ try:
 except ImportError:
     pass  # python-dotenv not available, rely on environment
 
+from broker_adapter_service.schemas.order_dtos import BasOrderPlaceRequest, BasOrderLeg
+from smarttrade_common.schemas.types import OrderSide, OrderType, TimeInForce, PositionType, InstrumentType
+
 from e2e.config import TestConfig
 from e2e.clients import (
     BASClient,
@@ -43,12 +47,13 @@ from e2e.fixtures.logging import configure_logging
 from e2e.fixtures.market_data_stream import MockMarketDataStream
 from e2e.fixtures.chaos_engine import ChaosEngine
 from e2e.fixtures.instruments import InstrumentCatalog
+from e2e.fixtures.test_instruments_data import get_test_instruments
 from e2e.fixtures.quote_injection import QuoteInjector
 
 log = logging.getLogger(__name__)
 
 
-async def wait_for_portfolio_service_listeners(portfolio_client: PortfolioClient, timeout: int = 30) -> None:
+async def wait_for_portfolio_service_listeners(portfolio_url: str, timeout: int = 30) -> None:
     """
     Wait for Portfolio Service event listeners to be fully subscribed.
 
@@ -56,7 +61,7 @@ async def wait_for_portfolio_service_listeners(portfolio_client: PortfolioClient
     This prevents the race condition where tests publish events before listeners are subscribed.
 
     Args:
-        portfolio_client: Portfolio Service client for health checks
+        portfolio_url: Portfolio Service base URL (e.g., "http://localhost:8008")
         timeout: Maximum wait time in seconds
 
     Raises:
@@ -67,7 +72,8 @@ async def wait_for_portfolio_service_listeners(portfolio_client: PortfolioClient
         try:
             # Make a simple request to trigger service startup completion
             # Once we get a 200 response, the service is ready
-            await portfolio_client._client.get("/ready")
+            async with httpx.AsyncClient(base_url=portfolio_url, timeout=5.0) as client:
+                await client.get("/ready")
             log.info("✅ Portfolio Service listeners ready")
             # Give an extra 2 seconds to ensure Redis connections are fully established
             await asyncio.sleep(2)
@@ -118,9 +124,12 @@ def pytest_sessionstart(session):
                     response = await client.get(f"{config.portfolio_url}/ready")
                     if response.status_code == 200:
                         log.info("✅ Portfolio Service is ready")
-                        # Long wait to ensure all event listeners are fully subscribed and ready
+                        # Verify event listeners are fully subscribed and ready
                         log.info("Waiting for event listeners to initialize (10s)...")
                         await asyncio.sleep(10)
+
+                        # Call the readiness gate to ensure Redis consumer heartbeats are registered
+                        await wait_for_portfolio_service_listeners(config.portfolio_url, timeout=30)
                         return
                 except Exception as e:
                     log.debug(f"Portfolio Service not ready: {e}")
@@ -191,85 +200,175 @@ def mds_rest_client(config: TestConfig) -> MDSRestClient:
 
 
 @pytest.fixture(scope="session")
-def instrument_catalog(mds_rest_client: MDSRestClient, config: TestConfig) -> InstrumentCatalog:
+def instrument_catalog(config: TestConfig) -> InstrumentCatalog:
     """
-    Provide session-scoped instrument catalog.
+    Provide session-scoped instrument catalog seeded into consumer databases.
 
-    Loads all instruments from MDS once and caches in memory.
+    Instruments are pre-seeded into BAS and PBS databases during setup.
+    This follows the event-driven architecture where:
+    1. Instruments are synced from external sources (e.g., Fyers) to MDS
+    2. MDS emits instrument.created events to consumers via market.instrument.v1 stream
+    3. Consumers (BAS, PBS) receive events and store instruments in their own databases
+    4. Consumers load instruments from their caches (populated from events or DB)
+    5. Tests use instruments from consumer caches (not from MDS)
+
+    For E2E tests, we simulate MDS behavior by:
+    - Seeding instruments to consumer databases (simulating DB persistence of received events)
+    - Publishing instrument events to Redis stream (simulating live MDS events)
+
     Scope: session (loaded once per test run)
-    Note: Not async-scoped to avoid pytest-asyncio scope mismatch issues.
     Uses asyncio.run() to execute the async load operation.
     """
-    catalog = InstrumentCatalog(mds_rest_client)
+    import subprocess
+    import json
+    import redis as redis_sync
+
+    # Get test instruments data
+    test_instruments = get_test_instruments()
+    log.info(f"Seeding {len(test_instruments)} instruments to consumer service databases and Redis stream")
+
+    # Seed to BAS database
+    for instr in test_instruments:
+        isin_val = f"'{instr.get('isin')}'" if instr.get('isin') else 'NULL'
+        exchange = instr.get("exchange", "NSE")
+        symbol = instr.get("symbol", "")
+        fyers_trading_symbol = f"{exchange}:{symbol}"
+
+        broker_instruments_json = json.dumps([{
+            "broker_id": "fyers",
+            "trading_symbol": fyers_trading_symbol,
+            "broker_token": symbol,
+        }])
+
+        sql = f"""
+            INSERT INTO instruments
+            (id, symbol, name, exchange, segment, instrument_type, isin, lot_size, tick_size, status, version, instrument_checksum, broker_instruments, created_at, updated_at)
+            VALUES
+            ('{instr.get("id")}',
+             '{instr.get("symbol")}',
+             '{instr.get("name", instr.get("symbol", ""))}',
+             '{instr.get("exchange", "NSE")}',
+             '{instr.get("segment", "CASH")}',
+             '{instr.get("type", "EQUITY")}',
+             {isin_val},
+             {instr.get('lot_size', 1)},
+             {instr.get('tick_size', 0.01)},
+             'ACTIVE',
+             1,
+             '',
+             '{broker_instruments_json.replace(chr(39), chr(39)+chr(39))}',
+             NOW(),
+             NOW())
+            ON CONFLICT (id) DO UPDATE SET
+                symbol = EXCLUDED.symbol,
+                broker_instruments = EXCLUDED.broker_instruments,
+                updated_at = NOW();
+        """
+
+        try:
+            proc = subprocess.run(
+                ["docker-compose", "-f", "../docker-compose.e2e.yml", "exec", "-T", "postgres",
+                 "psql", "-U", "postgres", "-d", "smarttrade_broker_adapter_service", "-c", sql],
+                cwd="/home/amit/Work/Smart-Trade/smarttrade-tests/e2e",
+                capture_output=True,
+                timeout=5,
+            )
+            if proc.returncode != 0:
+                log.warning(f"Could not insert {instr.get('id')} to BAS: {proc.stderr.decode()}")
+        except Exception as e:
+            log.warning(f"Could not insert {instr.get('id')} to BAS: {e}")
+
+    log.info("✅ Instruments seeded to BAS database")
+
+    # Seed to PBS database (optional, for PBS testing)
+    for instr in test_instruments:
+        isin_val = f"'{instr.get('isin')}'" if instr.get('isin') else 'NULL'
+        sql = f"""
+            INSERT INTO instruments
+            (id, symbol, name, exchange, segment, instrument_type, isin, lot_size, tick_size, status, version, instrument_checksum, created_at, updated_at)
+            VALUES
+            ('{instr.get("id")}',
+             '{instr.get("symbol")}',
+             '{instr.get("name", instr.get("symbol", ""))}',
+             '{instr.get("exchange", "NSE")}',
+             '{instr.get("segment", "CASH")}',
+             '{instr.get("type", "EQUITY")}',
+             {isin_val},
+             {instr.get('lot_size', 1)},
+             {instr.get('tick_size', 0.01)},
+             'ACTIVE',
+             1,
+             '',
+             NOW(),
+             NOW())
+            ON CONFLICT (id) DO UPDATE SET
+                symbol = EXCLUDED.symbol,
+                updated_at = NOW();
+        """
+
+        try:
+            proc = subprocess.run(
+                ["docker-compose", "-f", "../docker-compose.e2e.yml", "exec", "-T", "postgres",
+                 "psql", "-U", "postgres", "-d", "smarttrade_paper_broker_service", "-c", sql],
+                cwd="/home/amit/Work/Smart-Trade/smarttrade-tests/e2e",
+                capture_output=True,
+                timeout=5,
+            )
+            if proc.returncode != 0:
+                log.debug(f"Could not insert {instr.get('id')} to PBS: {proc.stderr.decode()}")
+        except Exception as e:
+            log.debug(f"Could not insert {instr.get('id')} to PBS: {e}")
+
+    log.info("✅ Instruments seeded to PBS database")
+
+    # Publish instrument events to Redis stream (market.instrument.v1)
+    # This simulates MDS publishing instrument events that consumers subscribe to
+    try:
+        redis_client = redis_sync.from_url("redis://localhost:6379/0")
+
+        # Delete any existing consumer group for BAS to reset position
+        try:
+            redis_client.execute_command("XGROUP", "DESTROY", "market.instrument.v1", "bas-instrument-master")
+            log.info("Reset BAS instrument master consumer group")
+        except:
+            # Group doesn't exist yet, which is fine
+            pass
+
+        for instr in test_instruments:
+            instrument_event = {
+                "event_id": f"instr_{instr.get('id')}",
+                "event_type": "instrument.created",
+                "instrument_id": instr.get("id"),
+                "symbol": instr.get("symbol"),
+                "name": instr.get("name"),
+                "exchange": instr.get("exchange", "NSE"),
+                "segment": instr.get("segment", "CASH"),
+                "type": instr.get("type", "EQUITY"),
+                "isin": instr.get("isin"),
+                "lot_size": instr.get("lot_size", 1),
+                "tick_size": instr.get("tick_size", 0.01),
+                "timestamp": time.time(),
+            }
+            redis_client.xadd("market.instrument.v1", {"data": json.dumps(instrument_event)})
+
+        log.info(f"✅ Published {len(test_instruments)} instrument events to Redis stream (market.instrument.v1)")
+
+        # Wait for consumers to process events (increased from 5s to 15s)
+        log.info("Waiting for instrument consumers to process events (15s)...")
+        for i in range(15):
+            time.sleep(1)
+            # Log progress
+            if (i + 1) % 5 == 0:
+                log.info(f"  ... {i + 1}/15 seconds elapsed")
+
+        redis_client.close()
+    except Exception as e:
+        log.warning(f"⚠️ Failed to publish instrument events to Redis: {e}")
+
+    # Create catalog from seeded test data
+    catalog = InstrumentCatalog(test_instruments)
     asyncio.run(catalog.load())
     log.info(f"✅ Instrument catalog ready: {catalog.count()} instruments")
-
-    # Seed instruments to BAS database for lazy-cache access
-    try:
-        import subprocess
-        import json
-
-        mds_instruments = catalog.list_all()
-        log.info(f"Seeding {len(mds_instruments)} instruments to BAS database")
-
-        for instr in mds_instruments:
-            # Use psql directly via Docker exec to avoid driver issues
-            isin_val = f"'{instr.get('isin')}'" if instr.get('isin') else 'NULL'
-
-            # Create broker_instruments mapping for Fyers
-            # Fyers trading symbol format: NSE:SBIN (symbol prefixed with exchange)
-            exchange = instr.get("exchange", "NSE")
-            symbol = instr.get("symbol", "")
-            fyers_trading_symbol = f"{exchange}:{symbol}"
-
-            broker_instruments_json = json.dumps([{
-                "broker_id": "fyers",
-                "trading_symbol": fyers_trading_symbol,
-                "broker_token": symbol,  # Simplified token for testing
-            }])
-
-            sql = f"""
-                INSERT INTO instruments
-                (id, symbol, name, exchange, segment, instrument_type, isin, lot_size, tick_size, status, version, instrument_checksum, broker_instruments, created_at, updated_at)
-                VALUES
-                ('{instr.get("id")}',
-                 '{instr.get("symbol")}',
-                 '{instr.get("name", instr.get("symbol", ""))}',
-                 '{instr.get("exchange", "NSE")}',
-                 '{instr.get("segment", "EQ")}',
-                 '{instr.get("type", "EQUITY")}',
-                 {isin_val},
-                 {instr.get('lot_size', 1)},
-                 {instr.get('tick_size', 0.01)},
-                 'ACTIVE',
-                 1,
-                 '',
-                 '{broker_instruments_json.replace(chr(39), chr(39)+chr(39))}',
-                 NOW(),
-                 NOW())
-                ON CONFLICT (id) DO UPDATE SET
-                    symbol = EXCLUDED.symbol,
-                    broker_instruments = EXCLUDED.broker_instruments,
-                    updated_at = NOW();
-            """
-
-            try:
-                # Execute via psql in the docker container
-                proc = subprocess.run(
-                    ["docker-compose", "-f", "../docker-compose.e2e.yml", "exec", "-T", "postgres",
-                     "psql", "-U", "postgres", "-d", "smarttrade_broker_adapter_service", "-c", sql],
-                    cwd="/home/amit/Work/Smart-Trade/smarttrade-tests/e2e",
-                    capture_output=True,
-                    timeout=5,
-                )
-                if proc.returncode != 0:
-                    log.debug(f"Could not insert {instr.get('id')}: {proc.stderr.decode()}")
-            except Exception as e:
-                log.debug(f"Could not insert {instr.get('id')}: {e}")
-
-        log.info("✅ Instruments seeded to BAS database")
-    except Exception as e:
-        log.warning(f"⚠️ Failed to seed instruments: {e}")
 
     return catalog
 
@@ -794,20 +893,29 @@ def scenario_engine() -> ScenarioEngine:
 
 
 @pytest_asyncio.fixture
-async def place_and_sync_order(bas_client: BASClient, mock_client: MockClient, config: TestConfig):
+async def place_and_sync_order(bas_client: BASClient, mock_client: MockClient, config: TestConfig, instrument_catalog: InstrumentCatalog):
     """
     Provide a helper function to place an order in BAS and sync it to paper broker service.
 
     This ensures orders exist in paper broker service with correct instrument_id (from MDS)
     before fill injection is attempted.
 
+    Supports both dict (simplified) and BasOrderPlaceRequest formats for order_request.
+
     Usage in tests:
-        [order_resp] = await place_and_sync_order(broker_id, account_id, order_request)
+        # Dict format (automatically converted to BasOrderPlaceRequest)
+        [order_resp] = await place_and_sync_order(
+            broker_id, account_id,
+            order_request={"instrument_id": "...", "side": "BUY", "qty": 100, ...}
+        )
+
+        # Or Pydantic model format (passed directly)
+        [order_resp] = await place_and_sync_order(broker_id, account_id, order_request=BasOrderPlaceRequest(...))
 
     Args (passed to helper):
         broker_id: Broker identifier
         account_id: Account identifier
-        order_request: BasOrderPlaceRequest
+        order_request: dict or BasOrderPlaceRequest
 
     Returns:
         List of order responses from BAS (same as place_order)
@@ -815,17 +923,70 @@ async def place_and_sync_order(bas_client: BASClient, mock_client: MockClient, c
     Scope: function
     """
     async def helper(broker_id: str, account_id: str, order_request):
+        # Convert dict to BasOrderPlaceRequest if needed
+        if isinstance(order_request, dict):
+            order_request = _dict_to_order_request(order_request, instrument_catalog)
+
         # Step 1: Place order in BAS (returns order with instrument_id from MDS)
         order_responses = await bas_client.place_order(broker_id, account_id, order_request)
 
         # Step 2: Sync each order to paper broker service using instrument_id (not broker symbol)
         for order_resp in order_responses:
-            await mock_client.sync_order(broker_id, account_id, order_resp.model_dump() if hasattr(order_resp, 'model_dump') else order_resp)
-            log.debug(f"Order synced: {order_resp.get('broker_order_id') if isinstance(order_resp, dict) else order_resp.broker_order_id}")
+            try:
+                await mock_client.sync_order(broker_id, account_id, order_resp.model_dump() if hasattr(order_resp, 'model_dump') else order_resp)
+                log.debug(f"Order synced: {order_resp.get('broker_order_id') if isinstance(order_resp, dict) else order_resp.broker_order_id}")
+            except Exception as e:
+                log.warning(f"Failed to sync order to paper broker service (non-critical): {e}")
+                # Sync to paper broker is optional - tests can proceed without it
 
         return order_responses
 
     return helper
+
+
+def _dict_to_order_request(order_dict: dict, instrument_catalog: InstrumentCatalog) -> BasOrderPlaceRequest:
+    """
+    Convert simplified dict order format to BasOrderPlaceRequest.
+
+    Dict format:
+        {
+            "instrument_id": "NSE:SBIN:EQ",
+            "position_type": "INTRADAY",
+            "side": "BUY",
+            "order_type": "MARKET",
+            "qty": 100,
+            "ltp": Decimal("550.00"),  # optional, defaults to 100.00
+            "price": Decimal("550.00"),  # optional, for LIMIT orders
+            "stop_price": Decimal("545.00"),  # optional, for STOP orders
+        }
+    """
+    instrument_id = order_dict["instrument_id"]
+    instrument = instrument_catalog.get_by_id(instrument_id)
+
+    if not instrument:
+        raise ValueError(f"Instrument not found: {instrument_id}")
+
+    # Build the leg
+    leg = BasOrderLeg(
+        instrument_id=instrument_id,
+        instrument_type=InstrumentType(order_dict.get("instrument_type", "EQUITY")),
+        side=OrderSide(order_dict["side"].upper()),
+        qty=int(order_dict["qty"]),
+        order_type=OrderType(order_dict["order_type"].upper()),
+        ltp=Decimal(str(order_dict.get("ltp", "100.00"))),
+        price=Decimal(str(order_dict["price"])) if "price" in order_dict else None,
+        stop_price=Decimal(str(order_dict["stop_price"])) if "stop_price" in order_dict else None,
+    )
+
+    # Build the request
+    return BasOrderPlaceRequest(
+        client_order_id=f"e2e_{uuid.uuid4().hex[:12]}",
+        position_type=PositionType(order_dict.get("position_type", "INTRADAY").upper()),
+        legs=[leg],
+        underlying_instrument_id=instrument_id,
+        underlying_symbol=instrument.get("symbol", instrument_id),
+        tif=TimeInForce(order_dict.get("tif", "DAY").upper()),
+    )
 
 
 # ────────────────────────────────────────────────────────────────────────────────

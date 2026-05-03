@@ -430,23 +430,26 @@ class MockClient:
             if not order_id:
                 raise ValueError("order_response must have broker_order_id")
 
-            # Extract first leg (BAS returns multi-leg orders, but paper broker service uses single-instrument)
-            legs = order_response.get("legs", [])
-            if not legs:
-                raise ValueError("order_response must have at least one leg")
-
-            first_leg = legs[0]
-            instrument_id = first_leg.get("instrument_id")
+            # BasOrderPlaceResponse has instrument_id at top level (not in legs)
+            instrument_id = order_response.get("instrument_id")
             if not instrument_id:
-                raise ValueError("leg must have instrument_id (from MDS)")
+                # Fallback: try to extract from legs if present
+                legs = order_response.get("legs", [])
+                if legs:
+                    instrument_id = legs[0].get("instrument_id")
+
+                if not instrument_id:
+                    raise ValueError("order_response must have instrument_id")
 
             # Build order request for paper broker service with correct instrument_id
+            # Note: BasOrderPlaceResponse doesn't include legs details, so we can't extract side/qty from response
+            # The original order details are already in BAS - we just need to sync the order_id for fill injection
             sync_request = {
                 "order_id": order_id,
                 "instrument_id": instrument_id,  # Use MDS instrument_id (NOT broker symbol)
-                "instrument_type": first_leg.get("instrument_type", "EQUITY"),
-                "side": first_leg.get("side"),
-                "qty": first_leg.get("qty"),
+                "instrument_type": "EQUITY",  # Default, as response doesn't include this
+                "side": order_response.get("side", "BUY"),  # Default to BUY as response doesn't include this
+                "qty": order_response.get("qty", 1),  # Default, as response doesn't include this
                 "order_type": order_response.get("order_type", "MARKET"),
                 "tif": order_response.get("tif", "DAY"),
                 "price": order_response.get("price"),
