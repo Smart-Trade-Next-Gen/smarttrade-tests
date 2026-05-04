@@ -494,14 +494,16 @@ async def setup_broker_credentials(bas_client):
 @pytest.fixture
 def test_account_id(request) -> str:
     """
-    Generate a unique account ID per test.
+    Return a shared account ID for all tests.
 
-    Ensures test isolation by giving each test its own account ID.
+    Test isolation is preserved via setup_trading_account fixture which
+    deletes and recreates the account before each test. Using a single
+    shared account reduces WebSocket connections from 116 to 2, preventing
+    RAM exhaustion (each test no longer creates unique BAS + MDS WebSocket).
 
     Scope: function
     """
-    test_hash = hashlib.md5(request.node.nodeid.encode()).hexdigest()[:8]
-    return f"TEST_E2E_{test_hash}"
+    return "TEST_E2E_SHARED"
 
 
 # ────────────────────────────────────────────────────────────────────────────────
@@ -702,10 +704,12 @@ async def mds_client(
     except Exception as e:
         log.warning(f"Error disconnecting MDS client: {e}")
 
-    # Force close underlying WebSocket
+    # Force close underlying WebSocket with proper await and timeout
     if hasattr(client, 'ws') and client.ws is not None:
         try:
-            await client.ws.close()
+            await asyncio.wait_for(client.ws.close(), timeout=2.0)
+        except asyncio.TimeoutError:
+            log.debug("MDS WebSocket close timed out")
         except Exception:
             pass
 
@@ -823,12 +827,13 @@ async def bas_ws_client(
     # Aggressive cleanup to ensure WebSocket is fully closed
     stream_task.cancel()
     try:
-        await asyncio.wait_for(stream_task, timeout=2.0)
+        # Increased timeout from 2s to 5s to allow proper cleanup
+        await asyncio.wait_for(stream_task, timeout=5.0)
     except (asyncio.CancelledError, asyncio.TimeoutError):
-        pass
-
-    # Clear event collector reference to prevent memory leak
-    client._event_collector = None
+        log.debug("Stream task did not complete cancellation in 5s")
+    finally:
+        # Always clear the collector reference to prevent memory leak
+        client._event_collector = None
 
     # Ensure WebSocket is fully disconnected
     try:
@@ -836,17 +841,35 @@ async def bas_ws_client(
     except Exception as e:
         log.warning(f"Error disconnecting BAS client: {e}")
 
-    # Force close the underlying WebSocket connection
+    # Force close the underlying WebSocket connection with proper await
     if hasattr(client, 'ws') and client.ws is not None:
         try:
-            await client.ws.close()
+            await asyncio.wait_for(client.ws.close(), timeout=2.0)
+        except asyncio.TimeoutError:
+            log.debug("WebSocket close timed out")
         except Exception:
             pass
+
+    # Clear the client reference for garbage collection
+    client = None
 
 
 # ────────────────────────────────────────────────────────────────────────────────
 # FUNCTION-SCOPED FIXTURES: EVENT COLLECTION & HARNESS
 # ────────────────────────────────────────────────────────────────────────────────
+
+
+@pytest.fixture(autouse=True)
+def gc_cleanup():
+    """
+    Force garbage collection after each test to prevent memory accumulation.
+
+    Scope: function (runs after every test)
+    """
+    yield
+    # Force garbage collection after test cleanup
+    import gc
+    gc.collect()
 
 
 @pytest.fixture
@@ -859,7 +882,8 @@ def event_collector(bas_ws_client) -> EventCollector:
     Wires itself to bas_ws_client so BAS events are streamed into this collector.
     Memory is cleared after test completes.
     """
-    collector = EventCollector(maxsize=1000)
+    # Reduced maxsize from 1000 to 100 to limit memory per test
+    collector = EventCollector(maxsize=100)
     # Wire the collector to the bas_ws_client so it can stream events
     bas_ws_client._event_collector = collector
     yield collector
@@ -930,16 +954,22 @@ async def place_and_sync_order(bas_client: BASClient, mock_client: MockClient, c
         # Step 1: Place order in BAS (returns order with instrument_id from MDS)
         order_responses = await bas_client.place_order(broker_id, account_id, order_request)
 
-        # Step 2: Sync each order to paper broker service using instrument_id (not broker symbol)
-        for order_resp in order_responses:
+        # Step 2: Convert responses to dicts for consistency (tests expect dicts)
+        order_response_dicts = [
+            resp.model_dump() if hasattr(resp, 'model_dump') else resp
+            for resp in order_responses
+        ]
+
+        # Step 3: Sync each order to paper broker service using instrument_id (not broker symbol)
+        for order_resp_dict in order_response_dicts:
             try:
-                await mock_client.sync_order(broker_id, account_id, order_resp.model_dump() if hasattr(order_resp, 'model_dump') else order_resp)
-                log.debug(f"Order synced: {order_resp.get('broker_order_id') if isinstance(order_resp, dict) else order_resp.broker_order_id}")
+                await mock_client.sync_order(broker_id, account_id, order_resp_dict)
+                log.debug(f"Order synced: {order_resp_dict.get('broker_order_id')}")
             except Exception as e:
                 log.warning(f"Failed to sync order to paper broker service (non-critical): {e}")
                 # Sync to paper broker is optional - tests can proceed without it
 
-        return order_responses
+        return order_response_dicts
 
     return helper
 

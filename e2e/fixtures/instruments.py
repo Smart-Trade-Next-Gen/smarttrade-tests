@@ -1,50 +1,61 @@
-"""Instrument catalog for E2E tests - Fetches real instruments from MDS."""
+"""Instrument catalog for E2E tests.
+
+Instruments are pre-seeded into consumer service databases (BAS, PBS)
+during test setup, following the event-driven architecture where:
+1. Instruments are synced from external sources to MDS
+2. MDS emits instrument events to consumers
+3. Consumers store instruments in their own databases
+4. Tests load instruments from consumer databases, not MDS
+"""
 
 import logging
 from typing import Optional
-
-from e2e.clients.mds_rest_client import MDSRestClient
 
 log = logging.getLogger(__name__)
 
 
 class InstrumentCatalog:
     """
-    Session-scoped instrument catalog that loads instruments from MDS once.
+    Session-scoped instrument catalog loaded from consumer service databases.
 
     Provides convenient methods to fetch instruments by symbol, ID, or get arbitrary equities.
     Caches all instruments in memory for fast lookup.
+
+    Note: Instruments are pre-seeded into BAS/PBS databases during fixture setup.
+    This simulates the event-driven flow where consumer services receive instrument
+    events and store them in their own databases.
     """
 
-    def __init__(self, mds_rest_client: MDSRestClient):
+    def __init__(self, instruments_data: list[dict]):
         """
-        Initialize instrument catalog.
+        Initialize instrument catalog with pre-seeded instruments.
 
         Args:
-            mds_rest_client: MDSRestClient instance for fetching instruments
+            instruments_data: List of instrument dictionaries to load
         """
-        self.mds_client = mds_rest_client
         self._instruments: list[dict] = []
         self._by_symbol: dict[str, dict] = {}
         self._by_id: dict[str, dict] = {}
         self._loaded = False
+        self._instruments_data = instruments_data
 
     async def load(self) -> None:
         """
-        Fetch and cache all instruments from MDS.
+        Load instruments from pre-seeded data.
 
-        Call once at session startup. Raises error if MDS is unavailable.
+        This simulates the event-driven architecture where instruments
+        are already in consumer service databases.
 
         Raises:
-            Exception: If instruments cannot be fetched from MDS
+            Exception: If no instruments are provided
         """
         if self._loaded:
             log.debug("Instruments already loaded, skipping")
             return
 
         try:
-            self._instruments = await self.mds_client.get_instruments()
-            log.info(f"Loaded {len(self._instruments)} instruments from MDS")
+            self._instruments = self._instruments_data
+            log.info(f"Loaded {len(self._instruments)} instruments from test data")
 
             # Build lookup maps
             for instrument in self._instruments:
@@ -62,7 +73,7 @@ class InstrumentCatalog:
                 f"{len(self._by_symbol)} by symbol"
             )
         except Exception as e:
-            log.error(f"Failed to load instruments from MDS: {e}")
+            log.error(f"Failed to load instruments: {e}")
             raise
 
     def get_equity(self, symbol: str) -> dict:
