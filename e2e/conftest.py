@@ -492,14 +492,13 @@ async def setup_broker_credentials(bas_client):
 
 
 @pytest.fixture
-def test_account_id(request) -> str:
+def test_account_id() -> str:
     """
-    Return a shared account ID for all tests.
+    Single shared account for all tests.
 
-    Test isolation is preserved via setup_trading_account fixture which
-    deletes and recreates the account before each test. Using a single
-    shared account reduces WebSocket connections from 116 to 2, preventing
-    RAM exhaustion (each test no longer creates unique BAS + MDS WebSocket).
+    Test isolation is preserved via setup_trading_account fixture which deletes
+    and recreates the account before each test. Using a single shared account
+    reduces the number of connection attempts vs unique accounts per test.
 
     Scope: function
     """
