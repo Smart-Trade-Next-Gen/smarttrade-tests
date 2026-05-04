@@ -34,6 +34,8 @@ class MDSWebSocketClient:
         heartbeat_interval: float = 5.0,
         initial_backoff: float = 1.0,
         max_backoff: float = 30.0,
+        max_reconnect_attempts: int = 5,
+        auto_reconnect: bool = False,
     ):
         """
         Initialize MDSWebSocketClient.
@@ -46,6 +48,13 @@ class MDSWebSocketClient:
             heartbeat_interval: Interval for responding to heartbeats (default: 5.0)
             initial_backoff: Initial reconnect backoff in seconds (default: 1.0)
             max_backoff: Maximum reconnect backoff in seconds (default: 30.0)
+            max_reconnect_attempts: Maximum connect attempts before raising
+                ConnectionError. Bounded to prevent unbounded connection growth
+                that crashes the service. (default: 5)
+            auto_reconnect: When True, the client transparently reconnects on
+                disconnect via a supervisor task. When False (default for tests),
+                the client surfaces disconnects loudly so test failures are
+                visible instead of hidden behind silent reconnect storms.
         """
         self.ws_url = ws_url.rstrip("/")
         self.account_id = account_id
@@ -54,15 +63,23 @@ class MDSWebSocketClient:
         self.heartbeat_interval = heartbeat_interval
         self.initial_backoff = initial_backoff
         self.max_backoff = max_backoff
+        self.max_reconnect_attempts = max_reconnect_attempts
+        self.auto_reconnect = auto_reconnect
 
         self.connection: Optional[ClientConnection] = None
         self.is_connected = False
         self._reader_task: Optional[asyncio.Task] = None
         self._heartbeat_task: Optional[asyncio.Task] = None
+        self._reconnect_task: Optional[asyncio.Task] = None
         self._subscribed = False
         self._backoff = initial_backoff
         self._event_queue: Optional[asyncio.Queue] = None
         self._system_connected_event: Optional[asyncio.Event] = None
+        # Serializes connect()/disconnect() so concurrent disconnects from the
+        # reader and heartbeat loops cannot fire parallel connect() retries.
+        # Lazy-init in connect() so the lock binds to the active event loop.
+        self._connect_lock: Optional[asyncio.Lock] = None
+        self._reconnecting = False
 
     async def __aenter__(self) -> "MDSWebSocketClient":
         """Async context manager entry."""
@@ -77,61 +94,121 @@ class MDSWebSocketClient:
         """
         Establish WebSocket connection and wait for system.connected.
 
+        Bounded by ``max_reconnect_attempts``: if all attempts fail this raises
+        ``ConnectionError`` instead of looping forever, preventing the
+        connection storm that previously exhausted resources.
+
+        Concurrent calls are serialized by ``_connect_lock`` and become
+        no-ops once the first call succeeds.
+
         Raises:
-            TimeoutError: If connection times out
-            ConnectionError: If unable to connect after retries
+            ConnectionError: If unable to connect after ``max_reconnect_attempts``
         """
-        while not self.is_connected:
-            try:
-                log.info(
-                    f"Connecting to MDS | ws_url={self.ws_url} | account_id={self.account_id}"
-                )
-                # Add token and account_id as query parameters for authentication and routing
-                ws_url_with_params = f"{self.ws_url}?token={self.token}&account_id={self.account_id}"
-                self.connection = await asyncio.wait_for(
-                    websockets.asyncio.client.connect(ws_url_with_params),
-                    timeout=self.timeout,
-                )
-                log.info(f"WebSocket connected to {self.ws_url}")
+        if self._connect_lock is None:
+            self._connect_lock = asyncio.Lock()
 
-                # Initialize lazy resources (bound to current event loop)
-                if self._event_queue is None:
-                    self._event_queue = asyncio.Queue(maxsize=1000)
-                if self._system_connected_event is None:
-                    self._system_connected_event = asyncio.Event()
+        async with self._connect_lock:
+            if self.is_connected and self.connection is not None:
+                log.debug("MDS WebSocket already connected, skipping connect()")
+                return
 
-                # Reset system connected event for new connection
-                self._system_connected_event.clear()
+            self._backoff = self.initial_backoff
+            last_error: Optional[BaseException] = None
 
-                # Start reader and heartbeat tasks FIRST (reader will handle system.connected)
-                self._reader_task = asyncio.create_task(self._reader_loop())
-                self._heartbeat_task = asyncio.create_task(self._heartbeat_loop())
-
-                # Wait for system.connected to be signaled by reader loop
-                await asyncio.wait_for(
-                    self._system_connected_event.wait(),
-                    timeout=self.timeout
-                )
-
-                self.is_connected = True
-                self._backoff = self.initial_backoff
-                log.info(f"MDS connection established | account_id={self.account_id}")
-
-                break
-
-            except asyncio.TimeoutError:
-                log.error(f"Connection timeout after {self.timeout}s, retrying...")
+            for attempt in range(1, self.max_reconnect_attempts + 1):
+                # Always close any leaked connection/tasks from a previous
+                # iteration before opening a new one. This is the invariant
+                # that prevents the connection leak.
                 await self._cleanup_resources()
-                await self._backoff_wait()
 
-            except Exception as e:
-                log.error(f"Connection failed: {e}, retrying...")
-                await self._cleanup_resources()
-                await self._backoff_wait()
+                try:
+                    log.info(
+                        f"Connecting to MDS "
+                        f"(attempt {attempt}/{self.max_reconnect_attempts}) | "
+                        f"ws_url={self.ws_url} | account_id={self.account_id}"
+                    )
+                    # Add token and account_id as query parameters for authentication and routing
+                    ws_url_with_params = f"{self.ws_url}?token={self.token}&account_id={self.account_id}"
+                    self.connection = await asyncio.wait_for(
+                        websockets.asyncio.client.connect(ws_url_with_params),
+                        timeout=self.timeout,
+                    )
+                    log.info(f"MDS WebSocket connected to {self.ws_url}")
+
+                    # Initialize lazy resources (bound to current event loop)
+                    if self._event_queue is None:
+                        self._event_queue = asyncio.Queue(maxsize=1000)
+                    if self._system_connected_event is None:
+                        self._system_connected_event = asyncio.Event()
+                    self._system_connected_event.clear()
+
+                    # Start reader and heartbeat tasks FIRST (reader will handle system.connected)
+                    self._reader_task = asyncio.create_task(self._reader_loop())
+                    self._heartbeat_task = asyncio.create_task(self._heartbeat_loop())
+
+                    # Wait for system.connected to be signaled by reader loop
+                    await asyncio.wait_for(
+                        self._system_connected_event.wait(),
+                        timeout=self.timeout,
+                    )
+
+                    self.is_connected = True
+                    self._backoff = self.initial_backoff
+                    log.info(
+                        f"MDS WebSocket connection established | "
+                        f"account_id={self.account_id}"
+                    )
+                    return
+
+                except asyncio.CancelledError:
+                    # Don't swallow cancellation — propagate after cleanup.
+                    await self._cleanup_resources()
+                    raise
+
+                except asyncio.TimeoutError as e:
+                    last_error = e
+                    log.error(
+                        f"MDS connect attempt {attempt}/{self.max_reconnect_attempts} "
+                        f"timed out after {self.timeout}s"
+                    )
+
+                except Exception as e:
+                    last_error = e
+                    log.error(
+                        f"MDS connect attempt {attempt}/{self.max_reconnect_attempts} "
+                        f"failed: {e}"
+                    )
+
+                if attempt < self.max_reconnect_attempts:
+                    await self._backoff_wait()
+
+            # Exhausted retries — clean up and surface a hard error so callers
+            # see the failure instead of silently leaking connections.
+            await self._cleanup_resources()
+            raise ConnectionError(
+                f"MDS WebSocket failed to connect after "
+                f"{self.max_reconnect_attempts} attempts | "
+                f"ws_url={self.ws_url} | last_error={last_error!r}"
+            )
 
     async def disconnect(self) -> None:
-        """Close WebSocket connection and cleanup resources."""
+        """Close WebSocket connection and cleanup resources.
+
+        Cancels any in-flight reconnect supervisor first so it cannot race
+        the disconnect and resurrect a connection after we tore it down.
+        """
         self.is_connected = False
+        # Suppress reconnects during teardown.
+        self.auto_reconnect = False
+
+        if self._reconnect_task is not None and not self._reconnect_task.done():
+            self._reconnect_task.cancel()
+            try:
+                await asyncio.wait_for(self._reconnect_task, timeout=2.0)
+            except (asyncio.CancelledError, asyncio.TimeoutError):
+                pass
+            self._reconnect_task = None
+
         await self._cleanup_resources()
         log.info(f"MDS disconnected | account_id={self.account_id}")
 
@@ -214,50 +291,55 @@ class MDSWebSocketClient:
         Background task to read messages from WebSocket.
 
         Routes messages to appropriate handlers (heartbeats, subscriptions, events).
-        Handles reconnection on disconnect.
+        On disconnect, schedules reconnect via supervisor task and exits — never
+        runs reconnect inline (which would cancel this task mid-execution and
+        corrupt the connection state).
         """
-        log.debug("Reader loop started")
+        log.debug("MDS reader loop started")
         try:
             while self.connection:
-                log.debug(f"Reader loop iteration - connection={self.connection is not None}")
                 try:
                     message = await asyncio.wait_for(
                         self.connection.recv(),
                         timeout=self.timeout,
                     )
                     data = json.loads(message)
-                    log.debug(f"Reader loop received message type: {data.get('type')}")
+                    log.debug(f"MDS reader loop received message type: {data.get('type')}")
                     await self._handle_message(data)
 
                 except asyncio.TimeoutError:
-                    log.warning(f"WebSocket receive timeout, reconnecting...")
-                    await self._handle_disconnect()
+                    log.warning("MDS WebSocket receive timeout")
+                    self._schedule_reconnect()
+                    return
 
                 except json.JSONDecodeError as e:
-                    log.warning(f"Malformed JSON message: {e}, skipping")
+                    log.warning(f"MDS: Malformed JSON message: {e}, skipping")
 
                 except ConnectionClosed as e:
-                    # Check if this is a "Replaced by new connection" close
+                    # "Replaced by new connection" is a graceful close from the
+                    # server's idempotency handling — don't trigger reconnect.
                     if e.rcvd and "Replaced by new connection" in str(e.rcvd.reason):
-                        log.info(f"Connection replaced by MDS (normal idempotency handling), stopping gracefully")
+                        log.info("MDS connection replaced (server idempotency), stopping gracefully")
                         self.is_connected = False
-                        break
-                    else:
-                        log.error(f"Reader error: Connection closed: {e}")
-                        await self._handle_disconnect()
+                        return
+                    log.error(f"MDS reader error: Connection closed: {e}")
+                    self._schedule_reconnect()
+                    return
 
                 except Exception as e:
-                    log.error(f"Reader error: {e}")
-                    await self._handle_disconnect()
+                    log.error(f"MDS reader error: {e}")
+                    self._schedule_reconnect()
+                    return
 
         except asyncio.CancelledError:
-            log.debug("Reader loop cancelled")
+            log.debug("MDS reader loop cancelled")
 
     async def _heartbeat_loop(self) -> None:
         """
         Background task to respond to heartbeat pings.
 
-        MDS sends periodic heartbeat messages; we respond with heartbeat ack.
+        On send failure, schedules reconnect and exits cleanly. Does not run
+        reconnect inline (avoids self-cancellation when reconnect closes tasks).
         """
         try:
             while self.is_connected and self.connection:
@@ -267,14 +349,17 @@ class MDSWebSocketClient:
                     if self.is_connected and self.connection:
                         heartbeat_msg = {"type": "heartbeat", "status": "pong"}
                         await self.connection.send(json.dumps(heartbeat_msg))
-                        log.debug("Heartbeat pong sent")
+                        log.debug("MDS heartbeat pong sent")
 
+                except asyncio.CancelledError:
+                    raise
                 except Exception as e:
-                    log.error(f"Heartbeat error: {e}")
-                    await self._handle_disconnect()
+                    log.error(f"MDS heartbeat error: {e}")
+                    self._schedule_reconnect()
+                    return
 
         except asyncio.CancelledError:
-            log.debug("Heartbeat loop cancelled")
+            log.debug("MDS heartbeat loop cancelled")
 
     async def _handle_message(self, data: dict) -> None:
         """
@@ -368,19 +453,51 @@ class MDSWebSocketClient:
         else:
             log.warning(f"Unknown message type: {msg_type} | Full message: {json.dumps(data, indent=2) if len(str(data)) < 1000 else str(data)[:1000]}")
 
-    async def _handle_disconnect(self) -> None:
-        """Handle WebSocket disconnect and trigger reconnection."""
-        log.warning(f"Disconnected from MDS, attempting reconnection...")
-        self.is_connected = False
-        await self._cleanup_connection()
+    def _schedule_reconnect(self) -> None:
+        """
+        Mark the connection as dead and (optionally) schedule a reconnect.
 
-        # Reconnect
+        The reconnect runs in a *separate* supervisor task so the calling
+        reader/heartbeat task can exit cleanly. Running ``connect()`` inline
+        from those tasks would cancel the very task that is awaiting it.
+
+        When ``auto_reconnect`` is False (default), the client just records
+        the disconnect — the next ``connect()`` call (or test failure)
+        surfaces the issue. This is the safe default for tests, where a
+        silent reconnect storm previously crashed the service.
+        """
+        self.is_connected = False
+
+        if not self.auto_reconnect:
+            log.info(
+                "MDS auto_reconnect disabled — marking client disconnected; "
+                "call connect() explicitly to reconnect"
+            )
+            return
+
+        if self._reconnecting:
+            log.debug("MDS reconnect already scheduled, skipping duplicate trigger")
+            return
+
+        if self._reconnect_task is not None and not self._reconnect_task.done():
+            log.debug("MDS reconnect task already running, skipping duplicate trigger")
+            return
+
+        self._reconnect_task = asyncio.create_task(self._reconnect_supervisor())
+
+    async def _reconnect_supervisor(self) -> None:
+        """Run a single bounded reconnect attempt off the reader/heartbeat tasks."""
+        if self._reconnecting:
+            return
+        self._reconnecting = True
         try:
             await self.connect()
             if self._subscribed:
                 await self.subscribe_account()
         except Exception as e:
-            log.error(f"Reconnection failed: {e}")
+            log.error(f"MDS reconnection failed: {e}")
+        finally:
+            self._reconnecting = False
 
     async def _cleanup_connection(self) -> None:
         """Close WebSocket connection safely."""
