@@ -491,16 +491,16 @@ async def setup_broker_credentials(bas_client):
     # Cleanup is optional - credentials can be reused
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def test_account_id() -> str:
     """
-    Single shared account for all tests.
+    Single shared account for all tests in the session.
 
     Test isolation is preserved via setup_trading_account fixture which deletes
-    and recreates the account before each test. Using a single shared account
-    reduces the number of connection attempts vs unique accounts per test.
+    and recreates the account before each test. All clients and WebSocket
+    connections are session-scoped and reuse this single account.
 
-    Scope: function
+    Scope: session
     """
     return "TEST_E2E_SHARED"
 
@@ -510,15 +510,15 @@ def test_account_id() -> str:
 # ────────────────────────────────────────────────────────────────────────────────
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def auth_token(config: TestConfig) -> str:
     """
     Get authentication token for service access.
 
-    Generates a JWT token using the same secret and library as the services.
-    Uses test credentials for E2E testing.
+    JWT is valid for 1440 minutes — far longer than any test session.
+    Created once and reused by all session-scoped clients.
 
-    Scope: function (fresh token per test, but with consistent user ID)
+    Scope: session
     """
     from jose import jwt
     from datetime import datetime, timedelta
@@ -561,12 +561,12 @@ def auth_token(config: TestConfig) -> str:
 # ────────────────────────────────────────────────────────────────────────────────
 
 
-@pytest_asyncio.fixture
+@pytest_asyncio.fixture(scope="session")
 async def bas_client(config: TestConfig, auth_token: str) -> AsyncGenerator[BASClient, None]:
     """
-    Provide BASClient instance with proper setup/teardown.
+    Provide BASClient instance. Reused across all tests in the session.
 
-    Scope: function (fresh client per test)
+    Scope: session
     """
     async with BASClient(
         base_url=config.bas_url,
@@ -576,14 +576,14 @@ async def bas_client(config: TestConfig, auth_token: str) -> AsyncGenerator[BASC
         yield client
 
 
-@pytest_asyncio.fixture
+@pytest_asyncio.fixture(scope="session")
 async def mock_client(
     config: TestConfig, auth_token: str
 ) -> AsyncGenerator[MockClient, None]:
     """
     Provide MockClient instance for deterministic fill injection.
 
-    Scope: function (fresh client per test)
+    Scope: session
     """
     async with MockClient(
         base_url=config.mock_url,
@@ -593,12 +593,12 @@ async def mock_client(
         yield client
 
 
-@pytest_asyncio.fixture
+@pytest_asyncio.fixture(scope="session")
 async def portfolio_client(config: TestConfig, auth_token: str) -> AsyncGenerator[PortfolioClient, None]:
     """
     Provide PortfolioClient for testing Portfolio Service async aggregation.
 
-    Scope: function (fresh client per test)
+    Scope: session
     """
     async with PortfolioClient(
         base_url=config.portfolio_url,
@@ -608,12 +608,12 @@ async def portfolio_client(config: TestConfig, auth_token: str) -> AsyncGenerato
         yield client
 
 
-@pytest_asyncio.fixture
+@pytest_asyncio.fixture(scope="session")
 async def journal_client(config: TestConfig, auth_token: str) -> AsyncGenerator[JournalClient, None]:
     """
     Provide JournalClient for testing Journal Service audit trail.
 
-    Scope: function (fresh client per test)
+    Scope: session
     """
     async with JournalClient(
         base_url=config.journal_url,
@@ -672,14 +672,14 @@ async def quote_injector(config: TestConfig, mock_client: MockClient) -> AsyncGe
     await injector.close()
 
 
-@pytest_asyncio.fixture
+@pytest_asyncio.fixture(scope="session")
 async def mds_client(
     config: TestConfig, auth_token: str, test_account_id: str
 ) -> AsyncGenerator[MDSWebSocketClient, None]:
     """
     Provide MDSWebSocketClient instance for market data only.
 
-    Scope: function (fresh connection per test)
+    Scope: session — one connection for the entire test run, never closed between tests
 
     Note: MDS WebSocket is now used for market data only (quotes, depth, candles).
     Account events (orders, trades, positions) are handled by BAS WebSocket.
@@ -697,33 +697,21 @@ async def mds_client(
 
     yield client
 
-    # Aggressive cleanup to ensure full resource release
+    # Session teardown: disconnect once at the very end of the session
     try:
         await client.disconnect()
     except Exception as e:
         log.warning(f"Error disconnecting MDS client: {e}")
 
-    # Force close underlying WebSocket with proper await and timeout
-    if hasattr(client, 'ws') and client.ws is not None:
-        try:
-            await asyncio.wait_for(client.ws.close(), timeout=2.0)
-        except asyncio.TimeoutError:
-            log.debug("MDS WebSocket close timed out")
-        except Exception:
-            pass
 
-    # Ensure client reference is released
-    client = None
-
-
-@pytest_asyncio.fixture
+@pytest_asyncio.fixture(scope="session")
 async def bas_ws_client(
-    config: TestConfig, auth_token: str, test_account_id: str, request
+    config: TestConfig, auth_token: str, test_account_id: str
 ) -> AsyncGenerator[BASWebSocketClient, None]:
     """
     Provide BASWebSocketClient instance for trading account events.
 
-    Scope: function (fresh connection per test)
+    Scope: session — one connection for the entire test run, never closed between tests
 
     Handles order fills, trades, and position updates.
     Automatically streams events into the event_collector for test assertions.
@@ -823,34 +811,19 @@ async def bas_ws_client(
 
     yield client
 
-    # Aggressive cleanup to ensure WebSocket is fully closed
+    # Session teardown: cancel stream and disconnect once at the very end of the session
     stream_task.cancel()
     try:
-        # Increased timeout from 2s to 5s to allow proper cleanup
         await asyncio.wait_for(stream_task, timeout=5.0)
     except (asyncio.CancelledError, asyncio.TimeoutError):
-        log.debug("Stream task did not complete cancellation in 5s")
+        pass
     finally:
-        # Always clear the collector reference to prevent memory leak
         client._event_collector = None
 
-    # Ensure WebSocket is fully disconnected
     try:
         await client.disconnect()
     except Exception as e:
         log.warning(f"Error disconnecting BAS client: {e}")
-
-    # Force close the underlying WebSocket connection with proper await
-    if hasattr(client, 'ws') and client.ws is not None:
-        try:
-            await asyncio.wait_for(client.ws.close(), timeout=2.0)
-        except asyncio.TimeoutError:
-            log.debug("WebSocket close timed out")
-        except Exception:
-            pass
-
-    # Clear the client reference for garbage collection
-    client = None
 
 
 # ────────────────────────────────────────────────────────────────────────────────
