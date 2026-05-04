@@ -161,34 +161,34 @@ services:
     networks:
       - smarttrade-e2e
 
-  # ──────────────────────────────────────────────────────────────────────
-  # User Settings Service (Port 8009) - Required by BAS
-  # ──────────────────────────────────────────────────────────────────────
-  user-setting-service:
-    container_name: user-setting-service-e2e
-    image: smarttrade/user-setting-service:latest
-    restart: unless-stopped
-    ports:
-      - "8009:8000"
-    environment:
-      <<: *common-env
-      SERVICE_NAME: user-setting-service
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/smarttrade_user_setting_service
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      auth-service:
-        condition: service_started
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/ready')"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-      start_period: 30s
-    networks:
-      - smarttrade-e2e
+  # # ──────────────────────────────────────────────────────────────────────
+  # # User Settings Service (Port 8009) - Required by BAS
+  # # ──────────────────────────────────────────────────────────────────────
+  # user-setting-service:
+  #   container_name: user-setting-service-e2e
+  #   image: smarttrade/user-setting-service:latest
+  #   restart: unless-stopped
+  #   ports:
+  #     - "8009:8000"
+  #   environment:
+  #     <<: *common-env
+  #     SERVICE_NAME: user-setting-service
+  #     DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/smarttrade_user_setting_service
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_healthy
+  #     auth-service:
+  #       condition: service_started
+  #   healthcheck:
+  #     test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/ready')"]
+  #     interval: 5s
+  #     timeout: 3s
+  #     retries: 10
+  #     start_period: 30s
+  #   networks:
+  #     - smarttrade-e2e
 
   # ──────────────────────────────────────────────────────────────────────
   # Broker Adapter Service (Port 8005)
@@ -223,8 +223,6 @@ services:
         condition: service_healthy
       paper-broker-service:
         condition: service_healthy
-      user-setting-service:
-        condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/ready')"]
       interval: 5s
@@ -239,6 +237,10 @@ services:
   # ──────────────────────────────────────────────────────────────────────
   portfolio-service:
     container_name: portfolio-service-e2e
+    build:
+      context: ..
+      dockerfile: portfolio-service/Dockerfile
+      target: runtime-dev
     image: smarttrade/portfolio-service:latest
     restart: unless-stopped
     ports:
@@ -274,6 +276,10 @@ services:
   # ──────────────────────────────────────────────────────────────────────
   journal-service:
     container_name: journal-service-e2e
+    build:
+      context: ..
+      dockerfile: journal-service/Dockerfile
+      target: runtime-dev
     image: smarttrade/journal-service:latest
     restart: unless-stopped
     ports:
