@@ -69,7 +69,8 @@ class RedisStreamObserver:
                 name=stream_key,
                 groupname=self.OBSERVER_GROUP,
                 id="$",  # Start at current tail
-                mkstream=False,  # Don't create stream if it doesn't exist
+                mkstream=True,  # Create the stream if missing so first-test pre-warm
+                                # doesn't fail before any producer has published.
             )
             self._created_groups.add(stream_key)
             log.debug(f"Created consumer group {self.OBSERVER_GROUP} for {stream_key}")
@@ -261,40 +262,56 @@ class RedisStreamObserver:
 
     def _unwrap_envelope(self, msg_data: dict) -> dict:
         """
-        Unwrap Redis stream message to extract event payload.
+        Unwrap a Redis stream entry into a flat event dict for assertions.
 
-        Redis stream format:
-            {
-                "event_type": "order.filled.v1",
-                "timestamp": "2025-04-28T...",
-                "trace_id": "...",
-                "payload": {...}
-            }
+        smarttrade_common.events.event_bus.publish writes entries like::
 
-        Args:
-            msg_data: Raw message data from Redis stream
+            xadd("events:<type>", {"event": json.dumps(envelope)})
 
-        Returns:
-            Unwrapped payload dictionary
+        where ``envelope`` is::
 
-        Raises:
-            ValueError: If message format is invalid
+            {event_id, event_type, timestamp, trace_id, payload: {...}}
+
+        Tests assert against fields like ``order_id``/``side`` that live
+        inside ``payload``. Return the payload dict merged with the envelope
+        metadata so both shapes are accessible.
         """
-        # Check for JSON string in payload field
-        if "payload" in msg_data:
+        envelope: dict | None = None
+
+        # Modern shape: single "event" field with a JSON-encoded envelope.
+        if "event" in msg_data:
+            raw = msg_data["event"]
+            if isinstance(raw, str):
+                try:
+                    envelope = json.loads(raw)
+                except json.JSONDecodeError:
+                    return {"raw": raw}
+            elif isinstance(raw, dict):
+                envelope = raw
+
+        # Legacy shape: a "payload" key directly on the entry.
+        if envelope is None and "payload" in msg_data:
             payload_data = msg_data["payload"]
             if isinstance(payload_data, str):
                 try:
                     return json.loads(payload_data)
                 except json.JSONDecodeError:
-                    # Fallback: return as-is if not JSON
-                    return payload_data
-            else:
-                # Already a dict
-                return payload_data
+                    return {"raw": payload_data}
+            return payload_data if isinstance(payload_data, dict) else {"raw": payload_data}
 
-        # Fallback: return entire message
-        return msg_data
+        if envelope is None:
+            return msg_data
+
+        # Merge envelope-level fields with the inner payload so tests can
+        # assert on either layer (`event_id`, `event_type`, `timestamp` from
+        # the envelope; `order_id`, `side`, … from the payload).
+        inner = envelope.get("payload") if isinstance(envelope, dict) else None
+        if isinstance(inner, dict):
+            merged = dict(inner)
+            for k in ("event_id", "event_type", "timestamp", "trace_id", "version"):
+                merged.setdefault(k, envelope.get(k))
+            return merged
+        return envelope
 
     async def get_stream_info(self, event_type: str) -> dict:
         """

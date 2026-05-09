@@ -70,7 +70,6 @@ async def test_market_buy_full_fill(
                 ltp=price,
             )
         ],
-        underlying_instrument_id=instrument_id,
         underlying_symbol=instrument["symbol"],
         tif=TimeInForce.DAY,
     )
@@ -173,7 +172,6 @@ async def test_market_sell_full_fill(
                 ltp=price,
             )
         ],
-        underlying_instrument_id=instrument_id,
         underlying_symbol=instrument["symbol"],
         tif=TimeInForce.DAY,
     )
@@ -276,7 +274,6 @@ async def test_limit_buy_triggers_at_price(
                 ltp=Decimal("551.00"),
             )
         ],
-        underlying_instrument_id=instrument_id,
         underlying_symbol=instrument["symbol"],
         tif=TimeInForce.DAY,
     )
@@ -372,7 +369,6 @@ async def test_limit_sell_triggers_at_price(
                 ltp=Decimal("549.00"),
             )
         ],
-        underlying_instrument_id=instrument_id,
         underlying_symbol=instrument["symbol"],
         tif=TimeInForce.DAY,
     )

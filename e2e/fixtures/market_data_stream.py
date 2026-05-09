@@ -1,16 +1,23 @@
 """
 Mock market data stream fixture for real execution mode tests.
 
-Allows tests to inject price updates that trigger execution via PriceExecutionEngine.
-Simulates realistic market scenarios: gradual price movement, limit order trigger, etc.
+Publishes price updates on the production Redis stream `market.quote.v1` so
+both BAS QuoteStore and PBS PriceExecutionEngine see them through their
+real consumer paths. Also calls the PBS `/price/{broker_id}` HTTP endpoint
+to synchronously trigger order evaluation — this avoids consumer-group lag
+flakiness in price-driven LIMIT/STOP tests.
 """
 
 import asyncio
+import json
 import logging
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Optional, List
 from dataclasses import dataclass
 from collections import deque
+
+import redis.asyncio as redis
 
 log = logging.getLogger(__name__)
 
@@ -28,33 +35,48 @@ class PriceUpdate:
 
 class MockMarketDataStream:
     """
-    Injects price updates into paper broker service to drive execution.
+    Injects price updates that drive both BAS QuoteStore and PBS execution.
+
+    Two-level injection:
+      1. XADD to Redis stream `market.quote.v1` — the production path that
+         BAS' MarketDataConsumer and PBS' PBSMarketDataConsumer both read.
+      2. POST to PBS `/api/v1/price/{broker_id}` — a deterministic test
+         shortcut that synchronously triggers PriceExecutionEngine, used to
+         keep LIMIT/STOP tests stable when consumer-group lag is non-zero.
 
     Usage:
-        # Gradually move price from 550 to 560
         await market_stream.update_price("INSTR_NSE_SBIN_EQ", Decimal("550.00"))
-        await market_stream.update_price("INSTR_NSE_SBIN_EQ", Decimal("555.00"))
-        await market_stream.update_price("INSTR_NSE_SBIN_EQ", Decimal("560.00"))
-
-        # Trigger fills by crossing limit price
-        await market_stream.update_price(
-            "INSTR_NSE_TCS_EQ",
-            Decimal("3799.50")  # Crosses limit BUY @ 3800
-        )
+        await market_stream.update_price("INSTR_NSE_TCS_EQ", Decimal("3799.50"))
     """
 
-    def __init__(self, mock_client, broker_id: str = "mock"):
+    QUOTE_STREAM = "market.quote.v1"
+
+    def __init__(
+        self,
+        mock_client,
+        broker_id: str = "mock",
+        redis_url: str = "redis://localhost:6379/0",
+    ):
         """
         Initialize market data stream.
 
         Args:
-            mock_client: MockClient for price update injection
+            mock_client: MockClient for HTTP price injection (deterministic trigger)
             broker_id: Broker ID for price updates (default: "mock")
+            redis_url: Redis connection URL for stream publishing
         """
         self.mock_client = mock_client
         self.broker_id = broker_id
+        self.redis_url = redis_url
+        self._redis: Optional[redis.Redis] = None
+        self._sequence_counters: dict[str, int] = {}
         self._price_cache = {}  # instrument_id -> last_price
         self._update_history = deque(maxlen=500)  # Bounded debug history
+
+    async def _connect_redis(self) -> redis.Redis:
+        if self._redis is None:
+            self._redis = await redis.from_url(self.redis_url, decode_responses=True)
+        return self._redis
 
     async def update_price(
         self,
@@ -65,7 +87,8 @@ class MockMarketDataStream:
         volume: Optional[int] = None,
     ) -> None:
         """
-        Inject price update to trigger execution.
+        Inject price update on the production Redis stream and via the PBS
+        HTTP shortcut (for deterministic execution).
 
         Args:
             instrument_id: Instrument ID (e.g., "INSTR_NSE_SBIN_EQ")
@@ -91,7 +114,31 @@ class MockMarketDataStream:
             f"Bid: {bid} | Ask: {ask}"
         )
 
-        # Send to paper broker service to trigger price-driven execution
+        # Level 1 (production path): publish to Redis stream so BAS QuoteStore
+        # and PBS PriceExecutionEngine both pick it up via their consumers.
+        # Use a ms-since-epoch sequence so PBS' per-instrument idempotency
+        # check (which survives across pytest invocations because PBS is
+        # long-lived) doesn't drop our quote as a duplicate.
+        try:
+            r = await self._connect_redis()
+            now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+            self._sequence_counters[instrument_id] = now_ms
+            quote_data = {
+                "instrument_id": instrument_id,
+                "ltp": str(ltp),
+                "sequence_number": str(now_ms),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+            if bid is not None:
+                quote_data["bid"] = str(bid)
+            if ask is not None:
+                quote_data["ask"] = str(ask)
+            await r.xadd(self.QUOTE_STREAM, quote_data)
+        except Exception as e:
+            log.error(f"Failed to publish quote to Redis stream: {e}")
+
+        # Level 2 (test shortcut): synchronously trigger PBS execution to
+        # avoid consumer-group lag flakiness in LIMIT/STOP tests.
         result = await self.mock_client.inject_price_update(
             broker_id=self.broker_id,
             instrument_id=instrument_id,
@@ -102,8 +149,9 @@ class MockMarketDataStream:
 
         if result.get("status") == "not_implemented":
             log.warning(
-                f"Price injection not available. Consider using inject_fill() "
-                f"for deterministic Phase 5 tests instead of Phase 6 real execution."
+                "PBS /price endpoint not available; relying on Redis-stream "
+                "consumer path. Tests asserting tight LIMIT/STOP triggers may "
+                "see consumer-group lag."
             )
 
     async def update_prices_gradual(
@@ -259,3 +307,13 @@ class MockMarketDataStream:
         """Reset cache and history."""
         self._price_cache.clear()
         self._update_history.clear()
+        self._sequence_counters.clear()
+
+    async def close(self) -> None:
+        """Close Redis connection."""
+        if self._redis is not None:
+            try:
+                await self._redis.close()
+            except Exception as e:
+                log.warning(f"Error closing Redis connection: {e}")
+            self._redis = None

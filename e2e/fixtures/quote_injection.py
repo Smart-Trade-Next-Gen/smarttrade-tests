@@ -68,12 +68,12 @@ class QuoteInjector:
         """
         await self._connect_redis()
 
-        # Auto-increment sequence number per instrument
+        # Use a ms-since-epoch sequence so PBS' per-instrument idempotency
+        # check (which survives across pytest invocations) doesn't drop the
+        # quote as a duplicate.
         if sequence_number is None:
-            self._sequence_counters[instrument_id] = (
-                self._sequence_counters.get(instrument_id, 0) + 1
-            )
-            sequence_number = self._sequence_counters[instrument_id]
+            sequence_number = int(datetime.now(timezone.utc).timestamp() * 1000)
+            self._sequence_counters[instrument_id] = sequence_number
 
         timestamp = datetime.now(timezone.utc).isoformat()
 

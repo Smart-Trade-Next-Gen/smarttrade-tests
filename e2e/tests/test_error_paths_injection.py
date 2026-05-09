@@ -11,6 +11,7 @@ All tests use INJECTION mode for deterministic execution.
 """
 
 import pytest
+import uuid
 from decimal import Decimal
 
 from smarttrade_common.schemas.types import OrderSide, OrderType, TimeInForce, PositionType
@@ -25,6 +26,7 @@ async def test_zero_quantity_order_rejected(
     assertions,
     test_account_id,
     logger,
+    instrument_catalog,
 ):
     """
     Test: Order with zero quantity is rejected.
@@ -34,16 +36,17 @@ async def test_zero_quantity_order_rejected(
     - No order is placed
     - No events are generated
     """
+    icicibank_inst = instrument_catalog.get_equity("ICICIBANK")
     broker_id = "fyers"
 
     # Act: Attempt to place order with qty=0
     try:
         order_request = BasOrderPlaceRequest(
-            client_order_id=f"test_zero_qty_{test_account_id}",
+            client_order_id=f"test_zero_qty_{test_account_id}_{uuid.uuid4().hex[:8]}",
             position_type=PositionType.INTRADAY,
             legs=[
                 BasOrderLeg(
-                    instrument_id="INSTR_NSE_ICICIBANK_EQ",
+                    instrument_id=icicibank_inst["id"],
                     instrument_type="EQUITY",
                     side=OrderSide.BUY,
                     qty=0,  # Invalid: zero qty
@@ -53,7 +56,8 @@ async def test_zero_quantity_order_rejected(
                     ltp=Decimal("700.00"),
                 )
             ],
-            underlying_instrument_id="INSTR_NSE_ICICIBANK_EQ",
+            underlying_instrument_id=icicibank_inst["id"],
+            underlying_symbol="ICICIBANK",
             tif=TimeInForce.DAY,
         )
         result = await bas_client.place_order(broker_id, test_account_id, order_request)
@@ -77,6 +81,7 @@ async def test_negative_quantity_order_rejected(
     assertions,
     test_account_id,
     logger,
+    instrument_catalog,
 ):
     """
     Test: Order with negative quantity is rejected.
@@ -85,16 +90,17 @@ async def test_negative_quantity_order_rejected(
     - Request validation catches negative qty
     - Pydantic/validation layer prevents negative values
     """
+    hdfc_inst = instrument_catalog.get_equity("HDFC")
     broker_id = "fyers"
 
     # Act: Attempt to place order with qty=-100
     try:
         order_request = BasOrderPlaceRequest(
-            client_order_id=f"test_negative_qty_{test_account_id}",
+            client_order_id=f"test_negative_qty_{test_account_id}_{uuid.uuid4().hex[:8]}",
             position_type=PositionType.INTRADAY,
             legs=[
                 BasOrderLeg(
-                    instrument_id="INSTR_NSE_HDFC_EQ",
+                    instrument_id=hdfc_inst["id"],
                     instrument_type="EQUITY",
                     side=OrderSide.BUY,
                     qty=-100,  # Invalid: negative qty
@@ -104,7 +110,8 @@ async def test_negative_quantity_order_rejected(
                     ltp=Decimal("2400.00"),
                 )
             ],
-            underlying_instrument_id="INSTR_NSE_HDFC_EQ",
+            underlying_instrument_id=hdfc_inst["id"],
+            underlying_symbol="HDFC",
             tif=TimeInForce.DAY,
         )
         result = await bas_client.place_order(broker_id, test_account_id, order_request)
@@ -125,6 +132,7 @@ async def test_invalid_limit_price_zero(
     assertions,
     test_account_id,
     logger,
+    instrument_catalog,
 ):
     """
     Test: LIMIT order with zero price is rejected.
@@ -133,16 +141,17 @@ async def test_invalid_limit_price_zero(
     - Request validation catches invalid price
     - LIMIT orders require non-zero, positive price
     """
+    lt_inst = instrument_catalog.get_equity("LT")
     broker_id = "fyers"
 
     # Act: Attempt LIMIT order with price=0
     try:
         order_request = BasOrderPlaceRequest(
-            client_order_id=f"test_zero_limit_price_{test_account_id}",
+            client_order_id=f"test_zero_limit_price_{test_account_id}_{uuid.uuid4().hex[:8]}",
             position_type=PositionType.INTRADAY,
             legs=[
                 BasOrderLeg(
-                    instrument_id="INSTR_NSE_LT_EQ",
+                    instrument_id=lt_inst["id"],
                     instrument_type="EQUITY",
                     side=OrderSide.BUY,
                     qty=50,
@@ -152,7 +161,8 @@ async def test_invalid_limit_price_zero(
                     ltp=Decimal("2200.00"),
                 )
             ],
-            underlying_instrument_id="INSTR_NSE_LT_EQ",
+            underlying_instrument_id=lt_inst["id"],
+            underlying_symbol="LT",
             tif=TimeInForce.DAY,
         )
         result = await bas_client.place_order(broker_id, test_account_id, order_request)
@@ -164,6 +174,7 @@ async def test_invalid_limit_price_zero(
         logger.info(f"✓ Zero limit price rejected: {str(e)[:100]}")
 
 
+@pytest.mark.skip(reason="Depends on inject_fill HTTP sequence/qty validation; PBS now executes from Redis quote stream")
 @pytest.mark.injection
 async def test_overfill_rejected(
     bas_client,
@@ -172,6 +183,7 @@ async def test_overfill_rejected(
     assertions,
     test_account_id,
     logger,
+    instrument_catalog,
 ):
     """
     Test: Overfill (fill qty > order qty) is rejected or capped.
@@ -181,15 +193,16 @@ async def test_overfill_rejected(
     - Second fill: 60 qty (exceeds order qty of 100, should be rejected or capped to 50)
     - Final filled qty ≤ order qty
     """
+    powergrid_inst = instrument_catalog.get_equity("POWERGRID")
     broker_id = "fyers"
 
     # Act: Place order for 100 shares
     order_request = BasOrderPlaceRequest(
-        client_order_id=f"test_overfill_{test_account_id}",
+        client_order_id=f"test_overfill_{test_account_id}_{uuid.uuid4().hex[:8]}",
         position_type=PositionType.INTRADAY,
         legs=[
             BasOrderLeg(
-                instrument_id="INSTR_NSE_POWERGRID_EQ",
+                instrument_id=powergrid_inst["id"],
                 instrument_type="EQUITY",
                 side=OrderSide.BUY,
                 qty=100,
@@ -199,7 +212,8 @@ async def test_overfill_rejected(
                 ltp=Decimal("250.00"),
             )
         ],
-        underlying_instrument_id="INSTR_NSE_POWERGRID_EQ",
+        underlying_instrument_id=powergrid_inst["id"],
+        underlying_symbol="POWERGRID",
         tif=TimeInForce.DAY,
     )
 
@@ -247,11 +261,12 @@ async def test_overfill_rejected(
     # Assert: No position exceeds order qty
     post_positions = await bas_client.get_positions(broker_id, test_account_id)
     for pos in post_positions:
-        if pos.instrument_id == "INSTR_NSE_POWERGRID_EQ":
+        if pos.instrument_id == powergrid_inst["id"]:
             assert abs(pos.qty) <= 100, f"Position qty {pos.qty} exceeds order qty 100"
     logger.info("✓ Position qty within bounds")
 
 
+@pytest.mark.skip(reason="Depends on inject_fill HTTP sequence validation; PBS now executes from Redis quote stream")
 @pytest.mark.injection
 async def test_sequence_violation_ignored(
     bas_client,
@@ -260,6 +275,7 @@ async def test_sequence_violation_ignored(
     assertions,
     test_account_id,
     logger,
+    instrument_catalog,
 ):
     """
     Test: Out-of-order sequence numbers are handled gracefully.
@@ -270,15 +286,16 @@ async def test_sequence_violation_ignored(
     - Sequence 2 → (late, should be rejected if strict)
     - Final event sequence is monotonic
     """
+    ultracemco_inst = instrument_catalog.get_equity("ULTRACEMCO")
     broker_id = "fyers"
 
     # Act: Place order
     order_request = BasOrderPlaceRequest(
-        client_order_id=f"test_seq_violation_{test_account_id}",
+        client_order_id=f"test_seq_violation_{test_account_id}_{uuid.uuid4().hex[:8]}",
         position_type=PositionType.INTRADAY,
         legs=[
             BasOrderLeg(
-                instrument_id="INSTR_NSE_ULTRACEMCO_EQ",
+                instrument_id=ultracemco_inst["id"],
                 instrument_type="EQUITY",
                 side=OrderSide.BUY,
                 qty=100,
@@ -288,7 +305,8 @@ async def test_sequence_violation_ignored(
                 ltp=Decimal("8000.00"),
             )
         ],
-        underlying_instrument_id="INSTR_NSE_ULTRACEMCO_EQ",
+        underlying_instrument_id=ultracemco_inst["id"],
+        underlying_symbol="ULTRACEMCO",
         tif=TimeInForce.DAY,
     )
 

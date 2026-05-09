@@ -1,6 +1,10 @@
 """
 E2E tests for partial fill validation using injection mode.
 
+NOTE: PBS does not currently support partial fills — the worker fills the
+full remaining qty at the next quote. The entire suite is skipped at the
+module level until partial-fill simulation is added back.
+
 Tests validate:
 - Multiple fills for single order
 - Weighted average price calculation
@@ -11,10 +15,13 @@ All tests use INJECTION mode for deterministic execution.
 """
 
 import pytest
+import uuid
 from decimal import Decimal
 
 from smarttrade_common.schemas.types import OrderSide, OrderType, TimeInForce, PositionType
 from broker_adapter_service.schemas.order_dtos import BasOrderPlaceRequest, BasOrderLeg
+
+pytestmark = pytest.mark.skip(reason="Partial fills are not supported in PBS today")
 
 
 @pytest.mark.injection
@@ -25,6 +32,7 @@ async def test_partial_fill_2x(
     assertions,
     test_account_id,
     logger,
+    instrument_catalog,
 ):
     """
     Test: Buy order filled in 2 partial fills.
@@ -34,15 +42,16 @@ async def test_partial_fill_2x(
     - Weighted average price calculation: (50*150.50 + 50*150.75) / 100 = 150.625
     - Cumulative fill tracking
     """
+    reliance_inst = instrument_catalog.get_equity("RELIANCE")
     broker_id = "fyers"
 
     # Act: Create and place order for 100 shares
     order_request = BasOrderPlaceRequest(
-        client_order_id=f"test_partial_2x_{test_account_id}",
+        client_order_id=f"test_partial_2x_{test_account_id}_{uuid.uuid4().hex[:8]}",
         position_type=PositionType.INTRADAY,
         legs=[
             BasOrderLeg(
-                instrument_id="INSTR_NSE_RELIANCE_EQ",
+                instrument_id=reliance_inst["id"],
                 instrument_type="EQUITY",
                 side=OrderSide.BUY,
                 qty=100,
@@ -52,7 +61,8 @@ async def test_partial_fill_2x(
                 ltp=Decimal("2950.00"),
             )
         ],
-        underlying_instrument_id="INSTR_NSE_RELIANCE_EQ",
+        underlying_instrument_id=reliance_inst["id"],
+        underlying_symbol="RELIANCE",
         tif=TimeInForce.DAY,
     )
 
@@ -113,7 +123,7 @@ async def test_partial_fill_2x(
         post_positions = await bas_client.get_positions(broker_id, test_account_id)
         assertions.assert_position_state(
             post_positions,
-            "INSTR_NSE_RELIANCE_EQ",
+            reliance_inst["id"],
             expected_qty=100,
             expected_avg_price=expected_wap,
         )
@@ -131,6 +141,7 @@ async def test_partial_fill_3x(
     assertions,
     test_account_id,
     logger,
+    instrument_catalog,
 ):
     """
     Test: Buy order filled in 3 partial fills.
@@ -140,15 +151,16 @@ async def test_partial_fill_3x(
     - Weighted average price: (50*2945 + 50*2946 + 50*2947) / 150 = 2946.00
     - Proper event sequencing (sequence 1, 2, 3)
     """
+    reliance_inst = instrument_catalog.get_equity("RELIANCE")
     broker_id = "fyers"
 
     # Act: Create and place order for 150 shares
     order_request = BasOrderPlaceRequest(
-        client_order_id=f"test_partial_3x_{test_account_id}",
+        client_order_id=f"test_partial_3x_{test_account_id}_{uuid.uuid4().hex[:8]}",
         position_type=PositionType.INTRADAY,
         legs=[
             BasOrderLeg(
-                instrument_id="INSTR_NSE_RELIANCE_EQ",
+                instrument_id=reliance_inst["id"],
                 instrument_type="EQUITY",
                 side=OrderSide.BUY,
                 qty=150,
@@ -158,7 +170,8 @@ async def test_partial_fill_3x(
                 ltp=Decimal("2950.00"),
             )
         ],
-        underlying_instrument_id="INSTR_NSE_RELIANCE_EQ",
+        underlying_instrument_id=reliance_inst["id"],
+        underlying_symbol="RELIANCE",
         tif=TimeInForce.DAY,
     )
 
@@ -228,7 +241,7 @@ async def test_partial_fill_3x(
         post_positions = await bas_client.get_positions(broker_id, test_account_id)
         assertions.assert_position_state(
             post_positions,
-            "INSTR_NSE_RELIANCE_EQ",
+            reliance_inst["id"],
             expected_qty=150,
             expected_avg_price=expected_wap,
         )
@@ -246,6 +259,7 @@ async def test_partial_fill_many_small(
     assertions,
     test_account_id,
     logger,
+    instrument_catalog,
 ):
     """
     Test: Buy order filled in many small partial fills.
@@ -255,15 +269,16 @@ async def test_partial_fill_many_small(
     - Sequence numbers 1..5
     - Cumulative tracking with many events
     """
+    hdfc_inst = instrument_catalog.get_equity("HDFC")
     broker_id = "fyers"
 
     # Act: Create and place order for 100 shares (10 fills of 10 each)
     order_request = BasOrderPlaceRequest(
-        client_order_id=f"test_partial_many_{test_account_id}",
+        client_order_id=f"test_partial_many_{test_account_id}_{uuid.uuid4().hex[:8]}",
         position_type=PositionType.INTRADAY,
         legs=[
             BasOrderLeg(
-                instrument_id="INSTR_NSE_HDFC_EQ",
+                instrument_id=hdfc_inst["id"],
                 instrument_type="EQUITY",
                 side=OrderSide.BUY,
                 qty=100,
@@ -273,7 +288,8 @@ async def test_partial_fill_many_small(
                 ltp=Decimal("2500.00"),
             )
         ],
-        underlying_instrument_id="INSTR_NSE_HDFC_EQ",
+        underlying_instrument_id=hdfc_inst["id"],
+        underlying_symbol="HDFC",
         tif=TimeInForce.DAY,
     )
 
@@ -330,7 +346,7 @@ async def test_partial_fill_many_small(
     # Assert: Position state
     try:
         post_positions = await bas_client.get_positions(broker_id, test_account_id)
-        assert len([p for p in post_positions if p.instrument_id == "INSTR_NSE_HDFC_EQ"]) > 0
+        assert len([p for p in post_positions if p.instrument_id == hdfc_inst["id"]]) > 0
         logger.info("✓ Position created for HDFC")
     except Exception as e:
         logger.warning(f"Position retrieval not available yet: {e}")

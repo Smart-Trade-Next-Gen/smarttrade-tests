@@ -13,6 +13,7 @@ All tests use INJECTION mode for deterministic execution.
 """
 
 import pytest
+import uuid
 import asyncio
 from decimal import Decimal
 
@@ -28,6 +29,7 @@ async def test_two_concurrent_buy_orders(
     assertions,
     test_account_id,
     logger,
+    instrument_catalog,
 ):
     """
     Test: Two concurrent BUY orders placed and filled simultaneously.
@@ -39,15 +41,17 @@ async def test_two_concurrent_buy_orders(
     - Final positions reflect both buys
     - No event cross-contamination
     """
+    axis_inst = instrument_catalog.get_equity("AXIS")
+    kotak_inst = instrument_catalog.get_equity("KOTAK")
     broker_id = "fyers"
 
     # Act: Place two BUY orders concurrently
     order_request_1 = BasOrderPlaceRequest(
-        client_order_id=f"test_concurrent_buy_1_{test_account_id}",
+        client_order_id=f"test_concurrent_buy_1_{test_account_id}_{uuid.uuid4().hex[:8]}",
         position_type=PositionType.INTRADAY,
         legs=[
             BasOrderLeg(
-                instrument_id="INSTR_NSE_AXIS_EQ",
+                instrument_id=axis_inst["id"],
                 instrument_type="EQUITY",
                 side=OrderSide.BUY,
                 qty=50,
@@ -57,16 +61,17 @@ async def test_two_concurrent_buy_orders(
                 ltp=Decimal("900.00"),
             )
         ],
-        underlying_instrument_id="INSTR_NSE_AXIS_EQ",
+        underlying_instrument_id=axis_inst["id"],
+        underlying_symbol="AXIS",
         tif=TimeInForce.DAY,
     )
 
     order_request_2 = BasOrderPlaceRequest(
-        client_order_id=f"test_concurrent_buy_2_{test_account_id}",
+        client_order_id=f"test_concurrent_buy_2_{test_account_id}_{uuid.uuid4().hex[:8]}",
         position_type=PositionType.INTRADAY,
         legs=[
             BasOrderLeg(
-                instrument_id="INSTR_NSE_KOTAK_EQ",
+                instrument_id=kotak_inst["id"],
                 instrument_type="EQUITY",
                 side=OrderSide.BUY,
                 qty=75,
@@ -76,7 +81,8 @@ async def test_two_concurrent_buy_orders(
                 ltp=Decimal("1850.00"),
             )
         ],
-        underlying_instrument_id="INSTR_NSE_KOTAK_EQ",
+        underlying_instrument_id=kotak_inst["id"],
+        underlying_symbol="KOTAK",
         tif=TimeInForce.DAY,
     )
 
@@ -128,13 +134,13 @@ async def test_two_concurrent_buy_orders(
         post_positions = await bas_client.get_positions(broker_id, test_account_id)
         assertions.assert_position_state(
             post_positions,
-            "INSTR_NSE_AXIS_EQ",
+            axis_inst["id"],
             expected_qty=50,
             expected_avg_price=Decimal("899.50"),
         )
         assertions.assert_position_state(
             post_positions,
-            "INSTR_NSE_KOTAK_EQ",
+            kotak_inst["id"],
             expected_qty=75,
             expected_avg_price=Decimal("1849.00"),
         )
@@ -152,6 +158,7 @@ async def test_concurrent_buy_and_sell(
     assertions,
     test_account_id,
     logger,
+    instrument_catalog,
 ):
     """
     Test: BUY and SELL orders placed and filled concurrently.
@@ -162,15 +169,17 @@ async def test_concurrent_buy_and_sell(
     - Positions reflect both (long + short)
     - Financial invariants: debit for BUY, credit for SELL
     """
+    asian_inst = instrument_catalog.get_equity("ASIAN")
+    bhartiartl_inst = instrument_catalog.get_equity("BHARTIARTL")
     broker_id = "fyers"
 
     # Act: Place BUY and SELL orders concurrently
     buy_request = BasOrderPlaceRequest(
-        client_order_id=f"test_concurrent_buy_sell_buy_{test_account_id}",
+        client_order_id=f"test_concurrent_buy_sell_buy_{test_account_id}_{uuid.uuid4().hex[:8]}",
         position_type=PositionType.INTRADAY,
         legs=[
             BasOrderLeg(
-                instrument_id="INSTR_NSE_ASIAN_EQ",
+                instrument_id=asian_inst["id"],
                 instrument_type="EQUITY",
                 side=OrderSide.BUY,
                 qty=100,
@@ -180,16 +189,17 @@ async def test_concurrent_buy_and_sell(
                 ltp=Decimal("700.00"),
             )
         ],
-        underlying_instrument_id="INSTR_NSE_ASIAN_EQ",
+        underlying_instrument_id=asian_inst["id"],
+        underlying_symbol="ASIAN",
         tif=TimeInForce.DAY,
     )
 
     sell_request = BasOrderPlaceRequest(
-        client_order_id=f"test_concurrent_buy_sell_sell_{test_account_id}",
+        client_order_id=f"test_concurrent_buy_sell_sell_{test_account_id}_{uuid.uuid4().hex[:8]}",
         position_type=PositionType.INTRADAY,
         legs=[
             BasOrderLeg(
-                instrument_id="INSTR_NSE_BHARTIARTL_EQ",
+                instrument_id=bhartiartl_inst["id"],
                 instrument_type="EQUITY",
                 side=OrderSide.SELL,
                 qty=100,
@@ -199,7 +209,8 @@ async def test_concurrent_buy_and_sell(
                 ltp=Decimal("850.00"),
             )
         ],
-        underlying_instrument_id="INSTR_NSE_BHARTIARTL_EQ",
+        underlying_instrument_id=bhartiartl_inst["id"],
+        underlying_symbol="BHARTIARTL",
         tif=TimeInForce.DAY,
     )
 
@@ -268,13 +279,13 @@ async def test_concurrent_buy_and_sell(
         post_positions = await bas_client.get_positions(broker_id, test_account_id)
         assertions.assert_position_state(
             post_positions,
-            "INSTR_NSE_ASIAN_EQ",
+            asian_inst["id"],
             expected_qty=100,
             expected_avg_price=Decimal("699.50"),
         )
         assertions.assert_position_state(
             post_positions,
-            "INSTR_NSE_BHARTIARTL_EQ",
+            bhartiartl_inst["id"],
             expected_qty=-100,  # Short
             expected_avg_price=Decimal("851.00"),
         )
@@ -292,6 +303,7 @@ async def test_three_concurrent_orders_same_instrument(
     assertions,
     test_account_id,
     logger,
+    instrument_catalog,
 ):
     """
     Test: Three concurrent orders on same instrument accumulate correctly.
@@ -303,17 +315,18 @@ async def test_three_concurrent_orders_same_instrument(
     - WAP calculated correctly from three fills
     - No event cross-contamination
     """
+    reliance_inst = instrument_catalog.get_equity("RELIANCE")
     broker_id = "fyers"
 
     # Act: Place three BUY orders on same instrument
     order_ids = []
     for i in range(3):
         order_request = BasOrderPlaceRequest(
-            client_order_id=f"test_triple_buy_{i}_{test_account_id}",
+            client_order_id=f"test_triple_buy_{i}_{test_account_id}_{uuid.uuid4().hex[:8]}",
             position_type=PositionType.INTRADAY,
             legs=[
                 BasOrderLeg(
-                    instrument_id="INSTR_NSE_RELIANCE_EQ",
+                    instrument_id=reliance_inst["id"],
                     instrument_type="EQUITY",
                     side=OrderSide.BUY,
                     qty=50,
@@ -323,7 +336,8 @@ async def test_three_concurrent_orders_same_instrument(
                     ltp=Decimal("2950.00"),
                 )
             ],
-            underlying_instrument_id="INSTR_NSE_RELIANCE_EQ",
+            underlying_instrument_id=reliance_inst["id"],
+            underlying_symbol="RELIANCE",
             tif=TimeInForce.DAY,
         )
 
@@ -369,7 +383,7 @@ async def test_three_concurrent_orders_same_instrument(
         post_positions = await bas_client.get_positions(broker_id, test_account_id)
         assertions.assert_position_state(
             post_positions,
-            "INSTR_NSE_RELIANCE_EQ",
+            reliance_inst["id"],
             expected_qty=150,
             expected_avg_price=expected_wap,
         )

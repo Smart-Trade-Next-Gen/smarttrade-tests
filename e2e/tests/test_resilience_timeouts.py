@@ -16,6 +16,7 @@ Resilience & Chaos Testing (Phase 7):
 """
 
 import pytest
+import uuid
 import asyncio
 from decimal import Decimal
 
@@ -33,6 +34,7 @@ async def test_order_placement_under_mock_latency(
     test_account_id,
     chaos_engine,
     logger,
+    instrument_catalog,
 ):
     """
     Test: Order placement succeeds despite paper broker service latency.
@@ -43,15 +45,16 @@ async def test_order_placement_under_mock_latency(
     - Order status is PENDING after placement
     - No partial orders created
     """
+    sbin_inst = instrument_catalog.get_equity("SBIN")
     broker_id = "fyers"
 
     # Act: Attempt to place order while mock is slow
     order_request = BasOrderPlaceRequest(
-        client_order_id=f"test_placement_latency_{test_account_id}",
+        client_order_id=f"test_placement_latency_{test_account_id}_{uuid.uuid4().hex[:8]}",
         position_type=PositionType.INTRADAY,
         legs=[
             BasOrderLeg(
-                instrument_id="INSTR_NSE_SBIN_EQ",
+                instrument_id=sbin_inst["id"],
                 instrument_type="EQUITY",
                 side=OrderSide.BUY,
                 qty=100,
@@ -61,7 +64,7 @@ async def test_order_placement_under_mock_latency(
                 ltp=Decimal("550.00"),
             )
         ],
-        underlying_instrument_id="INSTR_NSE_SBIN_EQ",
+        underlying_symbol="SBIN",
         tif=TimeInForce.DAY,
     )
 
@@ -78,7 +81,7 @@ async def test_order_placement_under_mock_latency(
 
         # Verify no duplicates (order_id should be unique)
         orders = await bas_client.get_orders(broker_id, test_account_id)
-        sbin_orders = [o for o in orders if o.instrument_id == "INSTR_NSE_SBIN_EQ"]
+        sbin_orders = [o for o in orders if o.instrument_id == sbin_inst["id"]]
         assert len(sbin_orders) == 1, f"Expected 1 order, got {len(sbin_orders)} (duplicate placement?)"
         logger.info("✓ No duplicate orders created")
 
@@ -95,6 +98,7 @@ async def test_fill_injection_retry_on_timeout(
     test_account_id,
     chaos_engine,
     logger,
+    instrument_catalog,
 ):
     """
     Test: Fill injection handles timeouts and retries gracefully.
@@ -105,15 +109,16 @@ async def test_fill_injection_retry_on_timeout(
     - Order eventually fills
     - No partial fills or duplicates
     """
+    infy_inst = instrument_catalog.get_equity("INFY")
     broker_id = "fyers"
 
     # Act: Place order
     order_request = BasOrderPlaceRequest(
-        client_order_id=f"test_fill_retry_{test_account_id}",
+        client_order_id=f"test_fill_retry_{test_account_id}_{uuid.uuid4().hex[:8]}",
         position_type=PositionType.INTRADAY,
         legs=[
             BasOrderLeg(
-                instrument_id="INSTR_NSE_INFY_EQ",
+                instrument_id=infy_inst["id"],
                 instrument_type="EQUITY",
                 side=OrderSide.BUY,
                 qty=100,
@@ -123,7 +128,7 @@ async def test_fill_injection_retry_on_timeout(
                 ltp=Decimal("1950.00"),
             )
         ],
-        underlying_instrument_id="INSTR_NSE_INFY_EQ",
+        underlying_symbol="INFY",
         tif=TimeInForce.DAY,
     )
 
@@ -168,6 +173,7 @@ async def test_event_collection_with_delayed_delivery(
     assertions,
     test_account_id,
     logger,
+    instrument_catalog,
 ):
     """
     Test: EventCollector handles delayed event delivery.
@@ -178,15 +184,16 @@ async def test_event_collection_with_delayed_delivery(
     - No events are lost despite delays
     - Event ordering preserved despite latency
     """
+    tcs_inst = instrument_catalog.get_equity("TCS")
     broker_id = "fyers"
 
     # Act: Place and fill order
     order_request = BasOrderPlaceRequest(
-        client_order_id=f"test_delayed_events_{test_account_id}",
+        client_order_id=f"test_delayed_events_{test_account_id}_{uuid.uuid4().hex[:8]}",
         position_type=PositionType.INTRADAY,
         legs=[
             BasOrderLeg(
-                instrument_id="INSTR_NSE_TCS_EQ",
+                instrument_id=tcs_inst["id"],
                 instrument_type="EQUITY",
                 side=OrderSide.BUY,
                 qty=50,
@@ -196,7 +203,7 @@ async def test_event_collection_with_delayed_delivery(
                 ltp=Decimal("3800.00"),
             )
         ],
-        underlying_instrument_id="INSTR_NSE_TCS_EQ",
+        underlying_symbol="TCS",
         tif=TimeInForce.DAY,
     )
 
@@ -239,6 +246,7 @@ async def test_position_state_consistent_under_latency(
     assertions,
     test_account_id,
     logger,
+    instrument_catalog,
 ):
     """
     Test: Position state remains consistent despite latency.
@@ -250,6 +258,8 @@ async def test_position_state_consistent_under_latency(
     - No data corruption from concurrent latency
     - Financial invariants preserved
     """
+    bajajfinsv_inst = instrument_catalog.get_equity("BAJAJFINSV")
+    maruti_inst = instrument_catalog.get_equity("MARUTI")
     broker_id = "fyers"
 
     # Arrange: Capture pre-state
@@ -258,12 +268,12 @@ async def test_position_state_consistent_under_latency(
 
     # Act: Place and fill multiple orders under latency
     order_ids = []
-    for i, (instrument, qty, price) in enumerate([
-        ("INSTR_NSE_MARUTI_EQ", 50, Decimal("9000.00")),
-        ("INSTR_NSE_BAJAJFINSV_EQ", 25, Decimal("18000.00")),
+    for i, (symbol, instrument, qty, price) in enumerate([
+        ("MARUTI",maruti_inst["id"], 50, Decimal("9000.00")),
+        ("BAJAJFINSV",bajajfinsv_inst["id"], 25, Decimal("18000.00")),
     ]):
         order_request = BasOrderPlaceRequest(
-            client_order_id=f"test_consistent_pos_{i}_{test_account_id}",
+            client_order_id=f"test_consistent_pos_{i}_{test_account_id}_{uuid.uuid4().hex[:8]}",
             position_type=PositionType.INTRADAY,
             legs=[
                 BasOrderLeg(
@@ -277,7 +287,7 @@ async def test_position_state_consistent_under_latency(
                     ltp=price,
                 )
             ],
-            underlying_instrument_id=instrument,
+            underlying_symbol=symbol,
             tif=TimeInForce.DAY,
         )
 
@@ -309,8 +319,8 @@ async def test_position_state_consistent_under_latency(
 
     # Verify no negative positions (unless intentional short)
     for pos in post_positions:
-        assert hasattr(pos, 'qty'), f"Position missing qty field: {pos}"
-        logger.info(f"✓ Position {pos.instrument_id}: {pos.qty} shares @ {pos.avg_price}")
+        assert hasattr(pos, 'net_qty'), f"Position missing net_qty field: {pos}"
+        logger.info(f"✓ Position {pos.instrument_id}: {pos.net_qty} shares @ {pos.avg_price}")
 
     # Verify financial invariants
     total_debit = sum(

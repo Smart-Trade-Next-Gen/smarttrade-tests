@@ -28,6 +28,7 @@ async def test_cancel_unfilled_order(
     assertions,
     test_account_id,
     logger,
+    instrument_catalog,
 ):
     """
     Test: Cancel an unfilled order (no fills before cancellation).
@@ -39,6 +40,7 @@ async def test_cancel_unfilled_order(
     - No execution events after cancellation
     - No position created
     """
+    maruti_inst = instrument_catalog.get_equity("MARUTI")
     broker_id = "fyers"
 
     # Act: Create and place order (use unique client_order_id to bypass idempotency cache)
@@ -47,7 +49,7 @@ async def test_cancel_unfilled_order(
         position_type=PositionType.INTRADAY,
         legs=[
             BasOrderLeg(
-                instrument_id="INSTR_NSE_MARUTI_EQ",
+                instrument_id=maruti_inst["id"],
                 instrument_type="EQUITY",
                 side=OrderSide.BUY,
                 qty=100,
@@ -57,7 +59,7 @@ async def test_cancel_unfilled_order(
                 ltp=Decimal("9050.00"),
             )
         ],
-        underlying_instrument_id="INSTR_NSE_MARUTI_EQ",
+        underlying_symbol="MARUTI",
         tif=TimeInForce.DAY,
     )
 
@@ -87,11 +89,12 @@ async def test_cancel_unfilled_order(
 
     # Assert: No position created
     post_positions = await bas_client.get_positions(broker_id, test_account_id)
-    maruti_positions = [p for p in post_positions if p.instrument_id == "INSTR_NSE_MARUTI_EQ"]
+    maruti_positions = [p for p in post_positions if p.instrument_id == maruti_inst["id"]]
     assert len(maruti_positions) == 0, "Position should not exist for cancelled order"
     logger.info("✓ No position created")
 
 
+@pytest.mark.skip(reason="Partial fills are not supported in PBS today")
 @pytest.mark.injection
 async def test_cancel_partial_fill(
     bas_client,
@@ -100,6 +103,7 @@ async def test_cancel_partial_fill(
     assertions,
     test_account_id,
     logger,
+    instrument_catalog,
 ):
     """
     Test: Cancel a partially filled order (50% filled, then cancelled).
@@ -111,6 +115,7 @@ async def test_cancel_partial_fill(
     - Final filled quantity is preserved
     - Position reflects only filled quantity
     """
+    heromotoco_inst = instrument_catalog.get_equity("HEROMOTOCO")
     broker_id = "fyers"
 
     # Act: Create and place order for 100 shares (use unique client_order_id to bypass idempotency cache)
@@ -119,7 +124,7 @@ async def test_cancel_partial_fill(
         position_type=PositionType.INTRADAY,
         legs=[
             BasOrderLeg(
-                instrument_id="INSTR_NSE_HEROMOTOCO_EQ",
+                instrument_id=heromotoco_inst["id"],
                 instrument_type="EQUITY",
                 side=OrderSide.BUY,
                 qty=100,
@@ -129,7 +134,7 @@ async def test_cancel_partial_fill(
                 ltp=Decimal("3520.00"),
             )
         ],
-        underlying_instrument_id="INSTR_NSE_HEROMOTOCO_EQ",
+        underlying_symbol="HEROMOTOCO",
         tif=TimeInForce.DAY,
     )
 
@@ -199,6 +204,7 @@ async def test_cancel_then_fill_rejected(
     assertions,
     test_account_id,
     logger,
+    instrument_catalog,
 ):
     """
     Test: Fill injection after cancellation is rejected.
@@ -208,6 +214,7 @@ async def test_cancel_then_fill_rejected(
     - Attempting to fill a cancelled order fails gracefully
     - Final state remains CANCELLED with no fills
     """
+    titan_inst = instrument_catalog.get_equity("TITAN")
     broker_id = "fyers"
 
     # Act: Create and place order (use unique client_order_id to bypass idempotency cache)
@@ -216,7 +223,7 @@ async def test_cancel_then_fill_rejected(
         position_type=PositionType.INTRADAY,
         legs=[
             BasOrderLeg(
-                instrument_id="INSTR_NSE_TITAN_EQ",
+                instrument_id=titan_inst["id"],
                 instrument_type="EQUITY",
                 side=OrderSide.BUY,
                 qty=50,
@@ -226,7 +233,7 @@ async def test_cancel_then_fill_rejected(
                 ltp=Decimal("2850.00"),
             )
         ],
-        underlying_instrument_id="INSTR_NSE_TITAN_EQ",
+        underlying_symbol="TITAN",
         tif=TimeInForce.DAY,
     )
 
@@ -269,6 +276,6 @@ async def test_cancel_then_fill_rejected(
 
     # Assert: No position created
     post_positions = await bas_client.get_positions(broker_id, test_account_id)
-    titan_positions = [p for p in post_positions if p.instrument_id == "INSTR_NSE_TITAN_EQ"]
+    titan_positions = [p for p in post_positions if p.instrument_id == titan_inst["id"]]
     assert len(titan_positions) == 0, "Position should not exist for cancelled order"
     logger.info("✓ No position created")

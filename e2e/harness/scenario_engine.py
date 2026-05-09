@@ -38,6 +38,7 @@ class OrderScenario:
     fills: list[FillSpec]
     expected_status: str  # FILLED | CANCELLED | REJECTED
     expected_filled_qty: int
+    underlying_symbol: str
     expected_avg_price: Optional[Decimal] = None
     price: Optional[Decimal] = None  # LIMIT price
     stop_price: Optional[Decimal] = None  # STOP price

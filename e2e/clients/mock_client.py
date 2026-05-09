@@ -36,6 +36,7 @@ class MockClient:
         base_url: str,
         token: str,
         timeout: float = 5.0,
+        redis_url: str = "redis://localhost:6379/0",
     ):
         """
         Initialize MockClient.
@@ -44,6 +45,7 @@ class MockClient:
             base_url: Base URL for paper broker service (e.g., http://localhost:8002)
             token: Bearer token for authentication
             timeout: Request timeout in seconds (default: 5.0)
+            redis_url: Redis URL for publishing quotes that drive PBS fills.
 
         Raises:
             ValueError: If token is empty
@@ -56,6 +58,10 @@ class MockClient:
         self.timeout = timeout
         self.client: Optional[httpx.AsyncClient] = None
         self._sequence_tracker: dict[str, int] = {}  # Track sequence per order_id
+        # Redis quote-publish state for inject_fill (production fill path).
+        self._redis_url = redis_url
+        self._redis = None
+        self._quote_sequence: dict[str, int] = {}
 
     async def __aenter__(self) -> "MockClient":
         """Async context manager entry."""
@@ -71,6 +77,12 @@ class MockClient:
         if self.client:
             await self.client.aclose()
             self.client = None
+        if self._redis is not None:
+            try:
+                await self._redis.close()
+            except Exception:
+                pass
+            self._redis = None
 
     def _get_client(self) -> httpx.AsyncClient:
         """Get or create HTTP client."""
@@ -150,73 +162,88 @@ class MockClient:
         fill_price: Decimal,
     ):
         """
-        Inject a single fill execution.
+        Drive an order fill by publishing a quote on the production Redis stream.
+
+        PBS no longer exposes an HTTP /execute endpoint. Fills are produced by
+        the price-driven path: a quote on `market.quote.v1` is consumed by
+        PBSMarketDataConsumer, which enqueues an ExecutionWorker fill at the
+        quote's LTP for the **full remaining qty** of every open order on that
+        instrument. The worker emits ORDER_UPDATE / TRADE_UPDATE /
+        POSITION_UPDATE on PBS' internal WS post-commit.
+
+        The legacy ``sequence`` and ``fill_qty`` parameters are kept for
+        signature compatibility but are no longer honored — partial fills are
+        not supported in PBS today (skip those tests). ``fill_qty`` is treated
+        as a sanity check: if it is less than the order's remaining qty a
+        ValueError is raised so partial-fill tests fail loudly instead of
+        producing a misleading full fill.
 
         Args:
-            broker_id: Broker ID (e.g., "fyers")
-            account_id: Account ID
-            order_id: Order ID to fill
-            sequence: Execution sequence number (must be monotonic: 1, 2, 3, ...)
-            fill_qty: Quantity to fill
-            fill_price: Execution price
-
-        Returns:
-            ExecutionResult with execution details
-
-        Raises:
-            httpx.HTTPError: On HTTP error
-            ValueError: On sequence validation error
+            broker_id: Broker ID (used to look up the order)
+            account_id: Account ID (used to look up the order)
+            order_id: PBS order UUID
+            sequence: Ignored. Kept for backward compatibility.
+            fill_qty: Sanity-checked against the order's remaining qty.
+            fill_price: Quote LTP that the worker will use as the fill price.
         """
-        ExecutionCommand, ExecutionResult = self._ensure_imports()
-
-        # Validate sequence monotonicity
-        last_sequence = self._sequence_tracker.get(order_id, 0)
-        if sequence <= last_sequence:
-            raise ValueError(
-                f"Sequence must be monotonically increasing. "
-                f"Last: {last_sequence}, Got: {sequence}"
-            )
-        self._sequence_tracker[order_id] = sequence
-
+        # Discover the order's instrument_id and remaining qty so we can
+        # publish a quote that targets exactly this order.
         client = self._get_client()
         headers = self._get_headers()
+        url = f"/api/v1/order/{broker_id}/{account_id}/{order_id}"
+        order_response = await client.get(url, headers=headers)
+        order_response.raise_for_status()
+        order = order_response.json()
 
-        # Convert order_id to UUID if it's a string
-        try:
-            order_uuid = UUID(order_id) if isinstance(order_id, str) else order_id
-        except (ValueError, AttributeError):
-            raise ValueError(f"Invalid order_id format: {order_id}")
+        instrument_id = order.get("instrument_id")
+        remaining_qty = int(order.get("remaining_qty", 0))
+        if not instrument_id:
+            raise ValueError(
+                f"PBS returned no instrument_id for order_id={order_id}; "
+                f"cannot publish a quote to drive the fill."
+            )
+        if fill_qty != remaining_qty:
+            raise ValueError(
+                f"Partial fills are not supported in PBS. "
+                f"order_id={order_id}: requested fill_qty={fill_qty}, "
+                f"remaining_qty={remaining_qty}. Either pass the full "
+                f"remaining qty or skip the test."
+            )
 
-        execution_cmd = ExecutionCommand(
-            order_id=order_uuid,
-            sequence=sequence,
-            fill_qty=fill_qty,
-            fill_price=fill_price,
+        # Track sequence for back-compat callers that read it.
+        self._sequence_tracker[order_id] = sequence
+
+        # Publish quote on the production Redis stream. PBSMarketDataConsumer
+        # has a per-instrument idempotency check (`_last_seq[instrument_id]`)
+        # that survives across pytest invocations because PBS is long-lived.
+        # A millisecond timestamp keeps the sequence_number monotonic across
+        # processes so a new test session is never silently dropped as a
+        # duplicate.
+        import redis.asyncio as redis
+        from datetime import datetime, timezone
+
+        if self._redis is None:
+            self._redis = await redis.from_url(self._redis_url, decode_responses=True)
+
+        now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+        # Track within the session in case caller wants to read it back.
+        self._quote_sequence[instrument_id] = now_ms
+
+        await self._redis.xadd(
+            "market.quote.v1",
+            {
+                "instrument_id": instrument_id,
+                "ltp": str(fill_price),
+                "sequence_number": str(now_ms),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            },
         )
-
-        url = f"/api/v1/execute/{broker_id}/{account_id}"
         log.debug(
-            f"Injecting fill | broker_id={broker_id} | account_id={account_id} | "
-            f"order_id={order_id} | sequence={sequence} | qty={fill_qty} | price={fill_price}"
+            f"Published quote for fill | broker_id={broker_id} | "
+            f"account_id={account_id} | order_id={order_id} | "
+            f"instrument_id={instrument_id} | qty={fill_qty} | "
+            f"price={fill_price}"
         )
-
-        try:
-            response = await client.post(
-                url,
-                json=execution_cmd.model_dump(mode="json"),
-                headers=headers,
-            )
-            response.raise_for_status()
-            return ExecutionResult.model_validate(response.json())
-        except httpx.HTTPStatusError as e:
-            log.error(
-                f"inject_fill HTTP {e.response.status_code}: {e.response.text} | "
-                f"order_id={order_id} | sequence={sequence}"
-            )
-            raise
-        except httpx.HTTPError as e:
-            log.error(f"inject_fill connection error: {e} | order_id={order_id}")
-            raise
 
     async def inject_fills_sequence(
         self,
@@ -226,27 +253,17 @@ class MockClient:
         fills: list[tuple[Decimal, int]],
     ) -> None:
         """
-        Inject a sequence of fills with auto-incrementing sequence numbers.
+        DEPRECATED: partial fills are not supported in PBS today.
 
-        Args:
-            broker_id: Broker ID
-            account_id: Account ID
-            order_id: Order ID to fill
-            fills: List of (price, qty) tuples to fill in order
-
-        Raises:
-            httpx.HTTPError: On HTTP error
+        Raises ValueError unconditionally so any caller that still depends on
+        partial-fill semantics fails loudly. Tests exercising partial fills
+        should be skipped with a clear reason.
         """
-        for price, qty in fills:
-            sequence = self._get_next_sequence(order_id)
-            await self.inject_fill(
-                broker_id=broker_id,
-                account_id=account_id,
-                order_id=order_id,
-                sequence=sequence,
-                fill_qty=qty,
-                fill_price=price,
-            )
+        raise ValueError(
+            "inject_fills_sequence is deprecated: PBS does not support "
+            "partial fills. Skip these tests until partial-fill simulation "
+            "is added back."
+        )
 
     async def inject_price_update(
         self,
@@ -257,11 +274,16 @@ class MockClient:
         ask: Optional[Decimal] = None,
     ) -> dict:
         """
-        Inject a price update to trigger price-driven execution.
+        Test-only HTTP shortcut to synchronously trigger PBS PriceExecutionEngine.
 
-        This method sends a price update to the paper broker service, which triggers
-        the PriceExecutionEngine to evaluate all open orders and execute
-        any that match the trigger conditions.
+        Production data flow is via the Redis stream `market.quote.v1` consumed
+        by PBSMarketDataConsumer. This endpoint bypasses that path and is used
+        by E2E tests to keep LIMIT/STOP trigger assertions deterministic when
+        consumer-group lag would otherwise race the test.
+
+        Sends a price update to the paper broker service, which triggers the
+        PriceExecutionEngine to evaluate all open orders and execute any that
+        match the trigger conditions.
 
         Args:
             broker_id: Broker ID (e.g., "mock")
@@ -476,6 +498,51 @@ class MockClient:
         except (ValueError, KeyError) as e:
             log.error(f"Invalid order response format for sync: {e}")
             raise
+
+    async def cleanup_account(self, broker_id: str, account_id: str) -> dict:
+        """
+        Reset the PBS AccountBalance for (user, broker, account) to defaults.
+
+        Each filled BUY debits the AccountBalance row, so without a reset
+        the balance depletes across the test session until reserved exceeds
+        balance and the financial invariant violation aborts further fills.
+        """
+        client = self._get_client()
+        headers = self._get_headers()
+        try:
+            response = await client.delete(
+                f"/api/v1/cleanup/account/{broker_id}/{account_id}", headers=headers
+            )
+            response.raise_for_status()
+            log.debug(f"PBS account reset: {broker_id}/{account_id}")
+            return response.json()
+        except httpx.HTTPError as e:
+            log.warning(f"PBS account reset failed (non-critical): {e}")
+            return {"status": "error", "message": str(e)}
+
+    async def cleanup_price_cache(self) -> dict:
+        """
+        Drop PBS' in-memory LTP cache.
+
+        PBS' OrderService.create_order auto-fills any new order whose
+        instrument has a cached price. Tests share instruments across the
+        session, so the cache must be dropped between tests; otherwise an
+        order placed for SBIN gets filled at whatever LTP a previous test
+        last published, before the current test's own quote arrives.
+
+        Returns:
+            Response with status="cleared"
+        """
+        client = self._get_client()
+        headers = self._get_headers()
+        try:
+            response = await client.delete("/api/v1/cleanup/price_cache", headers=headers)
+            response.raise_for_status()
+            log.debug("PBS price_cache cleared")
+            return response.json()
+        except httpx.HTTPError as e:
+            log.warning(f"PBS price_cache cleanup failed (non-critical): {e}")
+            return {"status": "error", "message": str(e)}
 
     async def cleanup_execution_state(
         self,

@@ -28,6 +28,7 @@ async def test_market_buy_executes_immediately(
     assertions,
     test_account_id,
     logger,
+    instrument_catalog,
 ):
     """
     Test: Market BUY order executes immediately when price updates arrive.
@@ -38,6 +39,7 @@ async def test_market_buy_executes_immediately(
     - Event sequence and order lifecycle
     - Position created with fill price
     """
+    sbin_inst = instrument_catalog.get_equity("SBIN")
     broker_id = "fyers"
 
     # Arrange: Capture pre-state
@@ -50,7 +52,7 @@ async def test_market_buy_executes_immediately(
         position_type=PositionType.INTRADAY,
         legs=[
             BasOrderLeg(
-                instrument_id="INSTR_NSE_SBIN_EQ",
+                instrument_id=sbin_inst["id"],
                 instrument_type="EQUITY",
                 side=OrderSide.BUY,
                 qty=100,
@@ -60,7 +62,7 @@ async def test_market_buy_executes_immediately(
                 ltp=Decimal("550.00"),
             )
         ],
-        underlying_instrument_id="INSTR_NSE_SBIN_EQ",
+        underlying_symbol="SBIN",
         tif=TimeInForce.DAY,
     )
 
@@ -92,7 +94,7 @@ async def test_market_buy_executes_immediately(
     post_positions = await bas_client.get_positions(broker_id, test_account_id)
     assertions.assert_position_state(
         post_positions,
-        "INSTR_NSE_SBIN_EQ",
+        sbin_inst["id"],
         expected_qty=100,
         expected_avg_price=fill_price,
     )
@@ -107,6 +109,7 @@ async def test_limit_buy_triggers_on_price_cross(
     assertions,
     test_account_id,
     logger,
+    instrument_catalog,
 ):
     """
     Test: LIMIT BUY order triggers when price drops to/below limit.
@@ -117,6 +120,7 @@ async def test_limit_buy_triggers_on_price_cross(
     - Fills when price drops to ≤ 3800
     - Position reflects fill price (not order price)
     """
+    tcs_inst = instrument_catalog.get_equity("TCS")
     broker_id = "fyers"
 
     # Act: Place LIMIT BUY
@@ -126,7 +130,7 @@ async def test_limit_buy_triggers_on_price_cross(
         position_type=PositionType.INTRADAY,
         legs=[
             BasOrderLeg(
-                instrument_id="INSTR_NSE_TCS_EQ",
+                instrument_id=tcs_inst["id"],
                 instrument_type="EQUITY",
                 side=OrderSide.BUY,
                 qty=50,
@@ -136,7 +140,7 @@ async def test_limit_buy_triggers_on_price_cross(
                 ltp=Decimal("3850.00"),
             )
         ],
-        underlying_instrument_id="INSTR_NSE_TCS_EQ",
+        underlying_symbol="TCS",
         tif=TimeInForce.DAY,
     )
 
@@ -168,7 +172,7 @@ async def test_limit_buy_triggers_on_price_cross(
     post_positions = await bas_client.get_positions(broker_id, test_account_id)
     assertions.assert_position_state(
         post_positions,
-        "INSTR_NSE_TCS_EQ",
+        tcs_inst["id"],
         expected_qty=50,
         expected_avg_price=fill_price,
     )
@@ -183,6 +187,7 @@ async def test_limit_sell_triggers_on_price_cross(
     assertions,
     test_account_id,
     logger,
+    instrument_catalog,
 ):
     """
     Test: LIMIT SELL order triggers when price rises to/above limit.
@@ -193,6 +198,7 @@ async def test_limit_sell_triggers_on_price_cross(
     - Fills when price rises to ≥ 3900
     - Short position created
     """
+    tcs_inst = instrument_catalog.get_equity("TCS")
     broker_id = "fyers"
 
     # Act: Place LIMIT SELL (short, intraday allowed)
@@ -202,7 +208,7 @@ async def test_limit_sell_triggers_on_price_cross(
         position_type=PositionType.INTRADAY,
         legs=[
             BasOrderLeg(
-                instrument_id="INSTR_NSE_TCS_EQ",
+                instrument_id=tcs_inst["id"],
                 instrument_type="EQUITY",
                 side=OrderSide.SELL,
                 qty=50,
@@ -212,7 +218,7 @@ async def test_limit_sell_triggers_on_price_cross(
                 ltp=Decimal("3850.00"),
             )
         ],
-        underlying_instrument_id="INSTR_NSE_TCS_EQ",
+        underlying_symbol="TCS",
         tif=TimeInForce.DAY,
     )
 
@@ -244,7 +250,7 @@ async def test_limit_sell_triggers_on_price_cross(
     post_positions = await bas_client.get_positions(broker_id, test_account_id)
     assertions.assert_position_state(
         post_positions,
-        "INSTR_NSE_TCS_EQ",
+        tcs_inst["id"],
         expected_qty=-50,  # Short
         expected_avg_price=fill_price,
     )
@@ -259,6 +265,7 @@ async def test_stop_buy_triggers_on_price_cross(
     assertions,
     test_account_id,
     logger,
+    instrument_catalog,
 ):
     """
     Test: STOP BUY order triggers when price rises to/above stop level.
@@ -267,7 +274,31 @@ async def test_stop_buy_triggers_on_price_cross(
     - STOP BUY @ 2450 (activates when price ≥ 2450)
     - Executes as MARKET after trigger
     """
+    kotakbank_inst = instrument_catalog.get_equity("KOTAKBANK")
     broker_id = "fyers"
+
+    # STOP orders are risk-checked against a live quote in BAS' QuoteStore.
+    # Seed one so the order isn't rejected with 503 "Quote not available".
+    import redis.asyncio as redis
+    from datetime import datetime, timezone
+
+    r = await redis.from_url("redis://localhost:6379/0", decode_responses=True)
+    try:
+        seq = int(datetime.now(timezone.utc).timestamp() * 1000)
+        await r.xadd(
+            "market.quote.v1",
+            {
+                "instrument_id": kotakbank_inst["id"],
+                "ltp": "2400.00",
+                "sequence_number": str(seq),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            },
+        )
+    finally:
+        await r.aclose()
+    # Give BAS' MarketDataConsumer a beat to pick up the quote.
+    import asyncio
+    await asyncio.sleep(0.5)
 
     # Act: Place STOP BUY
     stop_price = Decimal("2450.00")
@@ -276,7 +307,7 @@ async def test_stop_buy_triggers_on_price_cross(
         position_type=PositionType.INTRADAY,
         legs=[
             BasOrderLeg(
-                instrument_id="INSTR_NSE_KOTAKBANK_EQ",
+                instrument_id=kotakbank_inst["id"],
                 instrument_type="EQUITY",
                 side=OrderSide.BUY,
                 qty=100,
@@ -286,7 +317,7 @@ async def test_stop_buy_triggers_on_price_cross(
                 ltp=Decimal("2400.00"),
             )
         ],
-        underlying_instrument_id="INSTR_NSE_KOTAKBANK_EQ",
+        underlying_symbol="KOTAKBANK",
         tif=TimeInForce.DAY,
     )
 
@@ -318,7 +349,7 @@ async def test_stop_buy_triggers_on_price_cross(
     post_positions = await bas_client.get_positions(broker_id, test_account_id)
     assertions.assert_position_state(
         post_positions,
-        "INSTR_NSE_KOTAKBANK_EQ",
+        kotakbank_inst["id"],
         expected_qty=100,
         expected_avg_price=fill_price,
     )

@@ -16,6 +16,7 @@ Resilience & Chaos Testing (Phase 7):
 """
 
 import pytest
+import uuid
 import asyncio
 from decimal import Decimal
 
@@ -31,6 +32,7 @@ async def test_concurrent_orders_with_partial_failures(
     assertions,
     test_account_id,
     logger,
+    instrument_catalog,
 ):
     """
     Test: Concurrent order placement with partial failures.
@@ -42,20 +44,26 @@ async def test_concurrent_orders_with_partial_failures(
     - Failed orders can be retried
     - Overall system recovers
     """
+    hdfc_inst = instrument_catalog.get_equity("HDFC")
+    infy_inst = instrument_catalog.get_equity("INFY")
+    kotak_inst = instrument_catalog.get_equity("KOTAK")
+    sbin_inst = instrument_catalog.get_equity("SBIN")
+    tcs_inst = instrument_catalog.get_equity("TCS")
     broker_id = "fyers"
 
     # Act: Place 5 concurrent orders
     order_requests = []
     for i in range(5):
         instruments = [
-            "INSTR_NSE_SBIN_EQ",
-            "INSTR_NSE_INFY_EQ",
-            "INSTR_NSE_TCS_EQ",
-            "INSTR_NSE_HDFC_EQ",
-            "INSTR_NSE_KOTAK_EQ",
+            sbin_inst["id"],
+            infy_inst["id"],
+            tcs_inst["id"],
+            hdfc_inst["id"],
+            kotak_inst["id"],
         ]
+        instrument_symbols = ["SBIN", "INFY", "TCS", "HDFC", "KOTAK"]
         request = BasOrderPlaceRequest(
-            client_order_id=f"test_partial_fail_order_{i}_{test_account_id}",
+            client_order_id=f"test_partial_fail_order_{i}_{test_account_id}_{uuid.uuid4().hex[:8]}",
             position_type=PositionType.INTRADAY,
             legs=[
                 BasOrderLeg(
@@ -69,7 +77,7 @@ async def test_concurrent_orders_with_partial_failures(
                     ltp=Decimal("100.00"),
                 )
             ],
-            underlying_instrument_id=instruments[i],
+            underlying_symbol=instrument_symbols[i],
             tif=TimeInForce.DAY,
         )
         order_requests.append(request)
@@ -119,6 +127,7 @@ async def test_recovery_after_service_slowdown(
     assertions,
     test_account_id,
     logger,
+    instrument_catalog,
 ):
     """
     Test: System recovers after period of service degradation.
@@ -130,16 +139,19 @@ async def test_recovery_after_service_slowdown(
     - Service recovers and returns to normal
     - No orders are lost during slowdown
     """
+    infy_inst = instrument_catalog.get_equity("INFY")
+    sbin_inst = instrument_catalog.get_equity("SBIN")
+    tcs_inst = instrument_catalog.get_equity("TCS")
     broker_id = "fyers"
 
     # Phase 1: Normal operation
     logger.info("Phase 1: Normal operation")
     order_request = BasOrderPlaceRequest(
-        client_order_id=f"test_recovery_1_{test_account_id}",
+        client_order_id=f"test_recovery_1_{test_account_id}_{uuid.uuid4().hex[:8]}",
         position_type=PositionType.INTRADAY,
         legs=[
             BasOrderLeg(
-                instrument_id="INSTR_NSE_SBIN_EQ",
+                instrument_id=sbin_inst["id"],
                 instrument_type="EQUITY",
                 side=OrderSide.BUY,
                 qty=100,
@@ -149,7 +161,7 @@ async def test_recovery_after_service_slowdown(
                 ltp=Decimal("550.00"),
             )
         ],
-        underlying_instrument_id="INSTR_NSE_SBIN_EQ",
+        underlying_symbol="SBIN",
         tif=TimeInForce.DAY,
     )
 
@@ -162,8 +174,8 @@ async def test_recovery_after_service_slowdown(
     # For now, continue with next order (may be slow)
 
     order_request.client_order_id = f"test_recovery_2_{test_account_id}"
-    order_request.legs[0].instrument_id = "INSTR_NSE_INFY_EQ"
-    order_request.underlying_instrument_id = "INSTR_NSE_INFY_EQ"
+    order_request.legs[0].instrument_id = infy_inst["id"]
+    order_request.underlying_symbol = "INFY"
 
     try:
         [resp2] = await asyncio.wait_for(
@@ -178,8 +190,8 @@ async def test_recovery_after_service_slowdown(
     # Phase 3: Recovery
     logger.info("Phase 3: Recovery")
     order_request.client_order_id = f"test_recovery_3_{test_account_id}"
-    order_request.legs[0].instrument_id = "INSTR_NSE_TCS_EQ"
-    order_request.underlying_instrument_id = "INSTR_NSE_TCS_EQ"
+    order_request.legs[0].instrument_id = tcs_inst["id"]
+    order_request.underlying_symbol = "TCS"
 
     try:
         [resp3] = await bas_client.place_order(broker_id, test_account_id, order_request)
@@ -202,6 +214,7 @@ async def test_invariants_preserved_under_partial_failures(
     assertions,
     test_account_id,
     logger,
+    instrument_catalog,
 ):
     """
     Test: Financial invariants preserved despite partial failures.
@@ -214,6 +227,9 @@ async def test_invariants_preserved_under_partial_failures(
     - Sum of positions matches trades
     - WAP is mathematically correct
     """
+    infy_inst = instrument_catalog.get_equity("INFY")
+    reliance_inst = instrument_catalog.get_equity("RELIANCE")
+    sbin_inst = instrument_catalog.get_equity("SBIN")
     broker_id = "fyers"
 
     # Arrange: Capture initial state
@@ -224,14 +240,14 @@ async def test_invariants_preserved_under_partial_failures(
     # Act: Place orders
     orders = []
     order_data = [
-        ("INSTR_NSE_SBIN_EQ", 100, Decimal("550.00")),
-        ("INSTR_NSE_INFY_EQ", 50, Decimal("1950.00")),
-        ("INSTR_NSE_RELIANCE_EQ", 75, Decimal("2950.00")),
+        ("SBIN", sbin_inst["id"], 100, Decimal("550.00")),
+        ("INFY",infy_inst["id"], 50, Decimal("1950.00")),
+        ("RELIANCE",reliance_inst["id"], 75, Decimal("2950.00")),
     ]
 
-    for instrument, qty, price in order_data:
+    for symbol, instrument, qty, price in order_data:
         request = BasOrderPlaceRequest(
-            client_order_id=f"test_invariants_{instrument}_{test_account_id}",
+            client_order_id=f"test_invariants_{instrument}_{test_account_id}_{uuid.uuid4().hex[:8]}",
             position_type=PositionType.INTRADAY,
             legs=[
                 BasOrderLeg(
@@ -245,7 +261,7 @@ async def test_invariants_preserved_under_partial_failures(
                     ltp=price,
                 )
             ],
-            underlying_instrument_id=instrument,
+            underlying_symbol=symbol,
             tif=TimeInForce.DAY,
         )
 
@@ -291,10 +307,10 @@ async def test_invariants_preserved_under_partial_failures(
     # 2. Position quantities are reasonable
     total_position_value = Decimal("0")
     for pos in post_positions:
-        assert hasattr(pos, 'qty') and hasattr(pos, 'avg_price'), "Position missing fields"
-        value = abs(pos.qty) * pos.avg_price
+        assert hasattr(pos, 'net_qty') and hasattr(pos, 'avg_price'), "Position missing fields"
+        value = abs(pos.net_qty) * pos.avg_price
         total_position_value += value
-        logger.info(f"✓ Position valid | {pos.instrument_id} | Qty: {pos.qty} | Avg: {pos.avg_price}")
+        logger.info(f"✓ Position valid | {pos.instrument_id} | Qty: {pos.net_qty} | Avg: {pos.avg_price}")
 
     # 3. Trades sum to positions
     if trades:

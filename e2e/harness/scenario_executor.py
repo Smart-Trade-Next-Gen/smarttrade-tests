@@ -287,7 +287,7 @@ class ScenarioExecutor:
             client_order_id=f"{order.name}_{int(time.time()*1000)}",
             position_type=PositionType(order.position_type),
             legs=[leg],
-            underlying_instrument_id=order.instrument_id,
+            underlying_symbol=order.underlying_symbol,
             tif=TimeInForce.DAY,
         )
 

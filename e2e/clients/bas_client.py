@@ -438,7 +438,6 @@ class BASClient:
         self,
         broker_id: str,
         account_id: str,
-        initial_funds: Decimal = Decimal("1000000.00"),
         account_name: str = None,
         account_type: str = "TRADING",
     ) -> dict:
@@ -448,9 +447,14 @@ class BASClient:
         Args:
             broker_id: Broker ID (e.g., "fyers")
             account_id: Account ID to create
-            initial_funds: Initial funds for the account (default: 1M INR)
             account_name: Name of the account (defaults to account_id)
             account_type: Account type ("TRADING" for live, "PAPER" for paper trading)
+
+        Note:
+            Initial funds are owned by PBS for paper accounts. PBS auto-creates
+            an AccountBalance row with DEFAULT_INITIAL_BALANCE (1,000,000) on
+            first access, so this call only creates the BAS-side trading-account
+            metadata.
 
         Returns:
             Response dict from the API
@@ -465,14 +469,12 @@ class BASClient:
         payload = {
             "account_id": account_id,
             "account_name": account_name or account_id,
-            "base_currency": "INR",
-            "initial_balance": float(initial_funds),
             "account_type": account_type,
+            "base_currency": "INR",
         }
 
         log.debug(
-            f"Creating trading account | broker_id={broker_id} | account_id={account_id} | "
-            f"initial_balance={initial_funds}"
+            f"Creating trading account | broker_id={broker_id} | account_id={account_id} "
         )
 
         response = await client.post(url, json=payload, headers=headers)
@@ -562,3 +564,24 @@ class BASClient:
         response = await client.put(url, json=payload, headers=headers)
         response.raise_for_status()
         return response.json()
+
+    async def cleanup_quote_store(self) -> dict:
+        """
+        Drop every cached quote in BAS' in-memory QuoteStore.
+
+        Test-only. BAS validates quote freshness for risk-checked order
+        types (LIMIT/STOP); without this hook a stale quote left behind
+        by an earlier test can flip risk decisions for the current test.
+        """
+        client = self._get_client()
+        headers = self._get_headers()
+        try:
+            response = await client.delete(
+                "/api/v1/_test/cleanup/quote_store", headers=headers
+            )
+            response.raise_for_status()
+            log.debug("BAS quote_store cleared")
+            return response.json()
+        except httpx.HTTPError as e:
+            log.warning(f"BAS quote_store cleanup failed (non-critical): {e}")
+            return {"status": "error", "message": str(e)}

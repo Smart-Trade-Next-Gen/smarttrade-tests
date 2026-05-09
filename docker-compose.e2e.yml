@@ -6,7 +6,7 @@ version: "3.9"
 # Minimal, self-contained setup for comprehensive E2E testing
 # - All services needed for E2E tests
 # - Test-specific database and Redis isolation
-# - Pre-built images (no source volumes) for CI compatibility
+# - Build from source and tag images; CI can skip rebuild if pre-built images are available
 # ============================================================================
 
 x-common-env: &common-env
@@ -22,6 +22,7 @@ x-common-env: &common-env
   UV_PROJECT_ENVIRONMENT: ${UV_PROJECT_ENVIRONMENT:-/opt/venv}
   UV_INDEX_URL: ${UV_INDEX_URL:-https://pypi.org/simple}
   UV_LINK_MODE: ${UV_LINK_MODE:-copy}
+  PROMETHEUS_ENABLED: ${PROMETHEUS_ENABLED:-false}
 
 services:
 
@@ -78,6 +79,10 @@ services:
   # ──────────────────────────────────────────────────────────────────────
   auth-service:
     container_name: auth-service-e2e
+    build:
+      context: ..
+      dockerfile: authentication-service/Dockerfile
+      target: runtime-dev
     image: smarttrade/authentication-service:latest
     restart: unless-stopped
     ports:
@@ -105,6 +110,10 @@ services:
   # ──────────────────────────────────────────────────────────────────────
   market-data-service:
     container_name: market-data-service-e2e
+    build:
+      context: ..
+      dockerfile: market-data-service/Dockerfile
+      target: runtime-dev
     image: smarttrade/market-data-service:latest
     restart: unless-stopped
     ports:
@@ -137,6 +146,10 @@ services:
   # ──────────────────────────────────────────────────────────────────────
   paper-broker-service:
     container_name: paper-broker-service-e2e
+    build:
+      context: ..
+      dockerfile: paper-broker-service/Dockerfile
+      target: runtime-dev
     image: smarttrade/paper-broker-service:latest
     restart: unless-stopped
     ports:
@@ -194,6 +207,10 @@ services:
   # ──────────────────────────────────────────────────────────────────────
   broker-adapter-service:
     container_name: broker-adapter-service-e2e
+    build:
+      context: ..
+      dockerfile: broker-adapter-service/Dockerfile
+      target: runtime-dev
     image: smarttrade/broker-adapter-service:latest
     restart: unless-stopped
     ports:

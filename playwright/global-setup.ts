@@ -56,7 +56,6 @@ async function globalSetup() {
           account_id: "TEST_E2E",
           account_name: "TEST_E2E",
           base_currency: "INR",
-          initial_balance: 100000.0,
           account_type: "PAPER"  // Routes to paper-broker-service
         }
       }

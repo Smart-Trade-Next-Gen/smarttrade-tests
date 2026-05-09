@@ -202,19 +202,23 @@ def mds_rest_client(config: TestConfig) -> MDSRestClient:
 @pytest.fixture(scope="session")
 def instrument_catalog(config: TestConfig) -> InstrumentCatalog:
     """
-    Provide session-scoped instrument catalog seeded into consumer databases.
+    Provide session-scoped instrument catalog seeded into BAS and Redis.
 
-    Instruments are pre-seeded into BAS and PBS databases during setup.
-    This follows the event-driven architecture where:
-    1. Instruments are synced from external sources (e.g., Fyers) to MDS
-    2. MDS emits instrument.created events to consumers via market.instrument.v1 stream
-    3. Consumers (BAS, PBS) receive events and store instruments in their own databases
-    4. Consumers load instruments from their caches (populated from events or DB)
-    5. Tests use instruments from consumer caches (not from MDS)
+    Architecture (current):
+    - MDS owns instrument metadata and publishes instrument.created events
+      to the Redis stream market.instrument.v1.
+    - BAS subscribes to market.instrument.v1 and persists instruments via
+      its InstrumentMaster cache.
+    - PBS does NOT have an instruments table — it operates on instrument_id
+      strings only and never syncs instrument metadata.
 
-    For E2E tests, we simulate MDS behavior by:
-    - Seeding instruments to consumer databases (simulating DB persistence of received events)
-    - Publishing instrument events to Redis stream (simulating live MDS events)
+    For E2E tests we simulate MDS by:
+    - Seeding instruments directly into the BAS database (covers the case
+      where the BAS InstrumentMaster cache is loaded from DB on startup).
+    - Publishing instrument.created events to market.instrument.v1 (covers
+      the live event-driven path).
+
+    PBS receives no instrument seeding by design.
 
     Scope: session (loaded once per test run)
     Uses asyncio.run() to execute the async load operation.
@@ -280,46 +284,8 @@ def instrument_catalog(config: TestConfig) -> InstrumentCatalog:
 
     log.info("✅ Instruments seeded to BAS database")
 
-    # Seed to PBS database (optional, for PBS testing)
-    for instr in test_instruments:
-        isin_val = f"'{instr.get('isin')}'" if instr.get('isin') else 'NULL'
-        sql = f"""
-            INSERT INTO instruments
-            (id, symbol, name, exchange, segment, instrument_type, isin, lot_size, tick_size, status, version, instrument_checksum, created_at, updated_at)
-            VALUES
-            ('{instr.get("id")}',
-             '{instr.get("symbol")}',
-             '{instr.get("name", instr.get("symbol", ""))}',
-             '{instr.get("exchange", "NSE")}',
-             '{instr.get("segment", "CASH")}',
-             '{instr.get("type", "EQUITY")}',
-             {isin_val},
-             {instr.get('lot_size', 1)},
-             {instr.get('tick_size', 0.01)},
-             'ACTIVE',
-             1,
-             '',
-             NOW(),
-             NOW())
-            ON CONFLICT (id) DO UPDATE SET
-                symbol = EXCLUDED.symbol,
-                updated_at = NOW();
-        """
-
-        try:
-            proc = subprocess.run(
-                ["docker-compose", "-f", "../docker-compose.e2e.yml", "exec", "-T", "postgres",
-                 "psql", "-U", "postgres", "-d", "smarttrade_paper_broker_service", "-c", sql],
-                cwd="/home/amit/Work/Smart-Trade/smarttrade-tests/e2e",
-                capture_output=True,
-                timeout=5,
-            )
-            if proc.returncode != 0:
-                log.debug(f"Could not insert {instr.get('id')} to PBS: {proc.stderr.decode()}")
-        except Exception as e:
-            log.debug(f"Could not insert {instr.get('id')} to PBS: {e}")
-
-    log.info("✅ Instruments seeded to PBS database")
+    # PBS no longer owns instrument metadata — it works with instrument_id only,
+    # so there is no PBS-side seeding step.
 
     # Publish instrument events to Redis stream (market.instrument.v1)
     # This simulates MDS publishing instrument events that consumers subscribe to
@@ -409,12 +375,17 @@ def _configure_test_timeout(request):
 
 
 @pytest_asyncio.fixture(autouse=True)
-async def setup_trading_account(bas_client, mock_client, test_account_id):
+async def setup_trading_account(
+    bas_client, mock_client, portfolio_client, test_account_id
+):
     """
-    Create paper trading accounts (autouse).
+    Create the BAS trading-account record (autouse).
 
-    Automatically creates a paper trading account with fyers broker before each test.
-    Paper accounts use real broker ID but account_type=PAPER to enable paper trading.
+    BAS owns trading-account metadata and is the only service we explicitly
+    create the account in. The matching PBS AccountBalance row is created
+    lazily on first access (PBS account_repo.get_with_lock auto-inserts with
+    DEFAULT_INITIAL_BALANCE = 1_000_000), so no PBS account-creation call is
+    needed.
 
     Scope: function
     """
@@ -427,16 +398,20 @@ async def setup_trading_account(bas_client, mock_client, test_account_id):
         except Exception:
             pass  # Account may not exist
 
-        # Create PAPER trading account
+        # Create PAPER trading account in BAS. PBS AccountBalance is auto-
+        # created on first order placement with DEFAULT_INITIAL_BALANCE.
         await bas_client.create_trading_account(
             broker_id=broker_id,
             account_id=test_account_id,
-            initial_funds=Decimal("1000000.00"),
             account_type="PAPER",
         )
         log.debug(f"✅ Paper trading account created: {broker_id}/{test_account_id}")
 
-        # Clean up execution state and positions (batch these for efficiency)
+        # Clean up execution state, positions, and PBS' in-memory price
+        # cache so the next test starts from a clean slate. Without
+        # cleanup_price_cache, OrderService.create_order auto-fills any
+        # newly-placed order at whatever LTP a previous test left in the
+        # cache, before the current test's own quote can be injected.
         try:
             await mock_client.cleanup_execution_state(broker_id, test_account_id)
             log.debug(f"✅ Execution state cleared: {broker_id}/{test_account_id}")
@@ -448,6 +423,24 @@ async def setup_trading_account(bas_client, mock_client, test_account_id):
             log.debug(f"✅ Positions cleared: {broker_id}/{test_account_id}")
         except Exception as e:
             log.warning(f"⚠️ Positions cleanup failed: {e}")
+
+        try:
+            await mock_client.cleanup_price_cache()
+            log.debug("✅ PBS price_cache cleared")
+        except Exception as e:
+            log.warning(f"⚠️ price_cache cleanup failed: {e}")
+
+        try:
+            await mock_client.cleanup_account(broker_id, test_account_id)
+            log.debug(f"✅ PBS account reset: {broker_id}/{test_account_id}")
+        except Exception as e:
+            log.warning(f"⚠️ PBS account reset failed: {e}")
+
+        try:
+            await portfolio_client.cleanup_positions()
+            log.debug("✅ Portfolio aggregated positions cleared")
+        except Exception as e:
+            log.warning(f"⚠️ Portfolio positions cleanup failed: {e}")
 
     except Exception as e:
         log.warning(f"⚠️ Paper account creation failed: {e}")
@@ -505,13 +498,27 @@ def test_account_id() -> str:
     return "TEST_E2E_SHARED"
 
 
+@pytest.fixture(scope="session")
+def test_user_id() -> str:
+    """
+    Single shared user UUID for all tests in the session.
+
+    Must match the `sub` claim in auth_token; many components (BAS/PBS
+    subscription publisher, MDS UI WS routing, RBAC) key state on user_id
+    so tests need a single canonical value.
+
+    Scope: session
+    """
+    return "00000000-0000-0000-0000-000000000001"
+
+
 # ────────────────────────────────────────────────────────────────────────────────
 # FUNCTION-SCOPED FIXTURES: AUTHENTICATION
 # ────────────────────────────────────────────────────────────────────────────────
 
 
 @pytest.fixture(scope="session")
-def auth_token(config: TestConfig) -> str:
+def auth_token(config: TestConfig, test_user_id: str) -> str:
     """
     Get authentication token for service access.
 
@@ -539,8 +546,6 @@ def auth_token(config: TestConfig) -> str:
         raise ValueError("JWT_SECRET_KEY required for test authentication")
 
     now = datetime.utcnow()
-    # Use a fixed test user ID so all requests use the same user across the test
-    test_user_id = "00000000-0000-0000-0000-000000000001"
     payload = {
         "sub": test_user_id,  # Fixed UUID for consistency across test requests
         "roles": ["user"],
@@ -581,7 +586,11 @@ async def mock_client(
     config: TestConfig, auth_token: str
 ) -> AsyncGenerator[MockClient, None]:
     """
-    Provide MockClient instance for deterministic fill injection.
+    Provide MockClient instance for fill injection.
+
+    inject_fill drives PBS fills by publishing to the Redis stream
+    `market.quote.v1` (production path) — there is no longer an HTTP
+    /execute shortcut, so we pass the redis URL here.
 
     Scope: session
     """
@@ -589,6 +598,7 @@ async def mock_client(
         base_url=config.mock_url,
         token=auth_token,
         timeout=config.timeout_fast,
+        redis_url=config.redis_url,
     ) as client:
         yield client
 
@@ -628,13 +638,20 @@ async def market_data_stream(mock_client: MockClient, config: TestConfig) -> Moc
     """
     Provide MockMarketDataStream for real execution mode tests.
 
-    Allows tests to inject price updates that trigger execution via Mock's PriceExecutionEngine.
+    Publishes price updates on the production Redis stream `market.quote.v1`
+    (read by BAS QuoteStore and PBS PriceExecutionEngine) and also calls the
+    PBS HTTP shortcut for deterministic LIMIT/STOP triggering.
 
     Scope: function (fresh stream per test)
     """
-    stream = MockMarketDataStream(mock_client, broker_id=config.broker_id)
+    stream = MockMarketDataStream(
+        mock_client,
+        broker_id=config.broker_id,
+        redis_url=config.redis_url,
+    )
     yield stream
     stream.reset()
+    await stream.close()
 
 
 @pytest_asyncio.fixture
@@ -649,6 +666,13 @@ async def redis_observer(config: TestConfig) -> AsyncGenerator[RedisStreamObserv
     """
     observer = RedisStreamObserver(redis_url=config.redis_url)
     await observer.start()
+    # Pre-warm consumer groups at the current stream tail so events emitted
+    # during the test are captured. Without this, the consumer group is
+    # created lazily inside observe_stream() — by which point any events the
+    # test produced before its first observe_stream() call are already past
+    # the group's $ position and invisible.
+    for event_type in ["order.filled.v1", "trade.executed.v1", "position.updated.v1"]:
+        await observer._ensure_consumer_group(f"events:{event_type}")
     yield observer
     # Cleanup: delete observer consumer groups
     for event_type in ["order.filled.v1", "trade.executed.v1", "position.updated.v1"]:
@@ -674,21 +698,28 @@ async def quote_injector(config: TestConfig, mock_client: MockClient) -> AsyncGe
 
 @pytest_asyncio.fixture(scope="session")
 async def mds_client(
-    config: TestConfig, auth_token: str, test_account_id: str
+    config: TestConfig, auth_token: str, test_account_id: str, test_user_id: str
 ) -> AsyncGenerator[MDSWebSocketClient, None]:
     """
-    Provide MDSWebSocketClient instance for market data only.
+    Provide MDSWebSocketClient bound to the MDS UI WebSocket channel.
 
-    Scope: session — one connection for the entire test run, never closed between tests
+    Scope: session — one connection for the entire test run, never closed
+    between tests.
 
-    Note: MDS WebSocket is now used for market data only (quotes, depth, candles).
-    Account events (orders, trades, positions) are handled by BAS WebSocket.
+    The MDS UI channel is exclusively a UI-facing market data feed (quotes,
+    depth, candles, instrument subscription requests). BAS and PBS no longer
+    consume MDS via WebSocket — they read market data from the Redis stream
+    market.quote.v1. Tests must therefore not use mds_client as a stand-in
+    for the BAS/PBS data path.
+
+    Account/execution events stay on the BAS WebSocket (bas_ws_client).
     """
     ws_url_with_path = f"{config.mds_ws_url}/ws/{config.broker_id}/ui"
 
     client = MDSWebSocketClient(
         ws_url=ws_url_with_path,
         account_id=test_account_id,
+        user_id=test_user_id,
         token=auth_token,
         timeout=config.timeout_slow,
     )
@@ -754,6 +785,8 @@ async def bas_ws_client(
                     "order.filled.v1": "order_fill",
                     "trade.executed.v1": "trade_exec",
                     "position.updated.v1": "position_update",
+                    "order.cancelled.v1": "order_cancelled",
+                    "order.rejected.v1": "order_rejected",
                 }
                 normalized_event_type = event_type_map.get(event_type, event_type)
 
@@ -985,7 +1018,6 @@ def _dict_to_order_request(order_dict: dict, instrument_catalog: InstrumentCatal
         client_order_id=f"e2e_{uuid.uuid4().hex[:12]}",
         position_type=PositionType(order_dict.get("position_type", "INTRADAY").upper()),
         legs=[leg],
-        underlying_instrument_id=instrument_id,
         underlying_symbol=instrument.get("symbol", instrument_id),
         tif=TimeInForce(order_dict.get("tif", "DAY").upper()),
     )

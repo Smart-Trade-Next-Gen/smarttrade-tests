@@ -82,6 +82,33 @@ class PortfolioClient:
             log.error(f"Failed to fetch positions: {e.response.status_code}")
             raise
 
+    async def cleanup_positions(self) -> dict:
+        """
+        Delete every aggregated position for the current user.
+
+        Testing-only. Portfolio aggregates accumulate across e2e tests
+        because each fill mutates per-instrument totals; without this
+        reset, tests sharing an instrument see growing net_qty across runs.
+        """
+        if not self.client:
+            self.client = httpx.AsyncClient(
+                timeout=self.timeout,
+                headers=self._headers,
+            )
+
+        url = f"{self.base_url}/api/v1/positions/cleanup"
+        try:
+            response = await self.client.delete(url)
+            response.raise_for_status()
+            payload = response.json()
+            log.debug(
+                f"Portfolio positions cleared: {payload.get('positions_cleared', '?')}"
+            )
+            return payload
+        except httpx.HTTPError as e:
+            log.warning(f"Portfolio positions cleanup failed (non-critical): {e}")
+            return {"status": "error", "message": str(e)}
+
     async def get_portfolio(self) -> dict:
         """
         Fetch portfolio summary (total exposure, cash, etc.).

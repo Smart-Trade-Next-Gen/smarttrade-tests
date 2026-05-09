@@ -30,6 +30,7 @@ class MDSWebSocketClient:
         ws_url: str,
         account_id: str,
         token: str,
+        user_id: Optional[str] = None,
         timeout: float = 30.0,
         heartbeat_interval: float = 5.0,
         initial_backoff: float = 1.0,
@@ -41,9 +42,14 @@ class MDSWebSocketClient:
         Initialize MDSWebSocketClient.
 
         Args:
-            ws_url: WebSocket URL for MDS (e.g., ws://localhost:8004)
-            account_id: Account ID for subscription
+            ws_url: WebSocket URL for MDS UI route (e.g., ws://localhost:8004/ws/fyers/ui)
+            account_id: Account ID used in subscribe.account UI messages
             token: JWT token for authentication
+            user_id: User UUID — included as a ?user_id= query param so the MDS
+                UI route is consistently keyed by user (matches the inter-service
+                subscription model on market.subscription.request.v1). MDS
+                authoritatively reads user_id from the JWT; this query param is
+                cosmetic/observability for now.
             timeout: Connection timeout in seconds (default: 30.0)
             heartbeat_interval: Interval for responding to heartbeats (default: 5.0)
             initial_backoff: Initial reconnect backoff in seconds (default: 1.0)
@@ -58,6 +64,7 @@ class MDSWebSocketClient:
         """
         self.ws_url = ws_url.rstrip("/")
         self.account_id = account_id
+        self.user_id = user_id
         self.token = token
         self.timeout = timeout
         self.heartbeat_interval = heartbeat_interval
@@ -125,10 +132,14 @@ class MDSWebSocketClient:
                     log.info(
                         f"Connecting to MDS "
                         f"(attempt {attempt}/{self.max_reconnect_attempts}) | "
-                        f"ws_url={self.ws_url} | account_id={self.account_id}"
+                        f"ws_url={self.ws_url} | user_id={self.user_id} | "
+                        f"account_id={self.account_id}"
                     )
-                    # Add token and account_id as query parameters for authentication and routing
-                    ws_url_with_params = f"{self.ws_url}?token={self.token}&account_id={self.account_id}"
+                    # Token authenticates; user_id query param matches the
+                    # user-scoped subscription model used elsewhere in MDS.
+                    ws_url_with_params = (
+                        f"{self.ws_url}?token={self.token}&user_id={self.user_id}"
+                    )
                     self.connection = await asyncio.wait_for(
                         websockets.asyncio.client.connect(ws_url_with_params),
                         timeout=self.timeout,

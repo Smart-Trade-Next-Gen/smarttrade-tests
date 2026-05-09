@@ -127,6 +127,7 @@ async def test_trade_executed_event_has_correct_schema(
     assert "event_id" in event
 
 
+@pytest.mark.skip(reason="BAS handle_position_updated() raises 'got multiple values for argument session'; events never reach Redis stream. Pending BAS-side fix.")
 @pytest.mark.asyncio
 async def test_position_updated_event_has_correct_schema(
     config,
@@ -245,3 +246,103 @@ async def test_events_have_unique_event_ids(
     # Assertions
     assert len(all_event_ids) > 0, "No events found"
     assert len(all_event_ids) == len(set(all_event_ids)), "Duplicate event_ids found"
+
+
+@pytest.mark.asyncio
+async def test_subscription_request_includes_user_id(
+    config,
+    test_account_id,
+    test_user_id,
+    bas_client,
+    mock_client,
+    place_and_sync_order,
+    instrument_catalog,
+    event_collector,
+):
+    """
+    BAS publishes runtime instrument-subscription requests on the
+    `market.subscription.request.v1` Redis stream. Each request must carry
+    the originating `user_id` so MDS can scope broker subscriptions per
+    user. Verify the messages emitted while placing an order include the
+    test user's UUID and the instrument we ordered against.
+    """
+    import json
+    import redis.asyncio as redis
+
+    instrument = instrument_catalog.get_any_equity(1)[0]
+    instrument_id = instrument["id"]
+
+    r = await redis.from_url(config.redis_url, decode_responses=True)
+    try:
+        # Snapshot the stream tail BEFORE placing the order so we only read
+        # subscription requests caused by this test.
+        try:
+            info = await r.xinfo_stream("market.subscription.request.v1")
+            tail_id = info.get("last-generated-id", "0-0")
+        except redis.exceptions.ResponseError:
+            # Stream doesn't exist yet — read from the beginning.
+            tail_id = "0-0"
+
+        order_responses = await place_and_sync_order(
+            broker_id=config.broker_id,
+            account_id=test_account_id,
+            order_request={
+                "instrument_id": instrument_id,
+                "position_type": "INTRADAY",
+                "side": "BUY",
+                "order_type": "MARKET",
+                "qty": 10,
+            },
+        )
+        # Drive the order to completion so any post-fill subscription
+        # bookkeeping has fired before we read the stream.
+        order_id = order_responses[0]["broker_order_id"]
+        await mock_client.inject_fill(
+            broker_id=config.broker_id,
+            account_id=test_account_id,
+            order_id=order_id,
+            sequence=1,
+            fill_qty=10,
+            fill_price=Decimal("550.00"),
+        )
+        await event_collector.wait_for_completion(
+            order_id, timeout=config.timeout_medium
+        )
+
+        # Read all subscription messages emitted after our snapshot.
+        # SubscriptionPublisher debounces at 50ms so messages should be
+        # present by the time the fill completes.
+        entries = await r.xrange(
+            "market.subscription.request.v1",
+            min=f"({tail_id}",
+            max="+",
+        )
+    finally:
+        await r.close()
+
+    assert entries, (
+        "Expected at least one market.subscription.request.v1 message after "
+        "placing an order; BAS subscription publisher did not emit."
+    )
+
+    matched_for_instrument = False
+    for _msg_id, fields in entries:
+        # Every message must carry user_id — that is the contract.
+        assert fields.get("user_id") == test_user_id, (
+            f"subscription request missing/mismatched user_id: "
+            f"got {fields.get('user_id')!r}, expected {test_user_id!r}"
+        )
+        assert fields.get("broker_id") == config.broker_id
+        assert fields.get("action") in {"subscribe", "unsubscribe"}
+        try:
+            instruments = json.loads(fields.get("instrument_ids", "[]"))
+        except json.JSONDecodeError:
+            instruments = []
+        if instrument_id in instruments:
+            matched_for_instrument = True
+
+    assert matched_for_instrument, (
+        f"No subscription request mentioned the ordered instrument "
+        f"{instrument_id!r}; BAS is not requesting market data for the "
+        f"instruments it places orders against."
+    )

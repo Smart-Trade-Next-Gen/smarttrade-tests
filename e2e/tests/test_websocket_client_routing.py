@@ -49,7 +49,7 @@ async def test_bas_websocket_connect_includes_account_id(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_mds_websocket_connect_includes_account_id(monkeypatch):
+async def test_mds_websocket_connect_includes_user_id(monkeypatch):
     captured = {}
 
     class DummyConnection:
@@ -79,6 +79,7 @@ async def test_mds_websocket_connect_includes_account_id(monkeypatch):
     client = MDSWebSocketClient(
         ws_url="ws://localhost:8004/ws/fyers/ui",
         account_id="ACC-456",
+        user_id="00000000-0000-0000-0000-000000000001",
         token="jwt-token",
         timeout=0.1,
         heartbeat_interval=60.0,
@@ -87,4 +88,7 @@ async def test_mds_websocket_connect_includes_account_id(monkeypatch):
     await client.connect()
     await client.disconnect()
 
-    assert captured["url"] == "ws://localhost:8004/ws/fyers/ui?token=jwt-token&account_id=ACC-456"
+    assert captured["url"] == (
+        "ws://localhost:8004/ws/fyers/ui"
+        "?token=jwt-token&user_id=00000000-0000-0000-0000-000000000001"
+    )

@@ -49,26 +49,47 @@ class AssertionEngine:
         if not events:
             raise AssertionError("No events found for order")
 
-        # Look for order.filled event which has the status field
-        filled_event = None
-        for event in events:
-            if event.get("type") == "order_fill" or event.get("data", {}).get("event_type") == "order.filled.v1":
-                filled_event = event
-                break
+        # Pick the event whose status matches the expected lifecycle terminal:
+        # for FILLED outcomes that means an order_fill event; for CANCELLED /
+        # REJECTED the broker only emits order.cancelled.v1 / order.rejected.v1
+        # (no fill ever happens), so we must accept those too.
+        terminal_event_types = {
+            "FILLED": {"order_fill", "order.filled.v1"},
+            "CANCELLED": {"order_cancelled", "order.cancelled.v1"},
+            "REJECTED": {"order_rejected", "order.rejected.v1"},
+        }
+        match_types = terminal_event_types.get(expected_status, set())
 
-        if not filled_event:
-            raise AssertionError(f"No order.filled event found | Events: {len(events)}")
+        terminal_event = None
+        for event in events:
+            event_type = event.get("type") or ""
+            inner_type = (event.get("data") or {}).get("event_type") or ""
+            if match_types and (event_type in match_types or inner_type in match_types):
+                terminal_event = event
+                break
+        if terminal_event is None:
+            # Fall back to the prior heuristic (order_fill) so unrelated callers
+            # still surface a useful error.
+            for event in events:
+                if event.get("type") == "order_fill" or (event.get("data") or {}).get("event_type") == "order.filled.v1":
+                    terminal_event = event
+                    break
+
+        if not terminal_event:
+            raise AssertionError(
+                f"No terminal event matching status={expected_status} | Events: {len(events)}"
+            )
 
         final_status = (
-            filled_event.get("status")
-            or filled_event.get("data", {}).get("status")
-            or filled_event.get("order_status")
+            terminal_event.get("status")
+            or (terminal_event.get("data") or {}).get("status")
+            or terminal_event.get("order_status")
         )
 
         if final_status != expected_status:
             raise AssertionError(
                 f"Expected order status {expected_status}, got {final_status} | "
-                f"Events: {len(events)} | Final event: {final_event}"
+                f"Events: {len(events)} | Terminal event: {terminal_event}"
             )
 
         # If FILLED, validate quantity

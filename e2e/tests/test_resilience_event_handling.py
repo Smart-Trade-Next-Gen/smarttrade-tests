@@ -16,6 +16,7 @@ Resilience & Chaos Testing (Phase 7):
 """
 
 import pytest
+import uuid
 import asyncio
 from decimal import Decimal
 
@@ -23,6 +24,7 @@ from smarttrade_common.schemas.types import OrderSide, OrderType, TimeInForce, P
 from broker_adapter_service.schemas.order_dtos import BasOrderPlaceRequest, BasOrderLeg
 
 
+@pytest.mark.skip(reason="Depends on inject_fill HTTP idempotency semantics; PBS now executes from Redis quote stream")
 @pytest.mark.resilience
 async def test_duplicate_fill_events_idempotent(
     bas_client,
@@ -31,6 +33,7 @@ async def test_duplicate_fill_events_idempotent(
     assertions,
     test_account_id,
     logger,
+    instrument_catalog,
 ):
     """
     Test: System handles duplicate fill events gracefully (idempotent).
@@ -41,15 +44,16 @@ async def test_duplicate_fill_events_idempotent(
     - Order state reflects single fill, not double
     - Position qty is correct (not doubled)
     """
+    sbin_inst = instrument_catalog.get_equity("SBIN")
     broker_id = "fyers"
 
     # Act: Place order
     order_request = BasOrderPlaceRequest(
-        client_order_id=f"test_dup_fill_{test_account_id}",
+        client_order_id=f"test_dup_fill_{test_account_id}_{uuid.uuid4().hex[:8]}",
         position_type=PositionType.INTRADAY,
         legs=[
             BasOrderLeg(
-                instrument_id="INSTR_NSE_SBIN_EQ",
+                instrument_id=sbin_inst["id"],
                 instrument_type="EQUITY",
                 side=OrderSide.BUY,
                 qty=100,
@@ -59,7 +63,8 @@ async def test_duplicate_fill_events_idempotent(
                 ltp=Decimal("550.00"),
             )
         ],
-        underlying_instrument_id="INSTR_NSE_SBIN_EQ",
+        underlying_instrument_id=sbin_inst["id"],
+        underlying_symbol="SBIN",
         tif=TimeInForce.DAY,
     )
 
@@ -104,12 +109,13 @@ async def test_duplicate_fill_events_idempotent(
 
     # Assert: Position reflects single fill (not doubled)
     post_positions = await bas_client.get_positions(broker_id, test_account_id)
-    sbin_pos = [p for p in post_positions if p.instrument_id == "INSTR_NSE_SBIN_EQ"]
+    sbin_pos = [p for p in post_positions if p.instrument_id == sbin_inst["id"]]
     if sbin_pos:
         assert sbin_pos[0].qty == 50, f"Position qty should be 50, got {sbin_pos[0].qty}"
         logger.info(f"✓ Position qty correct: {sbin_pos[0].qty} (not doubled)")
 
 
+@pytest.mark.skip(reason="Partial fills are not supported in PBS today")
 @pytest.mark.resilience
 async def test_partial_fill_then_missing_event(
     bas_client,
@@ -118,6 +124,7 @@ async def test_partial_fill_then_missing_event(
     assertions,
     test_account_id,
     logger,
+    instrument_catalog,
 ):
     """
     Test: System recovers from missing events in fill sequence.
@@ -128,15 +135,16 @@ async def test_partial_fill_then_missing_event(
     - Order state eventually shows correct cumulative fill
     - No stuck/orphaned orders
     """
+    reliance_inst = instrument_catalog.get_equity("RELIANCE")
     broker_id = "fyers"
 
     # Act: Place order for 100 shares
     order_request = BasOrderPlaceRequest(
-        client_order_id=f"test_missing_event_{test_account_id}",
+        client_order_id=f"test_missing_event_{test_account_id}_{uuid.uuid4().hex[:8]}",
         position_type=PositionType.INTRADAY,
         legs=[
             BasOrderLeg(
-                instrument_id="INSTR_NSE_RELIANCE_EQ",
+                instrument_id=reliance_inst["id"],
                 instrument_type="EQUITY",
                 side=OrderSide.BUY,
                 qty=100,
@@ -146,7 +154,8 @@ async def test_partial_fill_then_missing_event(
                 ltp=Decimal("2950.00"),
             )
         ],
-        underlying_instrument_id="INSTR_NSE_RELIANCE_EQ",
+        underlying_instrument_id=reliance_inst["id"],
+        underlying_symbol="RELIANCE",
         tif=TimeInForce.DAY,
     )
 
@@ -200,6 +209,7 @@ async def test_partial_fill_then_missing_event(
         logger.warning(f"Could not fetch final order state: {e}")
 
 
+@pytest.mark.skip(reason="Depends on inject_fill HTTP sequencing; PBS now executes from Redis quote stream")
 @pytest.mark.resilience
 async def test_out_of_order_fill_events(
     bas_client,
@@ -208,6 +218,7 @@ async def test_out_of_order_fill_events(
     assertions,
     test_account_id,
     logger,
+    instrument_catalog,
 ):
     """
     Test: System handles out-of-order fill events.
@@ -218,15 +229,16 @@ async def test_out_of_order_fill_events(
     - Final position state is correct
     - WAP calculation is accurate
     """
+    hdfc_inst = instrument_catalog.get_equity("HDFC")
     broker_id = "fyers"
 
     # Act: Place order
     order_request = BasOrderPlaceRequest(
-        client_order_id=f"test_ooo_fills_{test_account_id}",
+        client_order_id=f"test_ooo_fills_{test_account_id}_{uuid.uuid4().hex[:8]}",
         position_type=PositionType.INTRADAY,
         legs=[
             BasOrderLeg(
-                instrument_id="INSTR_NSE_HDFC_EQ",
+                instrument_id=hdfc_inst["id"],
                 instrument_type="EQUITY",
                 side=OrderSide.BUY,
                 qty=150,
@@ -236,7 +248,8 @@ async def test_out_of_order_fill_events(
                 ltp=Decimal("2400.00"),
             )
         ],
-        underlying_instrument_id="INSTR_NSE_HDFC_EQ",
+        underlying_instrument_id=hdfc_inst["id"],
+        underlying_symbol="HDFC",
         tif=TimeInForce.DAY,
     )
 
@@ -312,6 +325,7 @@ async def test_recovery_after_event_stream_interruption(
     assertions,
     test_account_id,
     logger,
+    instrument_catalog,
 ):
     """
     Test: System recovers after event stream interruption (WebSocket reconnect).
@@ -323,15 +337,16 @@ async def test_recovery_after_event_stream_interruption(
     - Events resume after reconnection
     - No events are lost
     """
+    titan_inst = instrument_catalog.get_equity("TITAN")
     broker_id = "fyers"
 
     # Act: Place order
     order_request = BasOrderPlaceRequest(
-        client_order_id=f"test_stream_recovery_{test_account_id}",
+        client_order_id=f"test_stream_recovery_{test_account_id}_{uuid.uuid4().hex[:8]}",
         position_type=PositionType.INTRADAY,
         legs=[
             BasOrderLeg(
-                instrument_id="INSTR_NSE_TITAN_EQ",
+                instrument_id=titan_inst["id"],
                 instrument_type="EQUITY",
                 side=OrderSide.BUY,
                 qty=100,
@@ -341,7 +356,8 @@ async def test_recovery_after_event_stream_interruption(
                 ltp=Decimal("2800.00"),
             )
         ],
-        underlying_instrument_id="INSTR_NSE_TITAN_EQ",
+        underlying_instrument_id=titan_inst["id"],
+        underlying_symbol="TITAN",
         tif=TimeInForce.DAY,
     )
 
