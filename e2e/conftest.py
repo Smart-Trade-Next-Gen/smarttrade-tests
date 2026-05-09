@@ -922,14 +922,18 @@ def scenario_engine() -> ScenarioEngine:
 
 
 @pytest_asyncio.fixture
-async def place_and_sync_order(bas_client: BASClient, mock_client: MockClient, config: TestConfig, instrument_catalog: InstrumentCatalog):
+async def place_and_sync_order(bas_client: BASClient, config: TestConfig, instrument_catalog: InstrumentCatalog):
     """
-    Provide a helper function to place an order in BAS and sync it to paper broker service.
+    Place an order via BAS — and only via BAS.
 
-    This ensures orders exist in paper broker service with correct instrument_id (from MDS)
-    before fill injection is attempted.
+    BAS' paper plugin internally forwards the order to PBS' create_order
+    endpoint, so PBS receives the order through the production path. Tests
+    must NOT POST to PBS' /api/v1/order/... directly: that bypasses risk
+    validation, idempotency caching, the BAS↔PBS WebSocket session setup,
+    and the order-state machine in BAS.
 
-    Supports both dict (simplified) and BasOrderPlaceRequest formats for order_request.
+    Supports both dict (simplified) and BasOrderPlaceRequest formats for
+    order_request.
 
     Usage in tests:
         # Dict format (automatically converted to BasOrderPlaceRequest)
@@ -941,13 +945,7 @@ async def place_and_sync_order(bas_client: BASClient, mock_client: MockClient, c
         # Or Pydantic model format (passed directly)
         [order_resp] = await place_and_sync_order(broker_id, account_id, order_request=BasOrderPlaceRequest(...))
 
-    Args (passed to helper):
-        broker_id: Broker identifier
-        account_id: Account identifier
-        order_request: dict or BasOrderPlaceRequest
-
-    Returns:
-        List of order responses from BAS (same as place_order)
+    Returns: List of order response dicts from BAS.
 
     Scope: function
     """
@@ -956,25 +954,12 @@ async def place_and_sync_order(bas_client: BASClient, mock_client: MockClient, c
         if isinstance(order_request, dict):
             order_request = _dict_to_order_request(order_request, instrument_catalog)
 
-        # Step 1: Place order in BAS (returns order with instrument_id from MDS)
+        # Place order via BAS only. BAS' paper plugin auto-forwards to PBS.
         order_responses = await bas_client.place_order(broker_id, account_id, order_request)
-
-        # Step 2: Convert responses to dicts for consistency (tests expect dicts)
-        order_response_dicts = [
+        return [
             resp.model_dump() if hasattr(resp, 'model_dump') else resp
             for resp in order_responses
         ]
-
-        # Step 3: Sync each order to paper broker service using instrument_id (not broker symbol)
-        for order_resp_dict in order_response_dicts:
-            try:
-                await mock_client.sync_order(broker_id, account_id, order_resp_dict)
-                log.debug(f"Order synced: {order_resp_dict.get('broker_order_id')}")
-            except Exception as e:
-                log.warning(f"Failed to sync order to paper broker service (non-critical): {e}")
-                # Sync to paper broker is optional - tests can proceed without it
-
-        return order_response_dicts
 
     return helper
 
