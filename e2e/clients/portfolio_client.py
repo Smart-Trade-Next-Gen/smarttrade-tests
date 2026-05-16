@@ -12,17 +12,28 @@ log = logging.getLogger(__name__)
 class PortfolioClient:
     """REST client for Portfolio Service with polling support for eventual consistency."""
 
-    def __init__(self, base_url: str, token: str, timeout: float = 10.0):
+    def __init__(
+        self,
+        base_url: str,
+        token: str,
+        broker_id: str,
+        account_id: str,
+        timeout: float = 10.0,
+    ):
         """
         Initialize Portfolio Service client.
 
         Args:
             base_url: Base URL of Portfolio Service (e.g., http://localhost:8008)
             token: JWT authentication token
+            broker_id: Broker scope for all queries (required path segment after split)
+            account_id: Account scope for all queries (required path segment after split)
             timeout: Request timeout in seconds
         """
         self.base_url = base_url.rstrip("/")
         self.token = token
+        self.broker_id = broker_id
+        self.account_id = account_id
         self.timeout = timeout
         self.client = None
         self._headers = {"Authorization": f"Bearer {token}"}
@@ -66,7 +77,7 @@ class PortfolioClient:
                 headers=self._headers,
             )
 
-        url = f"{self.base_url}/api/v1/positions"
+        url = f"{self.base_url}/api/v1/positions/{self.broker_id}/{self.account_id}"
         params = {"limit": limit, "offset": offset}
         if instrument_id:
             params["instrument_id"] = instrument_id
@@ -125,7 +136,7 @@ class PortfolioClient:
                 headers=self._headers,
             )
 
-        url = f"{self.base_url}/api/v1/portfolio"
+        url = f"{self.base_url}/api/v1/portfolio/{self.broker_id}/{self.account_id}"
 
         try:
             response = await self.client.get(url)
@@ -201,74 +212,5 @@ class PortfolioClient:
                 await asyncio.sleep(poll_interval)
                 continue
 
-    async def get_orders(
-        self,
-        instrument_id: Optional[str] = None,
-        limit: int = 50,
-    ) -> list[dict]:
-        """
-        Fetch orders from Portfolio Service read model.
-
-        Args:
-            instrument_id: Optional filter by instrument ID
-            limit: Number of orders to return
-
-        Returns:
-            List of order dictionaries
-        """
-        if not self.client:
-            self.client = httpx.AsyncClient(
-                timeout=self.timeout,
-                headers=self._headers,
-            )
-
-        url = f"{self.base_url}/api/v1/orders"
-        params = {"limit": limit}
-        if instrument_id:
-            params["instrument_id"] = instrument_id
-
-        try:
-            response = await self.client.get(url, params=params)
-            response.raise_for_status()
-            data = response.json()
-            orders = data.get("items", [])
-            return orders
-        except httpx.HTTPStatusError as e:
-            log.error(f"Failed to fetch orders: {e.response.status_code}")
-            raise
-
-    async def get_trades(
-        self,
-        instrument_id: Optional[str] = None,
-        limit: int = 50,
-    ) -> list[dict]:
-        """
-        Fetch trades from Portfolio Service read model.
-
-        Args:
-            instrument_id: Optional filter by instrument ID
-            limit: Number of trades to return
-
-        Returns:
-            List of trade dictionaries
-        """
-        if not self.client:
-            self.client = httpx.AsyncClient(
-                timeout=self.timeout,
-                headers=self._headers,
-            )
-
-        url = f"{self.base_url}/api/v1/trades"
-        params = {"limit": limit}
-        if instrument_id:
-            params["instrument_id"] = instrument_id
-
-        try:
-            response = await self.client.get(url, params=params)
-            response.raise_for_status()
-            data = response.json()
-            trades = data.get("items", [])
-            return trades
-        except httpx.HTTPStatusError as e:
-            log.error(f"Failed to fetch trades: {e.response.status_code}")
-            raise
+    # Orders and trades belong to Journal Service after the read split.
+    # Use JournalClient.get_orders / JournalClient.get_trades instead.

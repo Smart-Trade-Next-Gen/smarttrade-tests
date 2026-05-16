@@ -12,17 +12,28 @@ log = logging.getLogger(__name__)
 class JournalClient:
     """REST client for Journal Service with polling support for eventual consistency."""
 
-    def __init__(self, base_url: str, token: str, timeout: float = 10.0):
+    def __init__(
+        self,
+        base_url: str,
+        token: str,
+        broker_id: str,
+        account_id: str,
+        timeout: float = 10.0,
+    ):
         """
         Initialize Journal Service client.
 
         Args:
             base_url: Base URL of Journal Service (e.g., http://localhost:8007)
             token: JWT authentication token
+            broker_id: Broker scope for all queries (required path segment after split)
+            account_id: Account scope for all queries (required path segment after split)
             timeout: Request timeout in seconds
         """
         self.base_url = base_url.rstrip("/")
         self.token = token
+        self.broker_id = broker_id
+        self.account_id = account_id
         self.timeout = timeout
         self.client = None
         self._headers = {"Authorization": f"Bearer {token}"}
@@ -68,7 +79,7 @@ class JournalClient:
                 headers=self._headers,
             )
 
-        url = f"{self.base_url}/api/v1/journal"
+        url = f"{self.base_url}/api/v1/journal/{self.broker_id}/{self.account_id}"
         params = {"limit": limit, "offset": offset}
         if instrument_id:
             params["instrument_id"] = instrument_id
@@ -112,7 +123,7 @@ class JournalClient:
                 headers=self._headers,
             )
 
-        url = f"{self.base_url}/api/v1/trades"
+        url = f"{self.base_url}/api/v1/trades/{self.broker_id}/{self.account_id}"
         params = {"limit": limit, "offset": offset}
         if instrument_id:
             params["instrument_id"] = instrument_id
@@ -269,8 +280,8 @@ class JournalClient:
                 headers=self._headers,
             )
 
-        url = f"{self.base_url}/api/v1/orders"
-        params = {"limit": limit}
+        url = f"{self.base_url}/api/v1/orders/{self.broker_id}/{self.account_id}"
+        params = {"page_size": limit}
         if instrument_id:
             params["instrument_id"] = instrument_id
 
@@ -278,7 +289,7 @@ class JournalClient:
             response = await self.client.get(url, params=params)
             response.raise_for_status()
             data = response.json()
-            orders = data.get("items", [])
+            orders = data.get("orders", [])
             return orders
         except httpx.HTTPStatusError as e:
             log.error(f"Failed to fetch orders: {e.response.status_code}")

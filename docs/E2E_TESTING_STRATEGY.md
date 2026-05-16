@@ -213,8 +213,7 @@ smarttrade-tests/
 ├── playwright.config.ts                  (testDir: "./playwright")
 ├── README.md
 ├── docs/
-│   ├── E2E_QUICKSTART.md
-│   └── HYBRID_E2E_TESTING.md
+│   └── E2E_TESTING_STRATEGY.md           (this document)
 ├── playwright/
 │   └── pie-critical-paths.spec.ts       (5 UI tests)
 ├── postman/

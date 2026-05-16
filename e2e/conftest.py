@@ -14,6 +14,7 @@ import uuid
 from typing import AsyncGenerator
 from pathlib import Path
 from decimal import Decimal
+from datetime import datetime
 
 import pytest
 import pytest_asyncio
@@ -37,7 +38,6 @@ from e2e.clients import (
     BASWebSocketClient,
     MDSWebSocketClient,
     MockClient,
-    MDSRestClient,
     PortfolioClient,
     JournalClient,
 )
@@ -188,152 +188,38 @@ def config() -> TestConfig:
 # ────────────────────────────────────────────────────────────────────────────────
 
 
-@pytest.fixture(scope="session")
-def mds_rest_client(config: TestConfig) -> MDSRestClient:
+@pytest_asyncio.fixture(scope="session")
+async def instrument_catalog(config: TestConfig) -> InstrumentCatalog:
     """
-    Provide MDSRestClient for fetching instruments from MDS.
+    Provide session-scoped instrument catalog using pre-defined test instruments.
 
-    Scope: session (created once per test run)
-    Note: Not async-scoped to avoid pytest-asyncio scope mismatch issues
-    """
-    return MDSRestClient(base_url=config.mds_url)
+    For E2E test reliability, we use pre-defined test instruments instead of relying on
+    MDS sync, which can fail due to broker API issues, network problems, or configuration.
 
+    Architecture notes:
+    - In production, MDS is the source of truth for instrument metadata
+    - MDS publishes instrument.created events to the Redis stream market.instrument.v1
+    - BAS subscribes to market.instrument.v1 and persists instruments via InstrumentMaster cache
+    - PBS does NOT have an instruments table — it operates on instrument_id strings only
 
-@pytest.fixture(scope="session")
-def instrument_catalog(config: TestConfig) -> InstrumentCatalog:
-    """
-    Provide session-scoped instrument catalog seeded into BAS and Redis.
-
-    Architecture (current):
-    - MDS owns instrument metadata and publishes instrument.created events
-      to the Redis stream market.instrument.v1.
-    - BAS subscribes to market.instrument.v1 and persists instruments via
-      its InstrumentMaster cache.
-    - PBS does NOT have an instruments table — it operates on instrument_id
-      strings only and never syncs instrument metadata.
-
-    For E2E tests we simulate MDS by:
-    - Seeding instruments directly into the BAS database (covers the case
-      where the BAS InstrumentMaster cache is loaded from DB on startup).
-    - Publishing instrument.created events to market.instrument.v1 (covers
-      the live event-driven path).
+    For E2E tests we:
+    - Use pre-defined test instruments (get_test_instruments)
+    - Tests use these instruments for placing orders
+    - This bypasses MDS sync dependency for test reliability
 
     PBS receives no instrument seeding by design.
 
     Scope: session (loaded once per test run)
-    Uses asyncio.run() to execute the async load operation.
     """
-    import subprocess
-    import json
-    import redis as redis_sync
+    log.info("Loading test instruments for E2E tests")
 
-    # Get test instruments data
-    test_instruments = get_test_instruments()
-    log.info(f"Seeding {len(test_instruments)} instruments to consumer service databases and Redis stream")
+    # Use pre-defined test instruments directly for reliability
+    instruments_data = get_test_instruments()
+    log.info(f"✅ Loaded {len(instruments_data)} test instruments")
 
-    # Seed to BAS database
-    for instr in test_instruments:
-        isin_val = f"'{instr.get('isin')}'" if instr.get('isin') else 'NULL'
-        exchange = instr.get("exchange", "NSE")
-        symbol = instr.get("symbol", "")
-        fyers_trading_symbol = f"{exchange}:{symbol}"
-
-        broker_instruments_json = json.dumps([{
-            "broker_id": "fyers",
-            "trading_symbol": fyers_trading_symbol,
-            "broker_token": symbol,
-        }])
-
-        sql = f"""
-            INSERT INTO instruments
-            (id, symbol, name, exchange, segment, instrument_type, isin, lot_size, tick_size, status, version, instrument_checksum, broker_instruments, created_at, updated_at)
-            VALUES
-            ('{instr.get("id")}',
-             '{instr.get("symbol")}',
-             '{instr.get("name", instr.get("symbol", ""))}',
-             '{instr.get("exchange", "NSE")}',
-             '{instr.get("segment", "CASH")}',
-             '{instr.get("type", "EQUITY")}',
-             {isin_val},
-             {instr.get('lot_size', 1)},
-             {instr.get('tick_size', 0.01)},
-             'ACTIVE',
-             1,
-             '',
-             '{broker_instruments_json.replace(chr(39), chr(39)+chr(39))}',
-             NOW(),
-             NOW())
-            ON CONFLICT (id) DO UPDATE SET
-                symbol = EXCLUDED.symbol,
-                broker_instruments = EXCLUDED.broker_instruments,
-                updated_at = NOW();
-        """
-
-        try:
-            proc = subprocess.run(
-                ["docker-compose", "-f", "../docker-compose.e2e.yml", "exec", "-T", "postgres",
-                 "psql", "-U", "postgres", "-d", "smarttrade_broker_adapter_service", "-c", sql],
-                cwd="/home/amit/Work/Smart-Trade/smarttrade-tests/e2e",
-                capture_output=True,
-                timeout=5,
-            )
-            if proc.returncode != 0:
-                log.warning(f"Could not insert {instr.get('id')} to BAS: {proc.stderr.decode()}")
-        except Exception as e:
-            log.warning(f"Could not insert {instr.get('id')} to BAS: {e}")
-
-    log.info("✅ Instruments seeded to BAS database")
-
-    # PBS no longer owns instrument metadata — it works with instrument_id only,
-    # so there is no PBS-side seeding step.
-
-    # Publish instrument events to Redis stream (market.instrument.v1)
-    # This simulates MDS publishing instrument events that consumers subscribe to
-    try:
-        redis_client = redis_sync.from_url("redis://localhost:6379/0")
-
-        # Delete any existing consumer group for BAS to reset position
-        try:
-            redis_client.execute_command("XGROUP", "DESTROY", "market.instrument.v1", "bas-instrument-master")
-            log.info("Reset BAS instrument master consumer group")
-        except:
-            # Group doesn't exist yet, which is fine
-            pass
-
-        for instr in test_instruments:
-            instrument_event = {
-                "event_id": f"instr_{instr.get('id')}",
-                "event_type": "instrument.created",
-                "instrument_id": instr.get("id"),
-                "symbol": instr.get("symbol"),
-                "name": instr.get("name"),
-                "exchange": instr.get("exchange", "NSE"),
-                "segment": instr.get("segment", "CASH"),
-                "type": instr.get("type", "EQUITY"),
-                "isin": instr.get("isin"),
-                "lot_size": instr.get("lot_size", 1),
-                "tick_size": instr.get("tick_size", 0.01),
-                "timestamp": time.time(),
-            }
-            redis_client.xadd("market.instrument.v1", {"data": json.dumps(instrument_event)})
-
-        log.info(f"✅ Published {len(test_instruments)} instrument events to Redis stream (market.instrument.v1)")
-
-        # Wait for consumers to process events (increased from 5s to 15s)
-        log.info("Waiting for instrument consumers to process events (15s)...")
-        for i in range(15):
-            time.sleep(1)
-            # Log progress
-            if (i + 1) % 5 == 0:
-                log.info(f"  ... {i + 1}/15 seconds elapsed")
-
-        redis_client.close()
-    except Exception as e:
-        log.warning(f"⚠️ Failed to publish instrument events to Redis: {e}")
-
-    # Create catalog from seeded test data
-    catalog = InstrumentCatalog(test_instruments)
-    asyncio.run(catalog.load())
+    # Create catalog from test instruments
+    catalog = InstrumentCatalog(instruments_data)
+    await catalog.load()
     log.info(f"✅ Instrument catalog ready: {catalog.count()} instruments")
 
     return catalog
@@ -490,8 +376,8 @@ def test_account_id() -> str:
     Single shared account for all tests in the session.
 
     Test isolation is preserved via setup_trading_account fixture which deletes
-    and recreates the account before each test. All clients and WebSocket
-    connections are session-scoped and reuse this single account.
+    and recreates the account before each test. Clients are now function-scoped
+    to avoid session-scoped HTTP connection issues.
 
     Scope: session
     """
@@ -566,12 +452,12 @@ def auth_token(config: TestConfig, test_user_id: str) -> str:
 # ────────────────────────────────────────────────────────────────────────────────
 
 
-@pytest_asyncio.fixture(scope="session")
+@pytest_asyncio.fixture
 async def bas_client(config: TestConfig, auth_token: str) -> AsyncGenerator[BASClient, None]:
     """
-    Provide BASClient instance. Reused across all tests in the session.
+    Provide BASClient instance. Created per test to avoid session-scoped issues.
 
-    Scope: session
+    Scope: function
     """
     async with BASClient(
         base_url=config.bas_url,
@@ -581,7 +467,7 @@ async def bas_client(config: TestConfig, auth_token: str) -> AsyncGenerator[BASC
         yield client
 
 
-@pytest_asyncio.fixture(scope="session")
+@pytest_asyncio.fixture
 async def mock_client(
     config: TestConfig, auth_token: str
 ) -> AsyncGenerator[MockClient, None]:
@@ -592,7 +478,7 @@ async def mock_client(
     `market.quote.v1` (production path) — there is no longer an HTTP
     /execute shortcut, so we pass the redis URL here.
 
-    Scope: session
+    Scope: function
     """
     async with MockClient(
         base_url=config.mock_url,
@@ -603,31 +489,39 @@ async def mock_client(
         yield client
 
 
-@pytest_asyncio.fixture(scope="session")
-async def portfolio_client(config: TestConfig, auth_token: str) -> AsyncGenerator[PortfolioClient, None]:
+@pytest_asyncio.fixture
+async def portfolio_client(
+    config: TestConfig, auth_token: str, test_account_id: str
+) -> AsyncGenerator[PortfolioClient, None]:
     """
     Provide PortfolioClient for testing Portfolio Service async aggregation.
 
-    Scope: session
+    Scope: function
     """
     async with PortfolioClient(
         base_url=config.portfolio_url,
         token=auth_token,
+        broker_id="fyers",
+        account_id=test_account_id,
         timeout=config.timeout_medium,
     ) as client:
         yield client
 
 
-@pytest_asyncio.fixture(scope="session")
-async def journal_client(config: TestConfig, auth_token: str) -> AsyncGenerator[JournalClient, None]:
+@pytest_asyncio.fixture
+async def journal_client(
+    config: TestConfig, auth_token: str, test_account_id: str
+) -> AsyncGenerator[JournalClient, None]:
     """
     Provide JournalClient for testing Journal Service audit trail.
 
-    Scope: session
+    Scope: function
     """
     async with JournalClient(
         base_url=config.journal_url,
         token=auth_token,
+        broker_id="fyers",
+        account_id=test_account_id,
         timeout=config.timeout_medium,
     ) as client:
         yield client
@@ -696,15 +590,14 @@ async def quote_injector(config: TestConfig, mock_client: MockClient) -> AsyncGe
     await injector.close()
 
 
-@pytest_asyncio.fixture(scope="session")
+@pytest_asyncio.fixture
 async def mds_client(
     config: TestConfig, auth_token: str, test_account_id: str, test_user_id: str
 ) -> AsyncGenerator[MDSWebSocketClient, None]:
     """
     Provide MDSWebSocketClient bound to the MDS UI WebSocket channel.
 
-    Scope: session — one connection for the entire test run, never closed
-    between tests.
+    Scope: function — created per test to avoid session-scoped issues.
 
     The MDS UI channel is exclusively a UI-facing market data feed (quotes,
     depth, candles, instrument subscription requests). BAS and PBS no longer
@@ -728,21 +621,21 @@ async def mds_client(
 
     yield client
 
-    # Session teardown: disconnect once at the very end of the session
+    # Function teardown: disconnect after each test
     try:
         await client.disconnect()
     except Exception as e:
         log.warning(f"Error disconnecting MDS client: {e}")
 
 
-@pytest_asyncio.fixture(scope="session")
+@pytest_asyncio.fixture
 async def bas_ws_client(
     config: TestConfig, auth_token: str, test_account_id: str
 ) -> AsyncGenerator[BASWebSocketClient, None]:
     """
     Provide BASWebSocketClient instance for trading account events.
 
-    Scope: session — one connection for the entire test run, never closed between tests
+    Scope: function — created per test to avoid session-scoped issues
 
     Handles order fills, trades, and position updates.
     Automatically streams events into the event_collector for test assertions.
@@ -844,7 +737,7 @@ async def bas_ws_client(
 
     yield client
 
-    # Session teardown: cancel stream and disconnect once at the very end of the session
+    # Function teardown: cancel stream and disconnect after each test
     stream_task.cancel()
     try:
         await asyncio.wait_for(stream_task, timeout=5.0)
