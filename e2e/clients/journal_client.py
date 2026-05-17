@@ -3,10 +3,20 @@
 import asyncio
 import logging
 from typing import Optional
+from uuid import UUID
 
 import httpx
 
 log = logging.getLogger(__name__)
+
+
+def _validate_uuid(id_str: str) -> str:
+    """Validate UUID format."""
+    try:
+        UUID(id_str)
+        return id_str
+    except ValueError as e:
+        raise ValueError(f"Invalid UUID format: {id_str}") from e
 
 
 class JournalClient:
@@ -262,18 +272,31 @@ class JournalClient:
     async def get_orders(
         self,
         instrument_id: Optional[str] = None,
-        limit: int = 50,
+        status: Optional[str] = None,
+        from_date: Optional[str] = None,
+        to_date: Optional[str] = None,
+        page: int = 1,
+        page_size: int = 50,
     ) -> list[dict]:
         """
-        Fetch orders from journal.
+        Fetch orders from journal with filters.
 
         Args:
             instrument_id: Optional filter by instrument ID
-            limit: Number of orders to return
+            status: Optional filter by status (PENDING, FILLED, PARTIAL, CANCELLED, REJECTED)
+            from_date: Optional filter orders placed after this datetime
+            to_date: Optional filter orders placed before this datetime
+            page: Page number (default: 1)
+            page_size: Items per page (default: 50, max: 200)
 
         Returns:
             List of order dictionaries
         """
+        if page < 1:
+            raise ValueError("page must be >= 1")
+        if page_size < 1 or page_size > 200:
+            raise ValueError("page_size must be between 1 and 200")
+
         if not self.client:
             self.client = httpx.AsyncClient(
                 timeout=self.timeout,
@@ -281,7 +304,128 @@ class JournalClient:
             )
 
         url = f"{self.base_url}/api/v1/orders/{self.broker_id}/{self.account_id}"
-        params = {"page_size": limit}
+        params = {"page": page, "page_size": page_size}
+        if instrument_id:
+            params["instrument_id"] = instrument_id
+        if status:
+            params["status"] = status
+        if from_date:
+            params["from_date"] = from_date
+        if to_date:
+            params["to_date"] = to_date
+
+        try:
+            response = await self.client.get(url, params=params)
+            response.raise_for_status()
+            data = response.json()
+            orders = data.get("orders", [])
+            log.debug(f"Fetched {len(orders)} orders from journal")
+            return orders
+        except httpx.HTTPStatusError as e:
+            log.error(f"Failed to fetch orders: {e.response.status_code}")
+            raise
+
+    async def get_order_by_id(
+        self,
+        order_id: str,
+    ) -> dict:
+        """
+        Fetch a specific order by ID (broker_order_id).
+
+        Args:
+            order_id: Order ID (broker_order_id)
+
+        Returns:
+            Order dictionary
+
+        Raises:
+            httpx.HTTPStatusError: If request fails or order not found
+        """
+        if not self.client:
+            self.client = httpx.AsyncClient(
+                timeout=self.timeout,
+                headers=self._headers,
+            )
+
+        url = f"{self.base_url}/api/v1/orders/{self.broker_id}/{self.account_id}/{order_id}"
+
+        try:
+            response = await self.client.get(url)
+            response.raise_for_status()
+            order = response.json()
+            log.debug(f"Fetched order {order_id}")
+            return order
+        except httpx.HTTPStatusError as e:
+            log.error(f"Failed to fetch order {order_id}: {e.response.status_code}")
+            raise
+
+    async def get_trade_by_id(
+        self,
+        trade_id: str,
+    ) -> dict:
+        """
+        Fetch a specific trade by ID.
+
+        Args:
+            trade_id: Trade ID (UUID)
+
+        Returns:
+            Trade dictionary
+
+        Raises:
+            httpx.HTTPStatusError: If request fails or trade not found
+            ValueError: If trade_id is not a valid UUID
+        """
+        trade_id = _validate_uuid(trade_id)
+
+        if not self.client:
+            self.client = httpx.AsyncClient(
+                timeout=self.timeout,
+                headers=self._headers,
+            )
+
+        url = f"{self.base_url}/api/v1/trades/{self.broker_id}/{self.account_id}/{trade_id}"
+
+        try:
+            response = await self.client.get(url)
+            response.raise_for_status()
+            trade = response.json()
+            log.debug(f"Fetched trade {trade_id}")
+            return trade
+        except httpx.HTTPStatusError as e:
+            log.error(f"Failed to fetch trade {trade_id}: {e.response.status_code}")
+            raise
+
+    async def get_actions(
+        self,
+        instrument_id: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[dict]:
+        """
+        Fetch actions from journal.
+
+        Args:
+            instrument_id: Optional filter by instrument ID
+            limit: Number of actions to return
+            offset: Pagination offset
+
+        Returns:
+            List of action dictionaries
+        """
+        if limit < 1 or limit > 200:
+            raise ValueError("limit must be between 1 and 200")
+        if offset < 0:
+            raise ValueError("offset must be >= 0")
+
+        if not self.client:
+            self.client = httpx.AsyncClient(
+                timeout=self.timeout,
+                headers=self._headers,
+            )
+
+        url = f"{self.base_url}/api/v1/actions/{self.broker_id}/{self.account_id}"
+        params = {"limit": limit, "offset": offset}
         if instrument_id:
             params["instrument_id"] = instrument_id
 
@@ -289,8 +433,83 @@ class JournalClient:
             response = await self.client.get(url, params=params)
             response.raise_for_status()
             data = response.json()
-            orders = data.get("orders", [])
-            return orders
+            actions = data.get("items", [])
+            log.debug(f"Fetched {len(actions)} actions from journal")
+            return actions
         except httpx.HTTPStatusError as e:
-            log.error(f"Failed to fetch orders: {e.response.status_code}")
+            log.error(f"Failed to fetch actions: {e.response.status_code}")
+            raise
+
+    async def get_action_by_id(
+        self,
+        action_id: str,
+    ) -> dict:
+        """
+        Fetch a specific action by ID.
+
+        Args:
+            action_id: Action ID (UUID)
+
+        Returns:
+            Action dictionary
+
+        Raises:
+            httpx.HTTPStatusError: If request fails or action not found
+            ValueError: If action_id is not a valid UUID
+        """
+        action_id = _validate_uuid(action_id)
+
+        if not self.client:
+            self.client = httpx.AsyncClient(
+                timeout=self.timeout,
+                headers=self._headers,
+            )
+
+        url = f"{self.base_url}/api/v1/actions/{self.broker_id}/{self.account_id}/{action_id}"
+
+        try:
+            response = await self.client.get(url)
+            response.raise_for_status()
+            action = response.json()
+            log.debug(f"Fetched action {action_id}")
+            return action
+        except httpx.HTTPStatusError as e:
+            log.error(f"Failed to fetch action {action_id}: {e.response.status_code}")
+            raise
+
+    async def get_journal_entry_by_id(
+        self,
+        journal_id: str,
+    ) -> dict:
+        """
+        Fetch a specific journal entry by ID.
+
+        Args:
+            journal_id: Journal entry ID (UUID)
+
+        Returns:
+            Journal entry dictionary
+
+        Raises:
+            httpx.HTTPStatusError: If request fails or entry not found
+            ValueError: If journal_id is not a valid UUID
+        """
+        journal_id = _validate_uuid(journal_id)
+
+        if not self.client:
+            self.client = httpx.AsyncClient(
+                timeout=self.timeout,
+                headers=self._headers,
+            )
+
+        url = f"{self.base_url}/api/v1/journal/{self.broker_id}/{self.account_id}/{journal_id}"
+
+        try:
+            response = await self.client.get(url)
+            response.raise_for_status()
+            entry = response.json()
+            log.debug(f"Fetched journal entry {journal_id}")
+            return entry
+        except httpx.HTTPStatusError as e:
+            log.error(f"Failed to fetch journal entry {journal_id}: {e.response.status_code}")
             raise

@@ -35,13 +35,14 @@ from smarttrade_common.schemas.types import OrderSide, OrderType, TimeInForce, P
 from e2e.config import TestConfig
 from e2e.clients import (
     BASClient,
-    BASWebSocketClient,
     MDSWebSocketClient,
     MockClient,
     PortfolioClient,
     JournalClient,
+    BrokerStateClient,
+    create_broker_state_client,
 )
-from e2e.harness import EventCollector, AssertionEngine, ScenarioEngine
+from e2e.harness import EventCollector, AssertionEngine, ScenarioEngine, RedisEventCollector
 from e2e.harness.redis_observer import RedisStreamObserver
 from e2e.fixtures.logging import configure_logging
 from e2e.fixtures.market_data_stream import MockMarketDataStream
@@ -337,15 +338,18 @@ async def setup_trading_account(
     # Cleanup is optional - accounts can be reused
 
 
-@pytest_asyncio.fixture(autouse=True)
+@pytest_asyncio.fixture
 async def setup_broker_credentials(bas_client):
     """
-    Seed broker credentials for MDS to use (autouse).
+    Seed broker credentials for MDS to use (NOT autouse).
 
     Creates broker connections with test credentials before each test.
     MDS needs these credentials to validate trading accounts and initialize plugins.
 
     Scope: function
+    Note: Removed autouse=True in v4.0 because broker connection updates
+    invalidate user sessions, breaking injection tests. Use explicitly for
+    tests that require MDS integration.
     """
     # Only setup fyers (primary broker)
     broker_id = "fyers"
@@ -565,11 +569,11 @@ async def redis_observer(config: TestConfig) -> AsyncGenerator[RedisStreamObserv
     # created lazily inside observe_stream() — by which point any events the
     # test produced before its first observe_stream() call are already past
     # the group's $ position and invisible.
-    for event_type in ["order.filled.v1", "trade.executed.v1", "position.updated.v1"]:
+    for event_type in ["order.updated.v1", "trade.executed.v1", "position.updated.v1"]:
         await observer._ensure_consumer_group(f"events:{event_type}")
     yield observer
     # Cleanup: delete observer consumer groups
-    for event_type in ["order.filled.v1", "trade.executed.v1", "position.updated.v1"]:
+    for event_type in ["order.updated.v1", "trade.executed.v1", "position.updated.v1"]:
         await observer.delete_consumer_group(event_type)
     await observer.stop()
 
@@ -605,7 +609,7 @@ async def mds_client(
     market.quote.v1. Tests must therefore not use mds_client as a stand-in
     for the BAS/PBS data path.
 
-    Account/execution events stay on the BAS WebSocket (bas_ws_client).
+    Account/execution events are collected via Redis Streams using redis_event_collector.
     """
     ws_url_with_path = f"{config.mds_ws_url}/ws/{config.broker_id}/ui"
 
@@ -628,130 +632,6 @@ async def mds_client(
         log.warning(f"Error disconnecting MDS client: {e}")
 
 
-@pytest_asyncio.fixture
-async def bas_ws_client(
-    config: TestConfig, auth_token: str, test_account_id: str
-) -> AsyncGenerator[BASWebSocketClient, None]:
-    """
-    Provide BASWebSocketClient instance for trading account events.
-
-    Scope: function — created per test to avoid session-scoped issues
-
-    Handles order fills, trades, and position updates.
-    Automatically streams events into the event_collector for test assertions.
-    """
-    client = BASWebSocketClient(
-        ws_url=config.bas_ws_url,
-        account_id=test_account_id,
-        token=auth_token,
-        timeout=config.timeout_slow,
-    )
-    await client.connect()
-    await client.subscribe_account(test_account_id)
-
-    # Get the event_collector fixture if it exists (it will be created after us)
-    # We store it on client so event_collector fixture can wire it up
-    client._event_collector = None
-
-    # Start background task to stream account events
-    async def stream_account_events():
-        try:
-            async for event in client.stream_events():
-                # Skip if collector not initialized (wait for next event)
-                if client._event_collector is None:
-                    continue
-
-                # Extract order_id early to avoid processing irrelevant events
-                event_data = event.get("data") or {}
-                order_id = event_data.get("order_id") or event_data.get("broker_order_id")
-
-                if not order_id:
-                    log.debug(f"No order_id in BAS event type={event.get('type')}, skipping")
-                    continue
-
-                # Extract status from event data
-                status = event_data.get("status") or event_data.get("order_status")
-                event_type = event.get("type")
-
-                # Map BAS event types to internal format
-                event_type_map = {
-                    "order.filled.v1": "order_fill",
-                    "trade.executed.v1": "trade_exec",
-                    "position.updated.v1": "position_update",
-                    "order.cancelled.v1": "order_cancelled",
-                    "order.rejected.v1": "order_rejected",
-                }
-                normalized_event_type = event_type_map.get(event_type, event_type)
-
-                # Infer terminal status from event type
-                if normalized_event_type == "order_fill" and not status:
-                    try:
-                        filled_pct = float(event_data.get("filled_percentage", 0))
-                    except (TypeError, ValueError):
-                        filled_pct = 0.0
-                    status = "FILLED" if filled_pct >= 100.0 else "PARTIALLY_FILLED"
-                elif normalized_event_type == "order_cancelled" and not status:
-                    status = "CANCELLED"
-
-                # Normalize event_data to have qty/price fields that assertion engine expects
-                normalized_data = dict(event_data)
-
-                # Map broker-specific field names to assertion engine expectations
-                if "delta_quantity" in normalized_data and "qty" not in normalized_data:
-                    normalized_data["qty"] = normalized_data["delta_quantity"]
-                    normalized_data["fill_qty"] = normalized_data["delta_quantity"]
-                elif "quantity" in normalized_data and "qty" not in normalized_data:
-                    normalized_data["qty"] = normalized_data["quantity"]
-                    normalized_data["fill_qty"] = normalized_data["quantity"]
-
-                # Map price fields
-                if "average_price" in normalized_data and "price" not in normalized_data:
-                    try:
-                        normalized_data["price"] = float(normalized_data["average_price"])
-                    except (TypeError, ValueError):
-                        normalized_data["price"] = normalized_data["average_price"]
-                elif "price" in normalized_data and isinstance(normalized_data["price"], str):
-                    try:
-                        normalized_data["price"] = float(normalized_data["price"])
-                    except (TypeError, ValueError):
-                        pass
-
-                # Create event dict with normalized data
-                event_dict = {
-                    "type": normalized_event_type,
-                    "status": status,
-                    "data": normalized_data,
-                    "timestamp": event_data.get("timestamp") or event.get("timestamp"),
-                }
-
-                qty = normalized_data.get("qty")
-                log.debug(f"Collected BAS event: order_id={order_id}, type={normalized_event_type}, status={status}, qty={qty}")
-                await client._event_collector.add_event(order_id, event_dict)
-        except asyncio.CancelledError:
-            log.debug("BAS event streaming cancelled")
-        except Exception as e:
-            import logging
-            logging.getLogger(__name__).error(f"Error in stream_account_events: {e}", exc_info=True)
-
-    stream_task = asyncio.create_task(stream_account_events())
-
-    yield client
-
-    # Function teardown: cancel stream and disconnect after each test
-    stream_task.cancel()
-    try:
-        await asyncio.wait_for(stream_task, timeout=5.0)
-    except (asyncio.CancelledError, asyncio.TimeoutError):
-        pass
-    finally:
-        client._event_collector = None
-
-    try:
-        await client.disconnect()
-    except Exception as e:
-        log.warning(f"Error disconnecting BAS client: {e}")
-
-
 # ────────────────────────────────────────────────────────────────────────────────
 # FUNCTION-SCOPED FIXTURES: EVENT COLLECTION & HARNESS
 # ────────────────────────────────────────────────────────────────────────────────
@@ -771,19 +651,18 @@ def gc_cleanup():
 
 
 @pytest.fixture
-def event_collector(bas_ws_client) -> EventCollector:
+def event_collector() -> EventCollector:
     """
     Provide EventCollector instance for async event collection.
 
     Scope: function (fresh collector per test)
 
-    Wires itself to bas_ws_client so BAS events are streamed into this collector.
+    NOTE: Updated for stateless architecture - no longer depends on bas_ws_client.
+    Events are now collected via Redis streams using redis_event_collector fixture.
     Memory is cleared after test completes.
     """
     # Reduced maxsize from 1000 to 100 to limit memory per test
     collector = EventCollector(maxsize=100)
-    # Wire the collector to the bas_ws_client so it can stream events
-    bas_ws_client._event_collector = collector
     yield collector
     # Aggressive cleanup: drain all queues, clear all events, and reset state
     try:
@@ -792,6 +671,54 @@ def event_collector(bas_ws_client) -> EventCollector:
         log.warning(f"Error clearing event collector: {e}")
     # Remove reference
     collector = None
+
+
+@pytest_asyncio.fixture
+async def broker_state_client(config: TestConfig, auth_token: str) -> BrokerStateClient:
+    """
+    Provide broker state client for direct broker queries.
+
+    Scope: function (created per test)
+
+    Broker is the single source of truth for order/position/trade state in the
+    stateless architecture. This client queries the broker directly.
+    """
+    client = create_broker_state_client(
+        broker_type=config.broker_type,
+        base_url=config.broker_api_url,
+        token=auth_token,
+    )
+    async with client:
+        yield client
+
+
+@pytest_asyncio.fixture
+async def redis_event_collector(config: TestConfig) -> RedisEventCollector:
+    """
+    Provide Redis event collector for stream-based event collection.
+
+    Scope: function (created per test)
+
+    Collects events directly from Redis Streams (bypassing service WebSockets).
+    Uses consumer groups for reliable event consumption with idempotency.
+    """
+    import uuid
+    
+    collector = RedisEventCollector(
+        redis_url=config.redis_url,
+        consumer_group=f"{config.redis_stream_consumer_group}-{uuid.uuid4().hex[:8]}",
+    )
+    await collector.connect()
+    await collector.subscribe_to_streams([
+        "events:order.updated.v1",
+        "events:trade.executed.v1",
+        "events:position.updated.v1",
+    ])
+    
+    yield collector
+    
+    await collector.cleanup()
+    await collector.disconnect()
 
 
 @pytest.fixture

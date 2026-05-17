@@ -114,7 +114,13 @@ class EventCollector:
             # Check current events
             events = self.get_events(order_id)
             for event in reversed(events):
-                if event.get("status") == status or event.get("data", {}).get("status") == status:
+                # NEW: Check status field in consolidated event schema (order.updated.v1)
+                event_status = (
+                    event.get("status")
+                    or event.get("payload", {}).get("status")
+                    or event.get("order_status")
+                )
+                if event_status == status:
                     return events
 
             # Check timeout
@@ -166,9 +172,10 @@ class EventCollector:
             # Check current events
             events = self.get_events(order_id)
             for event in reversed(events):
+                # NEW: Check status field in consolidated event schema (order.updated.v1)
                 event_status = (
                     event.get("status")
-                    or event.get("data", {}).get("status")
+                    or event.get("payload", {}).get("status")
                     or event.get("order_status")
                 )
                 if event_status in TERMINAL_STATUSES:
@@ -222,7 +229,7 @@ class EventCollector:
 
         Args:
             order_id: Order ID
-            event_type: Event type to filter (e.g., "order.placed", "order.filled")
+            event_type: Event type to filter (e.g., "order.updated.v1", "trade.executed.v1")
 
         Returns:
             List of events matching the type
@@ -329,7 +336,7 @@ class EventCollector:
         final_event = events[-1]
         final_status = (
             final_event.get("status")
-            or final_event.get("data", {}).get("status")
+            or final_event.get("payload", {}).get("status")
             or final_event.get("order_status")
         )
 

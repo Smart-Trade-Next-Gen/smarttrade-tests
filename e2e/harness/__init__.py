@@ -9,6 +9,7 @@ from e2e.harness.scenario_engine import (
     FillSpec,
 )
 from e2e.harness.scenario_executor import ScenarioExecutor, ScenarioResult
+from e2e.harness.redis_event_collector import RedisEventCollector
 
 __all__ = [
     "EventCollector",
@@ -21,4 +22,5 @@ __all__ = [
     "FillSpec",
     "ScenarioExecutor",
     "ScenarioResult",
+    "RedisEventCollector",
 ]

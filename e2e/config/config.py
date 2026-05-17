@@ -31,8 +31,15 @@ class TestConfig:
     test_password: str
     broker_id: str
     account_id: str
+    # NEW: Broker configuration for stateless architecture
+    broker_type: str = "pbs"  # "fyers" or "pbs"
+    broker_api_url: str = "http://localhost:8002"  # Direct broker API URL
+    # NEW: Redis stream configuration
+    redis_stream_consumer_group: str = "e2e-tests"  # Consumer group for Redis streams
+    # NEW: Outbox configuration
+    outbox_table_name: str = "outbox"  # Outbox table name
     timeout_fast: float = 5.0
-    timeout_medium: float = 10.0
+    timeout_medium: float = 15.0  # Increased for outbox polling latency (5s poll interval)
     timeout_slow: float = 30.0
 
     @staticmethod
@@ -96,6 +103,10 @@ class TestConfig:
             test_password=get_setting("TEST_PASSWORD", "test_password"),
             broker_id=get_setting("BROKER_ID", "broker_id"),
             account_id=get_setting("ACCOUNT_ID", "account_id"),
+            broker_type=get_setting("BROKER_TYPE", "broker_type"),
+            broker_api_url=get_setting("BROKER_API_URL", "broker_api_url"),
+            redis_stream_consumer_group=get_setting("REDIS_STREAM_CONSUMER_GROUP", "redis_stream_consumer_group"),
+            outbox_table_name=get_setting("OUTBOX_TABLE_NAME", "outbox_table_name"),
             timeout_fast=get_float_setting("TIMEOUT_FAST", "timeout_fast"),
             timeout_medium=get_float_setting("TIMEOUT_MEDIUM", "timeout_medium"),
             timeout_slow=get_float_setting("TIMEOUT_SLOW", "timeout_slow"),
@@ -137,6 +148,10 @@ def _get_default(key: str, env: str) -> str:
             "TEST_PASSWORD": "testpassword123",
             "BROKER_ID": "fyers",
             "ACCOUNT_ID": "TEST123456",
+            "BROKER_TYPE": "pbs",
+            "BROKER_API_URL": "http://localhost:8002",
+            "REDIS_STREAM_CONSUMER_GROUP": "e2e-tests",
+            "OUTBOX_TABLE_NAME": "outbox",
             "TIMEOUT_FAST": "5.0",
             "TIMEOUT_MEDIUM": "10.0",
             "TIMEOUT_SLOW": "30.0",
@@ -156,6 +171,10 @@ def _get_default(key: str, env: str) -> str:
             "TEST_PASSWORD": "staging-testpassword123",
             "BROKER_ID": "fyers",
             "ACCOUNT_ID": "STAGING123456",
+            "BROKER_TYPE": "fyers",
+            "BROKER_API_URL": "https://api.fyers.in",
+            "REDIS_STREAM_CONSUMER_GROUP": "e2e-tests-staging",
+            "OUTBOX_TABLE_NAME": "outbox",
             "TIMEOUT_FAST": "5.0",
             "TIMEOUT_MEDIUM": "15.0",
             "TIMEOUT_SLOW": "60.0",
@@ -175,6 +194,10 @@ def _get_default(key: str, env: str) -> str:
             "TEST_PASSWORD": "prod-testpassword123",
             "BROKER_ID": "fyers",
             "ACCOUNT_ID": "PROD123456",
+            "BROKER_TYPE": "fyers",
+            "BROKER_API_URL": "https://api.fyers.in",
+            "REDIS_STREAM_CONSUMER_GROUP": "e2e-tests-prod",
+            "OUTBOX_TABLE_NAME": "outbox",
             "TIMEOUT_FAST": "10.0",
             "TIMEOUT_MEDIUM": "20.0",
             "TIMEOUT_SLOW": "60.0",

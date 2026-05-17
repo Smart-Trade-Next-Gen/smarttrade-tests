@@ -50,28 +50,31 @@ class AssertionEngine:
             raise AssertionError("No events found for order")
 
         # Pick the event whose status matches the expected lifecycle terminal:
-        # for FILLED outcomes that means an order_fill event; for CANCELLED /
-        # REJECTED the broker only emits order.cancelled.v1 / order.rejected.v1
-        # (no fill ever happens), so we must accept those too.
+        # for FILLED outcomes that means an order.updated.v1 event with status FILLED;
+        # for CANCELLED / REJECTED the broker emits order.updated.v1 with those statuses.
         terminal_event_types = {
-            "FILLED": {"order_fill", "order.filled.v1"},
-            "CANCELLED": {"order_cancelled", "order.cancelled.v1"},
-            "REJECTED": {"order_rejected", "order.rejected.v1"},
+            "FILLED": {"order.updated.v1"},
+            "CANCELLED": {"order.updated.v1"},
+            "REJECTED": {"order.updated.v1"},
         }
         match_types = terminal_event_types.get(expected_status, set())
 
         terminal_event = None
         for event in events:
             event_type = event.get("type") or ""
-            inner_type = (event.get("data") or {}).get("event_type") or ""
+            inner_type = (event.get("payload") or {}).get("event_type") or ""
+            # Check if event type matches and status matches expected
             if match_types and (event_type in match_types or inner_type in match_types):
-                terminal_event = event
-                break
+                event_status = event.get("status") or (event.get("payload") or {}).get("status") or ""
+                if event_status == expected_status:
+                    terminal_event = event
+                    break
         if terminal_event is None:
-            # Fall back to the prior heuristic (order_fill) so unrelated callers
+            # Fall back to the prior heuristic (order.updated.v1) so unrelated callers
             # still surface a useful error.
             for event in events:
-                if event.get("type") == "order_fill" or (event.get("data") or {}).get("event_type") == "order.filled.v1":
+                if (event.get("type") == "order.updated.v1" or
+                    (event.get("payload") or {}).get("event_type") == "order.updated.v1"):
                     terminal_event = event
                     break
 
@@ -82,7 +85,7 @@ class AssertionEngine:
 
         final_status = (
             terminal_event.get("status")
-            or (terminal_event.get("data") or {}).get("status")
+            or (terminal_event.get("payload") or {}).get("status")
             or terminal_event.get("order_status")
         )
 
@@ -559,7 +562,7 @@ class AssertionEngine:
         final = events[-1]
         return (
             final.get("status")
-            or final.get("data", {}).get("status")
+            or final.get("payload", {}).get("status")
             or final.get("order_status")
             or "UNKNOWN"
         )
@@ -571,20 +574,34 @@ class AssertionEngine:
 
         Returns list of dicts with qty, price, side.
 
-        Note: Only counts order.filled / order_fill events, not trade.executed / trade_exec,
-        since trade_exec is a derived event from order_fill and would double-count the fill.
+        Note: Only counts order.updated.v1 events with status FILLED/PARTIALLY_FILLED,
+        not trade.executed / trade_exec, since trade_exec is a derived event from order fill
+        and would double-count the fill.
         """
         fills = []
         for event in events:
-            # Only count order fill events, not trade execution events (to avoid double-counting)
-            if event.get("type") in {"order.filled", "order_fill"}:
-                fill_data = event.get("data", event)
-                if "qty" in fill_data or "fill_qty" in fill_data:
-                    fills.append({
-                        "qty": fill_data.get("qty") or fill_data.get("fill_qty"),
-                        "price": fill_data.get("price") or fill_data.get("fill_price"),
-                        "side": fill_data.get("side", "BUY"),
-                    })
+            # Only count order updated events with fill status, not trade execution events (to avoid double-counting)
+            event_type = event.get("type") or (event.get("payload") or {}).get("event_type") or ""
+            if event_type == "order.updated.v1":
+                status = event.get("status") or (event.get("payload") or {}).get("status") or ""
+                if status in {"FILLED", "PARTIALLY_FILLED"}:
+                    fill_data = event.get("payload", event)
+                    qty = (
+                        fill_data.get("qty")
+                        or fill_data.get("fill_qty")
+                        or fill_data.get("filled_quantity")
+                    )
+                    price = (
+                        fill_data.get("price")
+                        or fill_data.get("fill_price")
+                        or fill_data.get("average_price")
+                    )
+                    if qty:
+                        fills.append({
+                            "qty": qty,
+                            "price": price,
+                            "side": fill_data.get("side", "BUY"),
+                        })
         return fills
 
     @staticmethod
@@ -616,3 +633,147 @@ class AssertionEngine:
         """Helper: extract total filled quantity from events."""
         fills = AssertionEngine.extract_fills(events)
         return sum(f["qty"] for f in fills)
+
+    # ────────────────────────────────────────────────────────────────────────────────
+    # NEW: Stateless Architecture Assertions
+    # ────────────────────────────────────────────────────────────────────────────────
+
+    @staticmethod
+    def assert_broker_state_matches_events(broker_state: dict, events: list[dict]) -> None:
+        """
+        Assert that broker state matches event-derived state.
+        
+        Validates that broker (source of truth) state matches the state
+        reconstructed from events. This ensures event correctness.
+        
+        Args:
+            broker_state: State from broker API
+            events: Events collected from Redis Streams
+        
+        Raises:
+            AssertionError: If states don't match
+        """
+        if not events:
+            raise AssertionError("No events provided for broker state validation")
+        
+        # Extract order state from events. The FILLED order.updated.v1 event
+        # carries fill data as `filled_quantity`/`average_price`; earlier
+        # placement events carry the requested qty/price as `quantity`/`price`.
+        last_event = events[-1]
+        last_payload = last_event.get("payload") or {}
+        event_status = last_payload.get("status") or last_event.get("status")
+        event_qty = (
+            last_payload.get("filled_quantity")
+            or last_payload.get("qty")
+            or last_payload.get("quantity")
+            or last_event.get("qty")
+        )
+        event_price = (
+            last_payload.get("average_price")
+            or last_payload.get("price")
+            or last_event.get("price")
+        )
+
+        # Compare with broker state (PBS uses filled_qty/avg_price; live brokers may use qty/price).
+        broker_status = broker_state.get("status")
+        broker_qty = (
+            broker_state.get("filled_qty")
+            or broker_state.get("qty")
+            or broker_state.get("quantity")
+        )
+        broker_price = (
+            broker_state.get("avg_price")
+            or broker_state.get("average_price")
+            or broker_state.get("price")
+        )
+        
+        def _num(v):
+            if v is None:
+                return None
+            try:
+                return Decimal(str(v))
+            except Exception:
+                return v
+
+        assert broker_status == event_status, (
+            f"Status mismatch | broker={broker_status} | event={event_status}"
+        )
+        assert _num(broker_qty) == _num(event_qty), (
+            f"Qty mismatch | broker={broker_qty} | event={event_qty}"
+        )
+        # MARKET orders carry no `price` on the broker order record — the
+        # actual fill price lives on the trade. Skip the order-level price
+        # check in that case; trade-level price checks belong elsewhere.
+        if broker_price is not None:
+            assert _num(broker_price) == _num(event_price), (
+                f"Price mismatch | broker={broker_price} | event={event_price}"
+            )
+        
+        log.debug(
+            f"Broker state matches events | status={event_status} | "
+            f"qty={event_qty} | price={event_price}"
+        )
+
+    @staticmethod
+    def assert_status_transition_correct(events: list[dict], expected_transitions: list[str]) -> None:
+        """
+        Assert that the expected statuses appear, in order, in the event
+        stream. Intermediate broker statuses (e.g. PENDING between PLACED and
+        FILLED) are allowed — callers describe checkpoints, not the exact
+        sequence the broker emits.
+
+        Raises AssertionError if a checkpoint is missing or appears out of
+        order.
+        """
+        if not events:
+            raise AssertionError("No events provided for status transition validation")
+
+        actual_transitions: list[str] = []
+        for event in events:
+            status = event.get("payload", {}).get("status") or event.get("status")
+            if status and status not in actual_transitions:
+                actual_transitions.append(status)
+
+        cursor = 0
+        for checkpoint in expected_transitions:
+            try:
+                cursor = actual_transitions.index(checkpoint, cursor) + 1
+            except ValueError:
+                raise AssertionError(
+                    f"Status transition mismatch | expected checkpoints={expected_transitions} "
+                    f"| actual={actual_transitions} | missing/out-of-order={checkpoint}"
+                )
+
+        log.debug(
+            f"Status transitions validated | checkpoints={expected_transitions} "
+            f"| actual={actual_transitions}"
+        )
+
+    @staticmethod
+    def assert_outbox_event_published(outbox_record: dict, event: dict) -> None:
+        """
+        Assert that outbox record matches published event.
+        
+        Validates that outbox pattern correctly published event to Redis.
+        
+        Args:
+            outbox_record: Outbox table record
+            event: Event from Redis Stream
+        
+        Raises:
+            AssertionError: If records don't match
+        """
+        assert outbox_record.get("event_type") == event.get("type"), (
+            f"Event type mismatch | outbox={outbox_record.get('event_type')} | event={event.get('type')}"
+        )
+        assert outbox_record.get("event_id") == event.get("payload", {}).get("event_id"), (
+            f"Event ID mismatch | outbox={outbox_record.get('event_id')} | event={event.get('data', {}).get('event_id')}"
+        )
+        assert outbox_record.get("status") == "PUBLISHED", (
+            f"Outbox record not published | status={outbox_record.get('status')}"
+        )
+        
+        log.debug(
+            f"Outbox event published validated | event_type={event.get('type')} | "
+            f"event_id={event.get('data', {}).get('event_id')}"
+        )

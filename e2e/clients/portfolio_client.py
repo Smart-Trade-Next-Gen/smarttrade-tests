@@ -3,10 +3,20 @@
 import asyncio
 import logging
 from typing import Optional
+from uuid import UUID
 
 import httpx
 
 log = logging.getLogger(__name__)
+
+
+def _validate_uuid(id_str: str) -> str:
+    """Validate UUID format."""
+    try:
+        UUID(id_str)
+        return id_str
+    except ValueError as e:
+        raise ValueError(f"Invalid UUID format: {id_str}") from e
 
 
 class PortfolioClient:
@@ -211,6 +221,127 @@ class PortfolioClient:
                 log.warning(f"Error fetching positions: {e.response.status_code}, retrying...")
                 await asyncio.sleep(poll_interval)
                 continue
+
+    async def get_position_by_id(
+        self,
+        position_id: str,
+    ) -> dict:
+        """
+        Fetch a specific position by ID.
+
+        Args:
+            position_id: Position ID (UUID)
+
+        Returns:
+            Position dictionary
+
+        Raises:
+            httpx.HTTPStatusError: If request fails or position not found
+            ValueError: If position_id is not a valid UUID
+        """
+        position_id = _validate_uuid(position_id)
+
+        if not self.client:
+            self.client = httpx.AsyncClient(
+                timeout=self.timeout,
+                headers=self._headers,
+            )
+
+        url = f"{self.base_url}/api/v1/positions/{self.broker_id}/{self.account_id}/{position_id}"
+
+        try:
+            response = await self.client.get(url)
+            response.raise_for_status()
+            position = response.json()
+            log.debug(f"Fetched position {position_id}")
+            return position
+        except httpx.HTTPStatusError as e:
+            log.error(f"Failed to fetch position {position_id}: {e.response.status_code}")
+            raise
+
+    async def get_holdings(
+        self,
+        instrument_id: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[dict]:
+        """
+        Fetch holdings from Portfolio Service.
+
+        Args:
+            instrument_id: Optional filter by instrument ID
+            limit: Number of holdings to return
+            offset: Pagination offset
+
+        Returns:
+            List of holding dictionaries (HoldingResponse)
+
+        Raises:
+            httpx.HTTPStatusError: If request fails
+        """
+        if limit < 1 or limit > 200:
+            raise ValueError("limit must be between 1 and 200")
+        if offset < 0:
+            raise ValueError("offset must be >= 0")
+
+        if not self.client:
+            self.client = httpx.AsyncClient(
+                timeout=self.timeout,
+                headers=self._headers,
+            )
+
+        url = f"{self.base_url}/api/v1/holdings/{self.broker_id}/{self.account_id}"
+        params = {"limit": limit, "offset": offset}
+        if instrument_id:
+            params["instrument_id"] = instrument_id
+
+        try:
+            response = await self.client.get(url, params=params)
+            response.raise_for_status()
+            data = response.json()
+            holdings = data.get("items", [])
+            log.debug(f"Fetched {len(holdings)} holdings from Portfolio Service")
+            return holdings
+        except httpx.HTTPStatusError as e:
+            log.error(f"Failed to fetch holdings: {e.response.status_code}")
+            raise
+
+    async def get_holding_by_id(
+        self,
+        holding_id: str,
+    ) -> dict:
+        """
+        Fetch a specific holding by ID.
+
+        Args:
+            holding_id: Holding ID (UUID)
+
+        Returns:
+            Holding dictionary
+
+        Raises:
+            httpx.HTTPStatusError: If request fails or holding not found
+            ValueError: If holding_id is not a valid UUID
+        """
+        holding_id = _validate_uuid(holding_id)
+
+        if not self.client:
+            self.client = httpx.AsyncClient(
+                timeout=self.timeout,
+                headers=self._headers,
+            )
+
+        url = f"{self.base_url}/api/v1/holdings/{self.broker_id}/{self.account_id}/{holding_id}"
+
+        try:
+            response = await self.client.get(url)
+            response.raise_for_status()
+            holding = response.json()
+            log.debug(f"Fetched holding {holding_id}")
+            return holding
+        except httpx.HTTPStatusError as e:
+            log.error(f"Failed to fetch holding {holding_id}: {e.response.status_code}")
+            raise
 
     # Orders and trades belong to Journal Service after the read split.
     # Use JournalClient.get_orders / JournalClient.get_trades instead.
