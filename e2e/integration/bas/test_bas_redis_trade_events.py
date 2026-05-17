@@ -44,7 +44,7 @@ async def test_trade_event_published_after_fill(
     broker_id = config.broker_id
 
     # Use the same helper as the BAS↔PBS WS test for consistency
-    from e2e.integration.test_bas_pbs_execution_ws import _place_and_fill
+    from .test_bas_pbs_execution_ws import _place_and_fill
 
     broker_order_id, instrument_id, events = await _place_and_fill(
         place_and_sync_order=place_and_sync_order,
@@ -103,7 +103,7 @@ async def test_trade_events_have_unique_ids_and_idempotency_keys(
     """
     broker_id = config.broker_id
 
-    from e2e.integration.test_bas_pbs_execution_ws import _place_and_fill
+    from .test_bas_pbs_execution_ws import _place_and_fill
 
     broker_order_id, instrument_id, events = await _place_and_fill(
         place_and_sync_order=place_and_sync_order,
@@ -146,7 +146,7 @@ async def test_multiple_fills_generate_multiple_trade_events(
     """
     broker_id = config.broker_id
 
-    from e2e.integration.test_bas_pbs_execution_ws import _place_and_fill
+    from .test_bas_pbs_execution_ws import _place_and_fill
 
     # Place and fill the order (first fill)
     broker_order_id, instrument_id, events = await _place_and_fill(

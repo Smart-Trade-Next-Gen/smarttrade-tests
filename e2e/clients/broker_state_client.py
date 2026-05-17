@@ -27,6 +27,11 @@ class BrokerStateClient(ABC):
         pass
     
     @abstractmethod
+    async def get_positions(self, broker_id: str, account_id: str) -> list:
+        """Get all positions for an account from broker."""
+        pass
+    
+    @abstractmethod
     async def get_trade_state(self, broker_id: str, account_id: str, order_id: str) -> dict:
         """Get trade state from broker."""
         pass
@@ -87,6 +92,20 @@ class FyersStateClient(BrokerStateClient):
                 return pos
         return {}
     
+    async def get_positions(self, broker_id: str, account_id: str) -> list:
+        """Query Fyers API for all positions."""
+        if not self.client:
+            raise RuntimeError("Client not connected. Use async context manager.")
+        
+        url = f"{self.api_url}/positions"
+        params = {"account_id": account_id}
+        headers = {"Authorization": f"Bearer {self.token}"}
+        
+        response = await self.client.get(url, params=params, headers=headers)
+        response.raise_for_status()
+        
+        return response.json()
+    
     async def get_trade_state(self, broker_id: str, account_id: str, order_id: str) -> dict:
         """Query Fyers API for trade state."""
         if not self.client:
@@ -119,7 +138,12 @@ class FyersStateClient(BrokerStateClient):
 
 
 class PBSStateClient(BrokerStateClient):
-    """Paper Broker Service state client."""
+    """Paper Broker Service state client.
+    
+    Security Note: The caller must ensure that the provided token belongs to the user
+    who is authorized to access the requested broker_id/account_id combination. This client
+    does not perform user_id validation - it relies on the service's RBAC to enforce access control.
+    """
     
     def __init__(self, base_url: str, token: str, timeout: float = 10.0):
         self.base_url = base_url.rstrip("/")
@@ -165,6 +189,20 @@ class PBSStateClient(BrokerStateClient):
                 return pos
         return {}
     
+    async def get_positions(self, broker_id: str, account_id: str) -> list:
+        """Query PBS internal API for all positions."""
+        if not self.client:
+            raise RuntimeError("Client not connected. Use async context manager.")
+        
+        url = f"{self.base_url}/api/v1/position/{broker_id}"
+        params = {"account_id": account_id}
+        headers = {"Authorization": f"Bearer {self.token}"}
+        
+        response = await self.client.get(url, params=params, headers=headers)
+        response.raise_for_status()
+        
+        return response.json()
+    
     async def get_trade_state(self, broker_id: str, account_id: str, order_id: str) -> dict:
         """Query PBS internal API for trade state."""
         if not self.client:
@@ -184,16 +222,46 @@ class PBSStateClient(BrokerStateClient):
         return {}
     
     async def get_account_state(self, broker_id: str, account_id: str) -> dict:
-        """Query PBS internal API for account state."""
+        """Query PBS internal API for account state.
+        
+        Args:
+            broker_id: Broker identifier
+            account_id: Account identifier
+            
+        Returns:
+            Dictionary with cash_balance, balance, reserved, currency
+            
+        Raises:
+            httpx.HTTPStatusError: If account doesn't exist (404) or other HTTP error
+            RuntimeError: If client not connected
+        """
         if not self.client:
             raise RuntimeError("Client not connected. Use async context manager.")
         
-        url = f"{self.base_url}/api/v1/accounts/{account_id}"
+        url = f"{self.base_url}/api/v1/account/{broker_id}/{account_id}/balance"
         headers = {"Authorization": f"Bearer {self.token}"}
         
-        response = await self.client.get(url, headers=headers)
-        response.raise_for_status()
-        return response.json()
+        try:
+            response = await self.client.get(url, headers=headers)
+            response.raise_for_status()
+            
+            balance_data = response.json()
+            # Map to expected format
+            return {
+                "cash_balance": balance_data.get("available", 0),
+                "balance": balance_data.get("balance", 0),
+                "reserved": balance_data.get("reserved", 0),
+                "currency": balance_data.get("currency", "INR"),
+            }
+        except httpx.HTTPStatusError as e:
+            # Provide clearer error message for account not found
+            if e.response.status_code == 404:
+                raise httpx.HTTPStatusError(
+                    f"Account not found: broker_id={broker_id}, account_id={account_id}",
+                    request=e.request,
+                    response=e.response
+                )
+            raise
 
 
 def create_broker_state_client(broker_type: str, base_url: str, token: str, timeout: float = 10.0) -> BrokerStateClient:

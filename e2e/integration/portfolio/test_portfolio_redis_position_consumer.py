@@ -77,7 +77,7 @@ async def test_portfolio_consumes_position_event_and_exposes_via_rest(
     """
     broker_id = config.broker_id
 
-    from e2e.integration.test_bas_pbs_execution_ws import _place_and_fill
+    from e2e.integration.bas.test_bas_pbs_execution_ws import _place_and_fill
 
     qty = 100
     price = Decimal("550.00")
@@ -150,7 +150,7 @@ async def test_portfolio_position_accumulates_across_two_fills(
     """
     broker_id = config.broker_id
 
-    from e2e.integration.test_bas_pbs_execution_ws import _place_and_fill
+    from e2e.integration.bas.test_bas_pbs_execution_ws import _place_and_fill
 
     qty1 = 50
     price1 = Decimal("550.00")

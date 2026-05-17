@@ -4,7 +4,7 @@ Production-grade end-to-end testing for the SmartTrade trading platform.
 
 **Updated for v4.0 Stateless Architecture** - Broker is source of truth, BAS is stateless
 
-**Total coverage**: 34 comprehensive tests across 4 test phases (updated from 39)
+**Total coverage**: 50+ comprehensive tests across 4 test phases
 
 ## Quick Start
 
@@ -18,23 +18,23 @@ pip install -r requirements.txt
 ### Run All Tests
 
 ```bash
-pytest tests/ -v
+pytest integration/ -v
 ```
 
 ### Run by Test Phase
 
 ```bash
-# Phase 5: Injection Mode (deterministic, 13 tests)
-pytest -m injection -v
+# Phase 1: Cross-cutting concerns (architecture boundaries, order lifecycle, financial invariants, RBAC)
+pytest -m smoke -v
 
-# Phase 6: Real Execution (price-driven, 10 tests) - TODO
-pytest -m real_execution -v
+# Phase 2: Service-specific coverage (BAS, PBS, MDS, Journal, Portfolio, Notification, Strategy)
+pytest -m integration -v
 
-# Phase 7: Resilience (chaos testing, 11 tests) - TODO
+# Phase 3: Resilience & chaos (Redis failure, PostgreSQL failure, service restart, network partition)
 pytest -m resilience -v
 
-# Quick sanity check (2 tests) - TODO
-pytest -m smoke -v
+# Phase 4: Performance & stress (order load, quote processing, database performance, Redis stream performance)
+pytest -m performance -v
 ```
 
 ## Project Structure
@@ -44,54 +44,56 @@ e2e/
 ├── README.md                          # This file
 ├── requirements.txt                   # Python dependencies
 ├── pytest.ini                         # pytest configuration
-├── TEST_CATEGORIZATION.md            # Test organization and CI/CD strategy
 ├── conftest.py                        # Global pytest fixtures
-├── config/
-│   ├── __init__.py
-│   └── config.py                     # Test configuration (URLs, timeouts, broker config)
 ├── clients/
 │   ├── __init__.py
 │   ├── bas_client.py                 # Broker Adapter Service REST client
-│   ├── broker_state_client.py        # Broker state client (NEW - source of truth)
+│   ├── broker_state_client.py        # Broker state client (source of truth)
 │   ├── mds_client.py                 # Market Data Service WebSocket client
 │   ├── mds_rest_client.py            # MDS REST client (instruments)
-│   ├── mock_client.py                # Mock Service client (fill injection)
 │   ├── portfolio_client.py          # Portfolio Service client
-│   └── journal_client.py            # Journal Service client
-├── harness/
-│   ├── __init__.py
-│   ├── event_collector.py            # Async event collection per order_id
-│   ├── redis_event_collector.py      # Redis Stream event collector (NEW)
-│   ├── assertions.py                 # Order/position/invariant assertions
-│   ├── scenario_engine.py            # YAML scenario loading
-│   └── scenario_executor.py          # Scenario execution orchestration
-├── fixtures/
-│   ├── __init__.py
-│   ├── logging.py                    # Test logging configuration
-│   ├── market_data_stream.py         # Price update injection (Phase 6)
-│   └── chaos_engine.py               # Failure injection (Phase 7)
-├── scenarios/                         # YAML scenario files
-│   ├── market_buy_full_fill.yaml
-│   ├── concurrent_orders_2x.yaml
-│   └── ...
-└── tests/
-    ├── __init__.py
-    ├── conftest.py                   # Test-level fixtures
-    ├── test_order_lifecycle_injection.py        # Phase 5: 4 tests (UPDATED)
-    ├── test_cancel_orders_injection.py          # Phase 5: 2 tests (UPDATED)
-    ├── test_error_paths_injection.py            # Phase 5: 4 tests (UPDATED)
-    ├── test_concurrent_orders_injection.py      # Phase 5: 3 tests (UPDATED)
-    ├── test_market_buy_real_execution.py        # Phase 6: 4 tests (TODO)
-    ├── test_execution_stress_scenarios.py       # Phase 6: 3 tests (TODO)
-    ├── test_resilience_timeouts.py              # Phase 7: 4 tests (TODO)
-    ├── test_resilience_event_handling.py        # Phase 7: 4 tests (TODO)
-    ├── test_resilience_partial_failures.py      # Phase 7: 3 tests (TODO)
-    ├── test_journal_integration.py            # 3 tests (TODO)
-    ├── test_portfolio_integration.py          # 3 tests (TODO)
-    ├── test_architecture_boundaries.py        # Architecture validation (TODO)
-    ├── test_websocket_client_routing.py        # WebSocket separation (TODO)
-    ├── test_websocket_separation_live.py      # Live WebSocket tests (TODO)
-    └── test_event_bus_validation.py           # Event bus validation (TODO)
+│   ├── journal_client.py            # Journal Service client
+│   ├── notification_client.py       # Notification Service client
+│   ├── strategy_client.py           # Strategy Service client
+│   └── redis_client.py              # Redis client (for stream validation)
+└── integration/
+    ├── conftest.py                   # Integration test fixtures
+    ├── cross_cutting/
+    │   ├── test_architecture_boundaries.py      # Architecture validation
+    │   └── test_rbac_enforcement.py            # RBAC enforcement
+    ├── order_lifecycle/
+    │   ├── test_order_lifecycle_e2e.py          # Order lifecycle end-to-end
+    │   └── test_financial_invariants.py         # Financial invariants validation
+    ├── bas/
+    │   ├── test_bas_rest_api_comprehensive.py   # BAS REST API comprehensive tests
+    │   └── test_bas_redis_trade_events.py      # BAS Redis trade events consumption
+    ├── pbs/
+    │   ├── test_pbs_execution_logic.py         # PBS execution logic tests
+    │   └── test_pbs_concurrency_safety.py      # PBS concurrency safety
+    ├── mds/
+    │   └── test_mds_quote_production.py         # MDS quote production tests
+    ├── journal/
+    │   ├── test_journal_redis_consumer.py      # Journal Redis event consumption
+    │   └── test_journal_rest_api.py            # Journal REST API tests
+    ├── portfolio/
+    │   ├── test_portfolio_redis_position_consumer.py  # Portfolio Redis position consumption
+    │   └── test_portfolio_rest_api.py          # Portfolio REST API tests
+    ├── notification/
+    │   ├── test_notification_redis_consumer.py  # Notification Redis event consumption
+    │   └── test_notification_rest_api.py       # Notification REST API tests
+    ├── strategy/
+    │   └── test_strategy_rest_api.py           # Strategy REST API tests
+    ├── resilience/
+    │   ├── test_redis_failure.py               # Redis failure scenarios
+    │   ├── test_postgresql_failure.py          # PostgreSQL failure scenarios
+    │   ├── test_service_restart.py             # Service restart scenarios
+    │   ├── test_network_partition.py          # Network partition scenarios
+    │   └── test_message_ordering.py            # Message ordering guarantees
+    └── performance/
+        ├── test_order_load.py                  # Order placement load testing
+        ├── test_quote_processing.py            # High-frequency quote processing
+        ├── test_database_performance.py        # Database query performance
+        └── test_redis_stream_performance.py    # Redis stream performance
 ```
 
 ## Quick Links
@@ -105,28 +107,41 @@ e2e/
 
 | Phase | Type | Count | Timeout | Purpose |
 |-------|------|-------|---------|---------|
-| 5 | Injection | 13 | 30s | Deterministic correctness (UPDATED) |
-| 6 | Real Execution | 10 | 10s | Price-driven execution (TODO) |
-| 7 | Resilience | 11 | 15s | Chaos & recovery (TODO) |
-| Smoke | Critical | 2 | 2min | Quick sanity check (TODO) |
+| 1.1 | Cross-cutting | 3 | 30s | Architecture boundaries validation |
+| 1.2 | Order Lifecycle | 7 | 30s | Order lifecycle end-to-end |
+| 1.3 | Financial Invariants | 5 | 30s | Financial invariants validation |
+| 1.5 | RBAC Enforcement | 4 | 30s | RBAC enforcement tests |
+| 2 | Service-Specific | 14 | 30s | Service-specific coverage |
+| 3 | Resilience & Chaos | 5 | 60s | Resilience & chaos testing |
+| 4 | Performance & Stress | 4 | 60s | Performance & stress testing |
+| Smoke | Critical | 5 | 2min | Quick sanity check |
 
 ## Running Tests
 
 ```bash
 # Local: All tests
-pytest tests/ -v
+pytest integration/ -v
 
 # By phase
-pytest -m smoke -v          # 2 critical tests
-pytest -m injection -v      # 18 deterministic tests
-pytest -m real_execution -v # 10 price-driven tests
-pytest -m resilience -v     # 11 chaos tests
+pytest -m smoke -v          # Critical path tests
+pytest -m integration -v    # Service-specific tests
+pytest -m resilience -v     # Resilience & chaos tests
+pytest -m performance -v    # Performance & stress tests
+
+# By service
+pytest integration/bas/ -v          # BAS tests
+pytest integration/pbs/ -v          # PBS tests
+pytest integration/mds/ -v          # MDS tests
+pytest integration/journal/ -v       # Journal tests
+pytest integration/portfolio/ -v    # Portfolio tests
+pytest integration/notification/ -v # Notification tests
+pytest integration/strategy/ -v     # Strategy tests
 
 # With coverage
-pytest tests/ --cov=e2e --cov-report=html
+pytest integration/ --cov=e2e --cov-report=html
 
 # Parallel execution
-pytest tests/ -n auto -v
+pytest integration/ -n auto -v
 ```
 
 ## CI/CD Pipeline
@@ -134,15 +149,15 @@ pytest tests/ -n auto -v
 GitHub Actions workflow with 4 stages:
 
 1. **Smoke** (2 min) → Block if fail
-2. **Injection** (10 min) → Block if fail
-3. **Real Execution** (15 min) → Warn if fail
-4. **Resilience** (30 min) → Warn if fail
+2. **Service-Specific** (15 min) → Block if fail
+3. **Resilience** (10 min) → Warn if fail
+4. **Performance** (10 min) → Warn if fail
 
-Total: **57 minutes** for full suite
+Total: **37 minutes** for full suite
 
 See [TEST_CATEGORIZATION.md](TEST_CATEGORIZATION.md) for strategy.
 
-## WebSocket Architecture
+## Event Architecture
 
 E2E tests use **Redis Streams** aligned with the v4.0 stateless architecture:
 
@@ -153,39 +168,38 @@ E2E tests use **Redis Streams** aligned with the v4.0 stateless architecture:
 ### Event Flow
 
 1. Test places order via `bas_client.place_order()`
-2. Mock service injects fill via `mock_client.inject_fill()`
-3. Broker publishes `order.updated.v1` event to Redis Streams
-4. `redis_event_collector` streams event from Redis Streams
-5. Test observes via `redis_event_collector.wait_for_completion(order_id)`
-6. Broker state verified via `broker_state_client` (source of truth)
+2. Broker processes order and publishes events to Redis Streams
+3. Test observes events via Redis stream consumers or service clients
+4. Broker state verified via `broker_state_client` (source of truth)
 
 ## Key Fixtures
 
 - `bas_client`: BAS REST client (order placement, portfolio queries)
-- `broker_state_client`: Broker state client (source of truth) - NEW
-- `redis_event_collector`: Redis Stream event collector (NEW)
-- `mds_client`: MDS WebSocket client (market data stream)
-- `mock_client`: Mock service for deterministic fill injection
-- `event_collector`: Async event collection (legacy, kept for compatibility)
-- `assertions`: Order/position validation (updated with broker state assertions)
+- `pbs_client`: PBS REST client (execution logic, order management)
+- `mds_client`: MDS REST client (instruments, quotes)
+- `journal_client`: Journal Service client (trades, orders, actions)
+- `portfolio_client`: Portfolio Service client (positions, account summary)
+- `notification_client`: Notification Service client (alerts, notifications)
+- `strategy_client`: Strategy Service client (strategies, decisions)
+- `broker_state_client`: Broker state client (source of truth)
+- `redis_client`: Redis client (for stream validation)
 - `test_account_id`: Unique test account per test
-- `chaos_engine`: Failure injection (Phase 7)
 
 ## Test Markers
 
 ```python
-@pytest.mark.smoke              # 2 tests
-@pytest.mark.injection          # 18 tests
-@pytest.mark.real_execution     # 10 tests
-@pytest.mark.resilience         # 11 tests
+@pytest.mark.smoke              # Critical path tests
+@pytest.mark.integration        # Service-specific tests
+@pytest.mark.resilience         # Resilience & chaos tests
+@pytest.mark.performance        # Performance & stress tests
 ```
 
 ## Performance
 
-- **34 total tests** (updated from 39)
-- **57 min full suite** (parallel-friendly, estimated)
+- **50+ total tests**
+- **37 min full suite** (parallel-friendly, estimated)
 - **2 min smoke only** (estimated)
-- **Individual test max**: 15 seconds
+- **Individual test max**: 60 seconds
 
 ## Troubleshooting
 
@@ -208,4 +222,4 @@ New tests should:
 
 ---
 
-**Status**: Production-ready | **Coverage**: 39 E2E tests | **Phases**: 5-7
+**Status**: Production-ready | **Coverage**: 50+ E2E tests | **Phases**: 1-4

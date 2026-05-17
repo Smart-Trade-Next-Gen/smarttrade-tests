@@ -721,6 +721,24 @@ async def redis_event_collector(config: TestConfig) -> RedisEventCollector:
     await collector.disconnect()
 
 
+@pytest_asyncio.fixture
+async def redis_client(config: TestConfig):
+    """
+    Provide direct Redis client for Redis stream operations.
+
+    Scope: function (created per test)
+
+    Provides direct access to Redis for stream operations in tests that
+    need to manually interact with Redis Streams (e.g., resilience tests,
+    performance tests, MDS quote production tests).
+    """
+    import redis.asyncio as redis
+    
+    client = await redis.from_url(config.redis_url, encoding="utf-8", decode_responses=True)
+    yield client
+    await client.close()
+
+
 @pytest.fixture
 def assertions() -> AssertionEngine:
     """

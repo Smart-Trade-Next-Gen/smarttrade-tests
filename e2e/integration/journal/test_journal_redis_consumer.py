@@ -101,7 +101,7 @@ async def test_journal_consumes_order_event_and_exposes_via_rest(
     """
     broker_id = config.broker_id
 
-    from e2e.integration.test_bas_pbs_execution_ws import _place_and_fill
+    from e2e.integration.bas.test_bas_pbs_execution_ws import _place_and_fill
 
     qty = 100
     price = Decimal("550.00")
@@ -145,7 +145,7 @@ async def test_journal_consumes_trade_event_and_exposes_via_rest(
     """
     broker_id = config.broker_id
 
-    from e2e.integration.test_bas_pbs_execution_ws import _place_and_fill
+    from e2e.integration.bas.test_bas_pbs_execution_ws import _place_and_fill
 
     qty = 100
     price = Decimal("550.00")

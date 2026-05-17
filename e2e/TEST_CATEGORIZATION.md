@@ -1,39 +1,58 @@
 # E2E Test Categorization & CI/CD Strategy
 
-## Architecture: Dual WebSocket Streams
+## Architecture: Redis Streams Event Bus
 
-Tests use the production WebSocket architecture with **two independent event streams**:
+Tests use the production event-driven architecture with **Redis Streams**:
 
-| Stream | Service | Endpoint | Purpose |
-|--------|---------|----------|---------|
-| **Market Data** | MDS | `ws://mds:8004/ws` | Real-time market data (quotes, depth, candles) |
-| **Account Events** | BAS | `ws://bas:8005/api/v1/ws` | Trading events (orders, trades, positions) |
+| Stream | Purpose | Events |
+|--------|---------|--------|
+| **Redis Streams** | Event-driven event collection | `order.updated.v1`, `trade.executed.v1`, `position.updated.v1` |
 
 **Event Collection Flow**:
-1. `bas_ws_client` connects to BAS WebSocket
-2. Subscribes to account events for test account
-3. Streams events (order.filled.v1, trade.executed.v1, position.updated.v1) to `event_collector`
-4. Tests observe via `event_collector.wait_for_completion(order_id, timeout)`
+1. Services publish events to Redis Streams
+2. Tests consume events via Redis clients or service clients
+3. Tests validate state via broker state clients (source of truth)
 
-**Rationale**: This separation ensures failure isolation and latency optimization—market data resilience is independent from trading event delivery.
+**Rationale**: This ensures event-driven testing that matches the production architecture with broker as source of truth.
 
 ## Overview
 
-The SmartTrade E2E testing framework spans **Phases 5-7** with **39 comprehensive tests** organized by execution mode and resilience focus.
+The SmartTrade E2E testing framework spans **Phases 1-4** with **50+ comprehensive tests** organized by cross-cutting concerns, service-specific coverage, resilience, and performance.
 
 ## Test Categories
 
-### 1. Smoke Tests (2 tests)
+### 1. Phase 1: Cross-Cutting Concerns (19 tests)
 
-**Purpose**: Quick sanity check for critical paths
+**Purpose**: Validate architecture boundaries, order lifecycle, financial invariants, and RBAC
 **Markers**: `@pytest.mark.smoke`
-**Timeout**: 2 minutes
+**Timeout**: 10 minutes (max 30s per test)
 **When to run**: Every PR, pre-deployment validation
 **Failure policy**: Block merge if failed
 
-Tests:
-- `test_market_buy_full_fill` (Phase 5)
-- `test_market_sell_full_fill` (Phase 5)
+**Test Modules**:
+1. **cross_cutting/test_architecture_boundaries.py** (3 tests)
+   - Service boundary validation
+   - Event bus validation
+   - WebSocket separation
+
+2. **cross_cutting/test_rbac_enforcement.py** (4 tests)
+   - Unauthorized access prevention
+   - Role-based access control
+   - Permission validation
+
+3. **order_lifecycle/test_order_lifecycle_e2e.py** (7 tests)
+   - Market BUY/SELL full fill
+   - LIMIT BUY/SELL trigger validation
+   - Order cancellation
+   - Order rejection
+   - Partial fills
+
+4. **order_lifecycle/test_financial_invariants.py** (5 tests)
+   - Buy order decreases cash
+   - Sell order increases cash
+   - Position quantity matches trades
+   - PnL calculation accuracy
+   - No negative cash or positions
 
 **Run command**:
 ```bash
@@ -42,125 +61,160 @@ pytest -m smoke -v
 
 ---
 
-### 2. Phase 5: Injection Mode Tests (18 tests)
+### 2. Phase 2: Service-Specific Coverage (14 tests)
 
-**Purpose**: Validate order correctness with deterministic fill injection
-**Markers**: `@pytest.mark.injection`
-**Timeout**: 10 minutes (max 30s per test)
+**Purpose**: Validate each service's REST API and event consumption
+**Markers**: `@pytest.mark.integration`
+**Timeout**: 15 minutes (max 30s per test)
 **When to run**: Every PR, daily CI runs
 **Failure policy**: Block merge if failed
 
-**Execution model**: Deterministic
-- Use `inject_fill()` to trigger fills
-- No price-driven execution
-- 100% reproducible
-- Fast execution
-
 **Test Modules**:
-1. **test_order_lifecycle_injection.py** (4 tests)
-   - Market BUY/SELL full fill
-   - LIMIT BUY/SELL trigger validation
-   
-2. **test_partial_fills_injection.py** (3 tests)
-   - 2-fill scenario (50+50)
-   - 3-fill scenario (50+50+50)
-   - 10-fill streaming (10 x 10)
+1. **bas/test_bas_rest_api_comprehensive.py** (4 tests)
+   - Order placement endpoint
+   - Order cancellation endpoint
+   - Portfolio query endpoint
+   - WebSocket routing
 
-3. **test_cancel_orders_injection.py** (3 tests)
-   - Cancel unfilled order
-   - Cancel partially filled order
-   - Fill after cancellation rejection
+2. **bas/test_bas_redis_trade_events.py** (3 tests)
+   - Trade event consumption
+   - Order event consumption
+   - Position event consumption
 
-4. **test_error_paths_injection.py** (5 tests)
-   - Invalid inputs (zero qty, negative qty, zero price)
-   - Overfill scenarios
-   - Sequence violations
+3. **pbs/test_pbs_execution_logic.py** (4 tests)
+   - Order execution validation
+   - Fill injection validation
+   - Position calculation
+   - Order state transitions
 
-5. **test_concurrent_orders_injection.py** (3 tests)
-   - Two concurrent BUY orders
-   - Concurrent BUY + SELL
-   - Three orders on same instrument
+4. **pbs/test_pbs_concurrency_safety.py** (3 tests)
+   - Concurrent order placement
+   - Concurrent fill injection
+   - Position consistency
+
+5. **mds/test_mds_quote_production.py** (4 tests)
+   - Quote production validation
+   - Quote format compliance
+   - Instrument master publishing
+   - Subscription request processing
+
+6. **journal/test_journal_redis_consumer.py** (3 tests)
+   - Trade event consumption
+   - Order event consumption
+   - Action event consumption
+
+7. **journal/test_journal_rest_api.py** (4 tests)
+   - Orders retrieval endpoint
+   - Trades retrieval endpoint
+   - Actions retrieval endpoint
+   - Order by ID endpoint
+
+8. **portfolio/test_portfolio_redis_position_consumer.py** (3 tests)
+   - Position event consumption
+   - Portfolio update validation
+   - Account summary validation
+
+9. **portfolio/test_portfolio_rest_api.py** (3 tests)
+   - Positions retrieval endpoint
+   - Position by instrument endpoint
+   - Account summary endpoint
+
+10. **notification/test_notification_redis_consumer.py** (3 tests)
+    - Alert event consumption
+    - Notification delivery validation
+    - Settings update validation
+
+11. **notification/test_notification_rest_api.py** (3 tests)
+    - Alerts retrieval endpoint
+    - Alert creation endpoint
+    - History endpoint
+
+12. **strategy/test_strategy_rest_api.py** (4 tests)
+    - Strategies retrieval endpoint
+    - Strategy by ID endpoint
+    - Strategy execution endpoint
+    - Decisions retrieval endpoint
 
 **Run command**:
 ```bash
-pytest -m injection -v --tb=short
+pytest -m integration -v
 ```
 
 ---
 
-### 3. Phase 6: Real Execution Tests (10 tests)
-
-**Purpose**: Test order execution triggered by price movements
-**Markers**: `@pytest.mark.real_execution`
-**Timeout**: 15 minutes (max 10s per test)
-**When to run**: Daily CI, pre-release
-**Failure policy**: Warn on failure, don't block merge (non-deterministic)
-
-**Execution model**: Price-driven
-- Use `market_data_stream.update_price()` to inject prices
-- PriceExecutionEngine triggers fills
-- Non-deterministic timing
-- Realistic execution scenarios
-
-**Test Modules**:
-1. **test_market_buy_real_execution.py** (4 tests)
-   - Market order immediate fill
-   - LIMIT BUY trigger (price ≤ limit)
-   - LIMIT SELL trigger (price ≥ limit)
-   - STOP BUY trigger (price ≥ stop)
-
-2. **test_partial_fills_real_execution.py** (3 tests)
-   - 2-fill streaming prices
-   - LIMIT order with price oscillation
-   - Concurrent orders with partial fills
-
-3. **test_execution_stress_scenarios.py** (3 tests)
-   - 10 concurrent orders (1000 shares)
-   - Rapid price updates (9 in 90ms)
-   - Oscillating prices in narrow range
-
-**Run command**:
-```bash
-pytest -m real_execution -v --tb=short
-```
-
----
-
-### 4. Phase 7: Resilience Tests (11 tests)
+### 3. Phase 3: Resilience & Chaos (5 tests)
 
 **Purpose**: Validate graceful degradation under failures
 **Markers**: `@pytest.mark.resilience`
-**Timeout**: 30 minutes (max 15s per test)
+**Timeout**: 10 minutes (max 60s per test)
 **When to run**: Weekly, pre-release
 **Failure policy**: Warn, investigate, don't block
 
-**Execution model**: Chaos-injected
-- Use `ChaosEngine.inject()` for failure scenarios
-- Test recovery mechanisms
-- Validate invariant preservation
-- Non-deterministic
-
 **Test Modules**:
-1. **test_resilience_timeouts.py** (4 tests)
-   - Order placement under latency
-   - Fill injection retries
-   - Delayed event collection
-   - Position state consistency
+1. **resilience/test_redis_failure.py** (3 tests)
+   - Redis unavailable during order placement
+   - Redis reconnection after failure
+   - Redis stream consumer recovery
 
-2. **test_resilience_event_handling.py** (4 tests)
-   - Duplicate fill idempotency
-   - Partial fill with missing events
-   - Out-of-order event delivery
-   - Stream interruption recovery
+2. **resilience/test_postgresql_failure.py** (3 tests)
+   - PostgreSQL unavailable during query
+   - Connection pool recovery
+   - Transaction rollback
 
-3. **test_resilience_partial_failures.py** (3 tests)
-   - Concurrent orders with partial failures
-   - Service degradation and recovery
-   - Invariants under partial failures
+3. **resilience/test_service_restart.py** (3 tests)
+   - Service startup sequence
+   - Service restart state persistence
+   - Event replay after restart
+
+4. **resilience/test_network_partition.py** (3 tests)
+   - Network partition between services
+   - Circuit breaker activation
+   - Timeout handling
+
+5. **resilience/test_message_ordering.py** (3 tests)
+   - Redis stream message ordering
+   - Consumer group ordering guarantees
+   - Idempotent processing
 
 **Run command**:
 ```bash
-pytest -m resilience -v --tb=short
+pytest -m resilience -v
+```
+
+---
+
+### 4. Phase 4: Performance & Stress (4 tests)
+
+**Purpose**: Validate system performance under load
+**Markers**: `@pytest.mark.performance`
+**Timeout**: 10 minutes (max 60s per test)
+**When to run**: Weekly, pre-release
+**Failure policy**: Warn, investigate, don't block
+
+**Test Modules**:
+1. **performance/test_order_load.py** (3 tests)
+   - Concurrent order placement
+   - Order placement throughput
+   - Order placement latency
+
+2. **performance/test_quote_processing.py** (3 tests)
+   - High-frequency quote processing
+   - Quote delivery latency
+   - Consumer group scaling
+
+3. **performance/test_database_performance.py** (3 tests)
+   - Journal query performance
+   - Portfolio query performance
+   - Connection pool efficiency
+
+4. **performance/test_redis_stream_performance.py** (3 tests)
+   - Redis stream write throughput
+   - Redis stream read throughput
+   - Consumer group performance
+
+**Run command**:
+```bash
+pytest -m performance -v
 ```
 
 ---
@@ -175,7 +229,7 @@ pytest -m resilience -v --tb=short
 
 **Dependencies**: None (runs first)
 
-### Stage 2: Injection Tests (10 min)
+### Stage 2: Service-Specific Tests (15 min)
 ```
 ✅ All passed? → Proceed to Stage 3
 ❌ Failed? → Block merge, report failure
@@ -184,23 +238,23 @@ pytest -m resilience -v --tb=short
 
 **Dependencies**: Smoke tests pass
 
-### Stage 3: Real Execution Tests (15 min)
+### Stage 3: Resilience Tests (10 min)
 ```
 ✅ All passed? → Proceed to Stage 4
 ❌ Failed? → Warn, log, proceed (non-deterministic)
 ⏭️  Skipped? → Proceed anyway
 ```
 
-**Dependencies**: Injection tests pass
+**Dependencies**: Service-specific tests pass
 
-### Stage 4: Resilience Tests (30 min)
+### Stage 4: Performance Tests (10 min)
 ```
 ✅ All passed? → All tests done
 ❌ Failed? → Warn, log (optional for merge)
 ⏭️  Skipped? → All tests done
 ```
 
-**Dependencies**: Real execution tests pass
+**Dependencies**: Resilience tests pass
 
 ### Stage 5: Test Summary & Reporting
 ```
@@ -217,22 +271,31 @@ pytest -m resilience -v --tb=short
 ### Local Development
 ```bash
 # Run all tests
-pytest e2e/tests/ -v
+pytest integration/ -v
 
 # Run by marker
 pytest -m smoke -v
-pytest -m injection -v
-pytest -m real_execution -v
+pytest -m integration -v
 pytest -m resilience -v
+pytest -m performance -v
+
+# Run by service
+pytest integration/bas/ -v
+pytest integration/pbs/ -v
+pytest integration/mds/ -v
+pytest integration/journal/ -v
+pytest integration/portfolio/ -v
+pytest integration/notification/ -v
+pytest integration/strategy/ -v
 
 # Run specific test
-pytest e2e/tests/test_order_lifecycle_injection.py::test_market_buy_full_fill -v
+pytest integration/order_lifecycle/test_order_lifecycle_e2e.py::test_market_buy_full_fill -v
 
 # Run with coverage
-pytest e2e/tests/ --cov=e2e --cov-report=html
+pytest integration/ --cov=e2e --cov-report=html
 
 # Run in parallel
-pytest e2e/tests/ -n auto -v
+pytest integration/ -n auto -v
 ```
 
 ### CI/CD (GitHub Actions)
@@ -242,9 +305,9 @@ on: [pull_request, push, workflow_dispatch]
 
 # Stages:
 1. Smoke (2 min) → Block if fail
-2. Injection (10 min) → Block if fail
-3. Real Execution (15 min) → Warn if fail
-4. Resilience (30 min) → Warn if fail
+2. Service-Specific (15 min) → Block if fail
+3. Resilience (10 min) → Warn if fail
+4. Performance (10 min) → Warn if fail
 5. Summary (5 min) → Aggregate results
 ```
 
@@ -253,16 +316,16 @@ on: [pull_request, push, workflow_dispatch]
 ## Test Markers Reference
 
 ```python
-@pytest.mark.smoke              # Critical path (2 tests)
-@pytest.mark.injection          # Deterministic mode (18 tests)
-@pytest.mark.real_execution     # Price-driven mode (10 tests)
-@pytest.mark.resilience         # Chaos/recovery (11 tests)
+@pytest.mark.smoke              # Critical path (19 tests)
+@pytest.mark.integration        # Service-specific (14 tests)
+@pytest.mark.resilience         # Resilience & chaos (5 tests)
+@pytest.mark.performance        # Performance & stress (4 tests)
 ```
 
 **Filter by marker**:
 ```bash
 pytest -m smoke
-pytest -m "smoke or injection"
+pytest -m "smoke or integration"
 pytest -m "not resilience"
 ```
 
@@ -274,12 +337,16 @@ pytest -m "not resilience"
 
 | Service | Port | Purpose | Container |
 |---------|------|---------|-----------|
-| PostgreSQL | 5432 | Mock order/trade/position data | postgres:16 |
+| PostgreSQL | 5432 | Service databases | postgres:16 |
 | Redis | 6379 | Event bus for async events | redis:7 |
 | Auth Service | 8001 | Token generation | (external) |
-| Mock Service | 8002 | Order execution engine | (external) |
-| BAS | 8005 | Order placement, positions | (external) |
-| MDS | 8004 | WebSocket events | (external) |
+| PBS | 8002 | Paper broker execution | (external) |
+| MDS | 8004 | Market data service | (external) |
+| BAS | 8005 | Broker adapter service | (external) |
+| Strategy Service | 8006 | Strategy service | (external) |
+| Journal Service | 8007 | Journal service | (external) |
+| Portfolio Service | 8008 | Portfolio service | (external) |
+| Notification Service | 8011 | Notification service | (external) |
 
 ### CI/CD Service Setup
 

@@ -157,7 +157,7 @@ async def test_notification_service_persists_order_fill_into_db(
 
     broker_id = config.broker_id
 
-    from e2e.integration.test_bas_pbs_execution_ws import _place_and_fill
+    from e2e.integration.bas.test_bas_pbs_execution_ws import _place_and_fill
 
     qty = 100
     price = Decimal("550.00")
@@ -229,7 +229,7 @@ async def test_notification_service_does_not_double_persist(
 
     broker_id = config.broker_id
 
-    from e2e.integration.test_bas_pbs_execution_ws import _place_and_fill
+    from e2e.integration.bas.test_bas_pbs_execution_ws import _place_and_fill
 
     _broker_order_id, _instrument_id, events = await _place_and_fill(
         place_and_sync_order=place_and_sync_order,
