@@ -11,9 +11,12 @@ portfolio_url: http://localhost:8008
 journal_url: http://localhost:8007
 redis_url: redis://localhost:6379/0
 
-# Test credentials
-test_user: testuser@example.com
-test_password: testpassword123
+# Test credentials — must match the seeded user in
+# authentication-service/seeder.py (settings.DEFAULT_ADMIN_USERNAME /
+# DEFAULT_ADMIN_PASSWORD). The auth service seeds this user automatically
+# on startup; we don't register a separate test user.
+test_user: admin
+test_password: ChangeMe123!
 
 # Broker and account IDs
 broker_id: fyers
@@ -21,5 +24,5 @@ account_id: TEST123456
 
 # Timeout settings (in seconds)
 timeout_fast: 5.0        # Quick smoke tests
-timeout_medium: 10.0     # Standard wait for events
+timeout_medium: 15.0     # Standard wait for events (increased for outbox polling latency)
 timeout_slow: 30.0       # Full order lifecycle wait
