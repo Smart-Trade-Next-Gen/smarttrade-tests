@@ -103,7 +103,7 @@ async def test_duplicate_fill_events_idempotent(
     logger.info(f"Events collected | Count: {len(events)}")
 
     # Assert: Only single fill processed
-    fill_events = [e for e in events if e.get("event_type") == "order_fill"]
+    fill_events = [e for e in events if e.get("event_type") == "order.updated.v1" and e.get("status") in ["FILLED", "PARTIALLY_FILLED"]]
     assert len(fill_events) <= 1, f"Expected ≤1 fill event, got {len(fill_events)}"
     logger.info(f"✓ Duplicate fill not processed | Unique fills: {len(fill_events)}")
 
@@ -197,7 +197,7 @@ async def test_partial_fill_then_missing_event(
         events = event_collector.get_events(order_id) if hasattr(event_collector, 'get_events') else []
 
     # Assert: At minimum, first fill was received
-    fill_count = sum(1 for e in events if e.get("event_type") == "order_fill")
+    fill_count = sum(1 for e in events if e.get("event_type") == "order.updated.v1" and e.get("status") in ["FILLED", "PARTIALLY_FILLED"])
     logger.info(f"✓ Fill events received: {fill_count} (of 2 injected)")
 
     # Assert: Check order state on broker

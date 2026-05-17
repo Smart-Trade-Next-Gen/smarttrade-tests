@@ -3,15 +3,15 @@ E2E tests for order cancellation using injection mode.
 
 Tests validate:
 - Cancel unfilled orders
-- Cancel partially filled orders
 - Cancel status transitions
-- Event sequence after cancellation
+- Event sequence after cancellation (via Redis Streams)
+- Broker state verification (source of truth)
 - Position state consistency
 
 All tests use INJECTION mode for deterministic execution.
+Updated for v4.0 stateless architecture.
 """
 
-import asyncio
 import pytest
 import uuid
 from decimal import Decimal
@@ -21,10 +21,13 @@ from broker_adapter_service.schemas.order_dtos import BasOrderPlaceRequest, BasO
 
 
 @pytest.mark.injection
+@pytest.mark.asyncio
 async def test_cancel_unfilled_order(
+    config,
     bas_client,
     mock_client,
-    event_collector,
+    redis_event_collector,
+    broker_state_client,
     assertions,
     test_account_id,
     logger,
@@ -36,14 +39,15 @@ async def test_cancel_unfilled_order(
     Validates:
     - Order placement succeeds
     - Cancellation succeeds without fills
-    - Order transitions to CANCELLED
+    - Order transitions to CANCELLED (via Redis Streams)
     - No execution events after cancellation
+    - Broker state verification
     - No position created
     """
     maruti_inst = instrument_catalog.get_equity("MARUTI")
-    broker_id = "fyers"
+    broker_id = config.broker_id
 
-    # Act: Create and place order (use unique client_order_id to bypass idempotency cache)
+    # Act: Create and place order
     order_request = BasOrderPlaceRequest(
         client_order_id=f"test_cancel_unfilled_{test_account_id}_{uuid.uuid4().hex[:8]}",
         position_type=PositionType.INTRADAY,
@@ -75,132 +79,41 @@ async def test_cancel_unfilled_order(
     )
     logger.info(f"Order cancelled | ID: {order_id}")
 
-    # Observe: Wait for cancellation completion
-    events = await event_collector.wait_for_completion(order_id, timeout=15.0)
+    # Observe: Wait for cancellation completion via Redis Streams
+    events = await redis_event_collector.wait_for_completion(order_id, timeout=15.0)
     logger.info(f"Events collected | Count: {len(events)}")
 
     # Assert: Order lifecycle transitions to CANCELLED
     assertions.assert_order_lifecycle(events, "CANCELLED", 0)
     logger.info("✓ Order cancelled (no fills)")
 
-    # Assert: No execution events
+    # Assert: Status transitions correct
+    assertions.assert_status_transition_correct(events, ["PLACED", "CANCELLED"])
+    logger.info("✓ Status transitions validated")
+
+    # Assert: No duplicate events
     assertions.assert_no_duplicate_events(events)
     logger.info("✓ No duplicate events")
 
+    # Assert: Broker state matches events
+    broker_order = await broker_state_client.get_order_state(broker_id, test_account_id, order_id)
+    assertions.assert_broker_state_matches_events(broker_order, events)
+    logger.info("✓ Broker state matches events")
+
     # Assert: No position created
-    post_positions = await bas_client.get_positions(broker_id, test_account_id)
-    maruti_positions = [p for p in post_positions if p.instrument_id == maruti_inst["id"]]
-    assert len(maruti_positions) == 0, "Position should not exist for cancelled order"
+    broker_positions = await broker_state_client.get_position_state(broker_id, test_account_id, maruti_inst["id"])
+    assert not broker_positions or broker_positions.get("net_qty", 0) == 0, "Position should not exist for cancelled order"
     logger.info("✓ No position created")
 
 
-@pytest.mark.skip(reason="Partial fills are not supported in PBS today")
 @pytest.mark.injection
-async def test_cancel_partial_fill(
-    bas_client,
-    mock_client,
-    event_collector,
-    assertions,
-    test_account_id,
-    logger,
-    instrument_catalog,
-):
-    """
-    Test: Cancel a partially filled order (50% filled, then cancelled).
-
-    Validates:
-    - Partial fill succeeds
-    - Cancellation succeeds after partial fill
-    - Order transitions to CANCELLED
-    - Final filled quantity is preserved
-    - Position reflects only filled quantity
-    """
-    heromotoco_inst = instrument_catalog.get_equity("HEROMOTOCO")
-    broker_id = "fyers"
-
-    # Act: Create and place order for 100 shares (use unique client_order_id to bypass idempotency cache)
-    order_request = BasOrderPlaceRequest(
-        client_order_id=f"test_cancel_partial_{test_account_id}_{uuid.uuid4().hex[:8]}",
-        position_type=PositionType.INTRADAY,
-        legs=[
-            BasOrderLeg(
-                instrument_id=heromotoco_inst["id"],
-                instrument_type="EQUITY",
-                side=OrderSide.BUY,
-                qty=100,
-                order_type=OrderType.LIMIT,
-                price=Decimal("3500.00"),
-                stop_price=None,
-                ltp=Decimal("3520.00"),
-            )
-        ],
-        underlying_symbol="HEROMOTOCO",
-        tif=TimeInForce.DAY,
-    )
-
-    [order_resp] = await bas_client.place_order(broker_id, test_account_id, order_request)
-    order_id = order_resp.broker_order_id
-    logger.info(f"Order placed | ID: {order_id} | Total Qty: 100")
-
-    # Act: Inject partial fill (50 shares)
-    await mock_client.inject_fill(
-        broker_id=broker_id,
-        account_id=test_account_id,
-        order_id=order_id,
-        sequence=1,
-        fill_qty=50,
-        fill_price=Decimal("3495.00"),
-    )
-    logger.info("Partial fill injected | Qty: 50 | Price: 3495.00")
-
-    # Wait for partial fill to be delivered before cancelling
-    try:
-        await event_collector.wait_for_status(order_id, "PARTIALLY_FILLED", timeout=10.0)
-        logger.info("Partial fill event confirmed, proceeding with cancel")
-    except (TimeoutError, asyncio.TimeoutError):
-        logger.warning("Partial fill event not seen within 10s, cancelling anyway")
-        await asyncio.sleep(2.0)
-
-    # Act: Cancel the remaining quantity
-    await mock_client.cancel_order(
-        broker_id=broker_id,
-        account_id=test_account_id,
-        order_id=order_id,
-    )
-    logger.info(f"Order cancelled after partial fill | ID: {order_id}")
-
-    # Observe: Wait for cancellation completion
-    events = await event_collector.wait_for_completion(order_id, timeout=15.0)
-    logger.info(f"Events collected | Count: {len(events)}")
-
-    # Assert: Order cancelled with terminal status
-    assertions.assert_order_lifecycle(events, "CANCELLED", 50)
-    logger.info("✓ Order cancelled (status=CANCELLED)")
-
-    # Note: Cumulative fills validation skipped due to event stream timing
-    # (fill events delayed 5+ seconds after cancellation, so not in collector)
-    # However, position state below proves fill actually executed
-
-    # Assert: Verify position was updated via event stream
-    # (Database query may lag behind events, but event stream proves functionality)
-    position_events = [e for e in events if e.get("type") == "position_update"]
-    if position_events:
-        position_data = position_events[0].get("data", {})
-        net_qty = position_data.get("net_quantity")
-        avg_price = position_data.get("average_price")
-        assert net_qty == 50, f"Expected 50 shares, got {net_qty}"
-        assert avg_price is not None, "Expected price in position event"
-        logger.info(f"✓ Position event validated (50 shares) - Confirms fill executed")
-    else:
-        # If position event not in collector yet, just verify fill happened via order state
-        logger.info("✓ Fill executed (position event not yet in collector, but order shows filled qty=50)")
-
-
-@pytest.mark.injection
+@pytest.mark.asyncio
 async def test_cancel_then_fill_rejected(
+    config,
     bas_client,
     mock_client,
-    event_collector,
+    redis_event_collector,
+    broker_state_client,
     assertions,
     test_account_id,
     logger,
@@ -212,12 +125,13 @@ async def test_cancel_then_fill_rejected(
     Validates:
     - Order cancelled successfully
     - Attempting to fill a cancelled order fails gracefully
-    - Final state remains CANCELLED with no fills
+    - Final state remains CANCELLED with no fills (via Redis Streams)
+    - Broker state verification
     """
     titan_inst = instrument_catalog.get_equity("TITAN")
-    broker_id = "fyers"
+    broker_id = config.broker_id
 
-    # Act: Create and place order (use unique client_order_id to bypass idempotency cache)
+    # Act: Create and place order
     order_request = BasOrderPlaceRequest(
         client_order_id=f"test_cancel_then_fill_{test_account_id}_{uuid.uuid4().hex[:8]}",
         position_type=PositionType.INTRADAY,
@@ -239,7 +153,7 @@ async def test_cancel_then_fill_rejected(
 
     [order_resp] = await bas_client.place_order(broker_id, test_account_id, order_request)
     order_id = order_resp.broker_order_id
-    logger.info(f"Order placed | ID: {order_id}")
+    logger.info(f"Order placed | ID: {order_id} | Status: {order_resp.status}")
 
     # Act: Cancel order
     await mock_client.cancel_order(
@@ -249,18 +163,11 @@ async def test_cancel_then_fill_rejected(
     )
     logger.info(f"Order cancelled | ID: {order_id}")
 
-    # Observe: Collect events for cancelled order
-    events = await event_collector.wait_for_completion(order_id, timeout=15.0)
-    logger.info(f"Events collected | Count: {len(events)}")
+    # Wait for cancellation event
+    events = await redis_event_collector.wait_for_completion(order_id, timeout=15.0)
+    logger.info(f"Cancellation events collected | Count: {len(events)}")
 
-    # Assert: Order is CANCELLED with no fills
-    assertions.assert_order_lifecycle(events, "CANCELLED", 0)
-    logger.info("✓ Order cancelled with 0 fills")
-
-    # Ensure cancel has fully propagated before fill attempt
-    await asyncio.sleep(1.0)
-
-    # Act: Attempt to fill cancelled order (should be rejected or ignored)
+    # Act: Try to inject fill after cancellation (should be rejected by broker)
     try:
         await mock_client.inject_fill(
             broker_id=broker_id,
@@ -268,14 +175,26 @@ async def test_cancel_then_fill_rejected(
             order_id=order_id,
             sequence=1,
             fill_qty=50,
-            fill_price=Decimal("2795.00"),
+            fill_price=Decimal("2810.00"),
         )
-        logger.warning("Fill injection accepted for cancelled order (may be cached by mock)")
+        logger.info("Fill injection attempted after cancellation")
     except Exception as e:
-        logger.info(f"Fill injection rejected for cancelled order: {e}")
+        logger.info(f"Fill injection rejected as expected: {e}")
 
-    # Assert: No position created
-    post_positions = await bas_client.get_positions(broker_id, test_account_id)
-    titan_positions = [p for p in post_positions if p.instrument_id == titan_inst["id"]]
-    assert len(titan_positions) == 0, "Position should not exist for cancelled order"
-    logger.info("✓ No position created")
+    # Observe: Final state should remain CANCELLED
+    final_events = await redis_event_collector.get_events(order_id)
+    logger.info(f"Final events collected | Count: {len(final_events)}")
+
+    # Assert: Order lifecycle shows CANCELLED
+    assertions.assert_order_lifecycle(final_events, "CANCELLED", 0)
+    logger.info("✓ Order remains CANCELLED")
+
+    # Assert: Broker state verification
+    broker_order = await broker_state_client.get_order_state(broker_id, test_account_id, order_id)
+    assert broker_order.get("status") == "CANCELLED", f"Expected CANCELLED, got {broker_order.get('status')}"
+    logger.info("✓ Broker state confirmed CANCELLED")
+
+    # Assert: No fills in broker state
+    broker_order_qty = broker_order.get("filled_qty", broker_order.get("qty", 0))
+    assert broker_order_qty == 0, f"Expected 0 fills, got {broker_order_qty}"
+    logger.info("✓ No fills in broker state")

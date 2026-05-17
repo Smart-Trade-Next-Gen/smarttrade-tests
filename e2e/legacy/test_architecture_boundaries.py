@@ -21,7 +21,7 @@ async def test_pbs_does_not_emit_to_execution_topics(
     """
     Test that PBS never publishes directly to execution event topics.
 
-    Only BAS should emit order.filled.v1, trade.executed.v1, position.updated.v1.
+    Only BAS should emit order.updated.v1, trade.executed.v1, position.updated.v1.
     PBS only emits broker.order_update which BAS consumes.
     """
     # Setup
@@ -31,7 +31,7 @@ async def test_pbs_does_not_emit_to_execution_topics(
     price = Decimal("550.00")
 
     # Record stream tail before fill
-    stream_info = await redis_observer.get_stream_info("order.filled.v1")
+    stream_info = await redis_observer.get_stream_info("order.updated.v1")
     tail_id = stream_info.get("last-generated-id", "0-0")
 
     # Place & sync order
@@ -62,9 +62,9 @@ async def test_pbs_does_not_emit_to_execution_topics(
     await event_collector.wait_for_completion(order_id, timeout=config.timeout_medium)
 
     # Verify events came from BAS (not PBS)
-    # BAS should emit exactly one order.filled.v1 event
+    # BAS should emit exactly one order.updated.v1 event
     events = await redis_observer.observe_stream(
-        event_type="order.filled.v1",
+        event_type="order.updated.v1",
         timeout=2.0,
         count=10,
     )
@@ -73,7 +73,7 @@ async def test_pbs_does_not_emit_to_execution_topics(
     order_events = [e for e in events if e.get("order_id") == order_id]
 
     # Assertions
-    assert len(order_events) > 0, "order.filled.v1 events should be emitted by BAS"
+    assert len(order_events) > 0, "order.updated.v1 events should be emitted by BAS"
     # All events should have trace_id indicating they came from BAS
     for event in order_events:
         # BAS should be the producer (trace_id context)

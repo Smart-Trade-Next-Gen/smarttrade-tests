@@ -84,7 +84,7 @@ async def test_mds_ws_receives_no_execution_events(
     # Assertions: MDS should NOT have execution events
     for event in mds_events:
         event_type = event.get("type", "")
-        assert not any(x in event_type for x in ["order.filled", "trade.executed", "position.updated"]), \
+        assert not any(x in event_type for x in ["order.updated", "trade.executed", "position.updated"]), \
             f"MDS received execution event: {event_type}"
 
 

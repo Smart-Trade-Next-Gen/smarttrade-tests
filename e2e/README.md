@@ -2,7 +2,9 @@
 
 Production-grade end-to-end testing for the SmartTrade trading platform.
 
-**Total coverage**: 39 comprehensive tests across 4 test phases
+**Updated for v4.0 Stateless Architecture** - Broker is source of truth, BAS is stateless
+
+**Total coverage**: 34 comprehensive tests across 4 test phases (updated from 39)
 
 ## Quick Start
 
@@ -22,16 +24,16 @@ pytest tests/ -v
 ### Run by Test Phase
 
 ```bash
-# Phase 5: Injection Mode (deterministic, 18 tests)
+# Phase 5: Injection Mode (deterministic, 13 tests)
 pytest -m injection -v
 
-# Phase 6: Real Execution (price-driven, 10 tests)
+# Phase 6: Real Execution (price-driven, 10 tests) - TODO
 pytest -m real_execution -v
 
-# Phase 7: Resilience (chaos testing, 11 tests)
+# Phase 7: Resilience (chaos testing, 11 tests) - TODO
 pytest -m resilience -v
 
-# Quick sanity check (2 tests)
+# Quick sanity check (2 tests) - TODO
 pytest -m smoke -v
 ```
 
@@ -46,16 +48,20 @@ e2e/
 ├── conftest.py                        # Global pytest fixtures
 ├── config/
 │   ├── __init__.py
-│   └── config.py                     # Test configuration (URLs, timeouts)
+│   └── config.py                     # Test configuration (URLs, timeouts, broker config)
 ├── clients/
 │   ├── __init__.py
 │   ├── bas_client.py                 # Broker Adapter Service REST client
-│   ├── bas_ws_client.py              # BAS WebSocket client (account events)
+│   ├── broker_state_client.py        # Broker state client (NEW - source of truth)
 │   ├── mds_client.py                 # Market Data Service WebSocket client
-│   └── mock_client.py                # Mock Service client (fill injection)
+│   ├── mds_rest_client.py            # MDS REST client (instruments)
+│   ├── mock_client.py                # Mock Service client (fill injection)
+│   ├── portfolio_client.py          # Portfolio Service client
+│   └── journal_client.py            # Journal Service client
 ├── harness/
 │   ├── __init__.py
 │   ├── event_collector.py            # Async event collection per order_id
+│   ├── redis_event_collector.py      # Redis Stream event collector (NEW)
 │   ├── assertions.py                 # Order/position/invariant assertions
 │   ├── scenario_engine.py            # YAML scenario loading
 │   └── scenario_executor.py          # Scenario execution orchestration
@@ -66,23 +72,26 @@ e2e/
 │   └── chaos_engine.py               # Failure injection (Phase 7)
 ├── scenarios/                         # YAML scenario files
 │   ├── market_buy_full_fill.yaml
-│   ├── partial_fill_3x.yaml
 │   ├── concurrent_orders_2x.yaml
 │   └── ...
 └── tests/
     ├── __init__.py
     ├── conftest.py                   # Test-level fixtures
-    ├── test_order_lifecycle_injection.py        # Phase 5: 4 tests
-    ├── test_partial_fills_injection.py          # Phase 5: 3 tests
-    ├── test_cancel_orders_injection.py          # Phase 5: 3 tests
-    ├── test_error_paths_injection.py            # Phase 5: 5 tests
-    ├── test_concurrent_orders_injection.py      # Phase 5: 3 tests
-    ├── test_market_buy_real_execution.py        # Phase 6: 4 tests
-    ├── test_partial_fills_real_execution.py     # Phase 6: 3 tests
-    ├── test_execution_stress_scenarios.py       # Phase 6: 3 tests
-    ├── test_resilience_timeouts.py              # Phase 7: 4 tests
-    ├── test_resilience_event_handling.py        # Phase 7: 4 tests
-    └── test_resilience_partial_failures.py      # Phase 7: 3 tests
+    ├── test_order_lifecycle_injection.py        # Phase 5: 4 tests (UPDATED)
+    ├── test_cancel_orders_injection.py          # Phase 5: 2 tests (UPDATED)
+    ├── test_error_paths_injection.py            # Phase 5: 4 tests (UPDATED)
+    ├── test_concurrent_orders_injection.py      # Phase 5: 3 tests (UPDATED)
+    ├── test_market_buy_real_execution.py        # Phase 6: 4 tests (TODO)
+    ├── test_execution_stress_scenarios.py       # Phase 6: 3 tests (TODO)
+    ├── test_resilience_timeouts.py              # Phase 7: 4 tests (TODO)
+    ├── test_resilience_event_handling.py        # Phase 7: 4 tests (TODO)
+    ├── test_resilience_partial_failures.py      # Phase 7: 3 tests (TODO)
+    ├── test_journal_integration.py            # 3 tests (TODO)
+    ├── test_portfolio_integration.py          # 3 tests (TODO)
+    ├── test_architecture_boundaries.py        # Architecture validation (TODO)
+    ├── test_websocket_client_routing.py        # WebSocket separation (TODO)
+    ├── test_websocket_separation_live.py      # Live WebSocket tests (TODO)
+    └── test_event_bus_validation.py           # Event bus validation (TODO)
 ```
 
 ## Quick Links
@@ -96,10 +105,10 @@ e2e/
 
 | Phase | Type | Count | Timeout | Purpose |
 |-------|------|-------|---------|---------|
-| 5 | Injection | 18 | 30s | Deterministic correctness |
-| 6 | Real Execution | 10 | 10s | Price-driven execution |
-| 7 | Resilience | 11 | 15s | Chaos & recovery |
-| Smoke | Critical | 2 | 2min | Quick sanity check |
+| 5 | Injection | 13 | 30s | Deterministic correctness (UPDATED) |
+| 6 | Real Execution | 10 | 10s | Price-driven execution (TODO) |
+| 7 | Resilience | 11 | 15s | Chaos & recovery (TODO) |
+| Smoke | Critical | 2 | 2min | Quick sanity check (TODO) |
 
 ## Running Tests
 
@@ -135,29 +144,30 @@ See [TEST_CATEGORIZATION.md](TEST_CATEGORIZATION.md) for strategy.
 
 ## WebSocket Architecture
 
-E2E tests use **dual WebSocket streams** aligned with the production architecture:
+E2E tests use **Redis Streams** aligned with the v4.0 stateless architecture:
 
-| WebSocket | Endpoint | Purpose | Events |
-|-----------|----------|---------|--------|
-| **MDS** | `ws://mds:8004/ws` | Market data only | Quotes, depth, candles |
-| **BAS** | `ws://bas:8005/api/v1/ws` | Trading events only | Orders, trades, positions |
+| Stream | Purpose | Events |
+|--------|---------|--------|
+| **Redis Streams** | Event-driven event collection | `order.updated.v1`, `trade.executed.v1`, `position.updated.v1` |
 
 ### Event Flow
 
 1. Test places order via `bas_client.place_order()`
 2. Mock service injects fill via `mock_client.inject_fill()`
-3. BAS WebSocket delivers account event (order.filled.v1, trade.executed.v1, etc.)
-4. `bas_ws_client` streams event to `event_collector`
-5. Test observes via `event_collector.wait_for_completion(order_id)`
+3. Broker publishes `order.updated.v1` event to Redis Streams
+4. `redis_event_collector` streams event from Redis Streams
+5. Test observes via `redis_event_collector.wait_for_completion(order_id)`
+6. Broker state verified via `broker_state_client` (source of truth)
 
 ## Key Fixtures
 
 - `bas_client`: BAS REST client (order placement, portfolio queries)
-- `bas_ws_client`: BAS WebSocket client (account event stream)
+- `broker_state_client`: Broker state client (source of truth) - NEW
+- `redis_event_collector`: Redis Stream event collector (NEW)
 - `mds_client`: MDS WebSocket client (market data stream)
 - `mock_client`: Mock service for deterministic fill injection
-- `event_collector`: Async event collection (depends on bas_ws_client)
-- `assertions`: Order/position validation
+- `event_collector`: Async event collection (legacy, kept for compatibility)
+- `assertions`: Order/position validation (updated with broker state assertions)
 - `test_account_id`: Unique test account per test
 - `chaos_engine`: Failure injection (Phase 7)
 
@@ -172,9 +182,9 @@ E2E tests use **dual WebSocket streams** aligned with the production architectur
 
 ## Performance
 
-- **39 total tests**
-- **57 min full suite** (parallel-friendly)
-- **2 min smoke only**
+- **34 total tests** (updated from 39)
+- **57 min full suite** (parallel-friendly, estimated)
+- **2 min smoke only** (estimated)
 - **Individual test max**: 15 seconds
 
 ## Troubleshooting

@@ -18,7 +18,7 @@ async def test_order_filled_event_has_correct_schema(
     redis_observer,
     event_collector,
 ):
-    """Test that order.filled.v1 event has correct schema."""
+    """Test that order.updated.v1 event has correct schema."""
     # Setup
     instrument = instrument_catalog.get_any_equity(1)[0]
     instrument_id = instrument["id"]
@@ -51,13 +51,13 @@ async def test_order_filled_event_has_correct_schema(
 
     # Wait for event on Redis stream
     event = await redis_observer.wait_for_event(
-        event_type="order.filled.v1",
+        event_type="order.updated.v1",
         predicate=lambda e: e.get("order_id") == order_id,
         timeout=config.timeout_medium,
     )
 
     # Assertions on schema
-    assert event["event_type"] == "order.filled.v1"
+    assert event["event_type"] == "order.updated.v1"
     assert event.get("order_id") == order_id
     assert event.get("instrument_id") == instrument_id
     assert event.get("side") == "BUY"
@@ -232,7 +232,7 @@ async def test_events_have_unique_event_ids(
 
     # Collect all events
     all_event_ids = []
-    for event_type in ["order.filled.v1", "trade.executed.v1", "position.updated.v1"]:
+    for event_type in ["order.updated.v1", "trade.executed.v1", "position.updated.v1"]:
         events = await redis_observer.observe_stream(
             event_type=event_type,
             timeout=2.0,

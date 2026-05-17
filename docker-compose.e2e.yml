@@ -229,7 +229,7 @@ services:
       BROKER_REDIRECT_URI: ${BROKER_REDIRECT_URI:-http://localhost/}
       FYERS_APP_SECRET: ${FYERS_APP_SECRET:-test_app_secret}
       RISK_VALIDATION_ENABLED: ${RISK_VALIDATION_ENABLED:-true}
-      USE_OUTBOX_PATTERN: false
+      USE_OUTBOX_PATTERN: true
     depends_on:
       postgres:
         condition: service_healthy
@@ -311,6 +311,39 @@ services:
       redis:
         condition: service_healthy
       market-data-service:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/ready')"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 30s
+    networks:
+      - smarttrade-e2e
+
+  # ──────────────────────────────────────────────────────────────────────
+  # Notification Service (Port 8011)
+  # ──────────────────────────────────────────────────────────────────────
+  notification-service:
+    container_name: notification-service-e2e
+    build:
+      context: ..
+      dockerfile: notification-service/Dockerfile
+      target: runtime-dev
+    image: smarttrade/notification-service:latest
+    restart: unless-stopped
+    ports:
+      - "8011:8000"
+    environment:
+      <<: *common-env
+      SERVICE_NAME: notification-service
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/smarttrade_notification_service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
       auth-service:
         condition: service_started
