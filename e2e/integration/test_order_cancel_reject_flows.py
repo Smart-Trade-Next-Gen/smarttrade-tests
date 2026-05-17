@@ -157,20 +157,6 @@ async def test_cancel_pending_limit_emits_cancelled_event_on_redis(
     )
 
 
-@pytest.mark.xfail(
-    reason=(
-        "Known BAS regression: cancel handler does NOT check the order's "
-        "current state before emitting CANCELLED. When the user (or a stale "
-        "UI) sends DELETE on an already-FILLED order, BAS returns HTTP 200 "
-        "AND publishes a fresh order.updated.v1 event with status=CANCELLED "
-        "for that broker_order_id. Downstream journal/portfolio then have to "
-        "reconcile a FILLED-then-CANCELLED stream for the same order, which "
-        "corrupts position/PnL aggregation. The fix is to make BAS' cancel "
-        "endpoint refuse 4xx (and skip event emission) when the broker "
-        "reports the order is already terminal."
-    ),
-    strict=False,
-)
 async def test_cancel_filled_order_is_rejected_without_spurious_event(
     place_and_sync_order,
     bas_client,
@@ -278,21 +264,6 @@ async def test_cancel_filled_order_is_rejected_without_spurious_event(
         )
 
 
-@pytest.mark.xfail(
-    reason=(
-        "Known BAS regression: cancel handler emits a new CANCELLED event on "
-        "every DELETE call (with a freshly-generated idempotency_key suffix "
-        "of the form '{broker_order_id}-cancelled-{random_uuid}'), even when "
-        "the order is already in CANCELLED state. Each broker_order_id "
-        "transition to CANCELLED must emit at most one event; otherwise "
-        "downstream journal/portfolio consumers will double-count. The "
-        "fix is to either (a) make the idempotency_key deterministic on "
-        "(broker_order_id, status) so the event-bus de-dupes server-side, "
-        "or (b) short-circuit the cancel handler when current state is "
-        "already terminal."
-    ),
-    strict=False,
-)
 async def test_cancel_idempotency_no_double_cancelled_event(
     place_and_sync_order,
     bas_client,
