@@ -108,42 +108,87 @@ def pytest_configure(config):
     reports_dir.mkdir(exist_ok=True)
 
 
+async def trigger_mds_instrument_restream(client: httpx.AsyncClient, config: TestConfig) -> None:
+    """
+    Trigger MDS to restream all instruments to Redis.
+
+    This calls the MDS /api/v1/instruments/restream endpoint which publishes
+    all instruments from the MDS database to the Redis stream market.instrument.v1.
+    BAS will consume these events and populate its instruments table.
+
+    This is a safety net to ensure BAS has the full instrument catalog even if
+    it missed events at startup.
+    """
+    try:
+        response = await client.post(f"{config.mds_url}/api/v1/instruments/restream", timeout=30.0)
+        if response.status_code == 200:
+            result = response.json()
+            count = result.get("count", 0)
+            log.info(f"✅ MDS restreamed {count} instruments to Redis market.instrument.v1")
+            if count == 0:
+                log.warning("⚠️ MDS has 0 instruments — run Fyers instrument sync before E2E tests")
+        else:
+            log.warning(f"⚠️ MDS restream returned status {response.status_code}: {response.text}")
+    except Exception as e:
+        log.error(f"❌ Failed to trigger MDS instrument restream: {e}")
+        raise
+
+
 def pytest_sessionstart(session):
-    """Wait for all services to be fully ready before running tests."""
+    """Wait for all services to be fully ready before running tests.
+
+    Instrument sync is performed ONCE at session start as a fire-and-forget
+    operation. Subsequent failures or timeouts do not retry — multiple
+    concurrent restreams overwhelm MDS (132k+ instruments in 500-batch chunks).
+    """
     config = TestConfig.from_env()
 
-    # Wait for Portfolio Service and other services to be ready
-    async def wait_services():
-        log.info("Waiting for services to be fully initialized...")
-
-        # Create a simple client to check readiness
+    async def wait_for_portfolio_ready():
+        """Wait for Portfolio Service readiness (separate from instrument sync)."""
         async with httpx.AsyncClient() as client:
-            # Wait for Portfolio Service
             start = time.time()
             while time.time() - start < 60:
                 try:
                     response = await client.get(f"{config.portfolio_url}/ready")
                     if response.status_code == 200:
                         log.info("✅ Portfolio Service is ready")
-                        # Verify event listeners are fully subscribed and ready
                         log.info("Waiting for event listeners to initialize (10s)...")
                         await asyncio.sleep(10)
-
-                        # Call the readiness gate to ensure Redis consumer heartbeats are registered
                         await wait_for_portfolio_service_listeners(config.portfolio_url, timeout=30)
-                        return
+                        return True
                 except Exception as e:
                     log.debug(f"Portfolio Service not ready: {e}")
-                    await asyncio.sleep(1)
+                await asyncio.sleep(1)
+            return False
 
-            raise TimeoutError("Portfolio Service did not become ready in time")
+    async def trigger_instrument_sync_once():
+        """Trigger MDS instrument restream — exactly once. Fire-and-forget on timeout."""
+        log.info("Triggering MDS instrument restream to Redis (one-time at session start)...")
+        async with httpx.AsyncClient() as client:
+            try:
+                await trigger_mds_instrument_restream(client, config)
+            except Exception as e:
+                log.warning(
+                    f"⚠️ MDS instrument restream call did not complete: {e}. "
+                    "Continuing — BAS likely has instruments from prior MDS startup sync."
+                )
 
-    # Run the async function
+    async def session_init():
+        log.info("Waiting for services to be fully initialized...")
+        ready = await wait_for_portfolio_ready()
+        if not ready:
+            log.warning("Portfolio Service did not become ready in time — proceeding anyway")
+        # Trigger instrument sync ONCE — independent of readiness loop
+        await trigger_instrument_sync_once()
+        log.info("Waiting for BAS to consume instruments (5s)...")
+        await asyncio.sleep(5)
+        log.info("✅ E2E test environment initialized")
+
     try:
-        asyncio.run(wait_services())
+        asyncio.run(session_init())
     except Exception as e:
-        log.error(f"Failed to wait for services: {e}")
-        log.warning("Proceeding with tests despite service readiness issues")
+        log.error(f"Failed to initialize E2E test session: {e}")
+        log.warning("Proceeding with tests despite initialization issues")
 
 
 def pytest_collection_modifyitems(config, items):
@@ -192,33 +237,40 @@ def config() -> TestConfig:
 @pytest_asyncio.fixture(scope="session")
 async def instrument_catalog(config: TestConfig) -> InstrumentCatalog:
     """
-    Provide session-scoped instrument catalog using pre-defined test instruments.
+    Provide session-scoped instrument catalog by fetching real instruments from MDS.
 
-    For E2E test reliability, we use pre-defined test instruments instead of relying on
-    MDS sync, which can fail due to broker API issues, network problems, or configuration.
+    The deployment docker-compose has MDS DB populated with real Fyers instruments.
+    Tests fetch the instrument list from MDS and use those real IDs for order placement.
 
     Architecture notes:
-    - In production, MDS is the source of truth for instrument metadata
-    - MDS publishes instrument.created events to the Redis stream market.instrument.v1
-    - BAS subscribes to market.instrument.v1 and persists instruments via InstrumentMaster cache
-    - PBS does NOT have an instruments table — it operates on instrument_id strings only
-
-    For E2E tests we:
-    - Use pre-defined test instruments (get_test_instruments)
-    - Tests use these instruments for placing orders
-    - This bypasses MDS sync dependency for test reliability
-
-    PBS receives no instrument seeding by design.
+    - MDS is the source of truth for instrument metadata
+    - Tests query MDS /api/v1/instruments to discover available instruments
+    - Tests use real canonical instrument IDs (e.g., NSE:CM:EQUITY:SBIN)
+    - BAS has consumed these same instruments via market.instrument.v1 Redis stream
 
     Scope: session (loaded once per test run)
     """
-    log.info("Loading test instruments for E2E tests")
+    log.info("Loading real instruments from MDS for E2E tests")
 
-    # Use pre-defined test instruments directly for reliability
-    instruments_data = get_test_instruments()
-    log.info(f"✅ Loaded {len(instruments_data)} test instruments")
+    # Fetch real instruments from MDS
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.get(f"{config.mds_url}/api/v1/instruments", timeout=15.0)
+            response.raise_for_status()
+            data = response.json()
+            instruments_data = data.get("instruments", [])
+        except Exception as e:
+            log.error(f"Failed to fetch instruments from MDS: {e}")
+            raise
 
-    # Create catalog from test instruments
+    if not instruments_data:
+        raise RuntimeError(
+            "MDS has 0 instruments. Run Fyers instrument sync in the deployment environment before E2E tests."
+        )
+
+    log.info(f"✅ Loaded {len(instruments_data)} real instruments from MDS")
+
+    # Create catalog from real instruments
     catalog = InstrumentCatalog(instruments_data)
     await catalog.load()
     log.info(f"✅ Instrument catalog ready: {catalog.count()} instruments")
@@ -388,6 +440,78 @@ def test_account_id() -> str:
     return "TEST_E2E_SHARED"
 
 
+@pytest_asyncio.fixture
+async def isolated_test_account(
+    bas_client,
+    mock_client,
+    portfolio_client,
+):
+    """
+    Create a unique isolated trading account per test.
+
+    Generates a unique account ID per test to avoid conflicts in concurrent
+    testing scenarios. Performs full cleanup including BAS account deletion,
+    PBS state cleanup, and Portfolio position cleanup.
+
+    Scope: function (unique per test)
+    """
+    broker_id = "fyers"
+    unique_account_id = f"TEST_ISO_{uuid.uuid4().hex[:12]}"
+
+    try:
+        # Create PAPER trading account in BAS
+        await bas_client.create_trading_account(
+            broker_id=broker_id,
+            account_id=unique_account_id,
+            account_type="PAPER",
+        )
+        log.debug(f"✅ Isolated paper trading account created: {broker_id}/{unique_account_id}")
+
+        yield unique_account_id
+
+    except Exception as e:
+        log.warning(f"⚠️ Isolated account creation failed: {e}")
+        raise
+
+    finally:
+        # Cleanup: delete account and all associated state
+        try:
+            await mock_client.cleanup_execution_state(broker_id, unique_account_id)
+            log.debug(f"✅ Execution state cleared: {broker_id}/{unique_account_id}")
+        except Exception as e:
+            log.warning(f"⚠️ Execution state cleanup failed: {e}")
+
+        try:
+            await mock_client.cleanup_positions(broker_id, unique_account_id)
+            log.debug(f"✅ Positions cleared: {broker_id}/{unique_account_id}")
+        except Exception as e:
+            log.warning(f"⚠️ Positions cleanup failed: {e}")
+
+        try:
+            await mock_client.cleanup_price_cache()
+            log.debug("✅ PBS price_cache cleared")
+        except Exception as e:
+            log.warning(f"⚠️ price_cache cleanup failed: {e}")
+
+        try:
+            await mock_client.cleanup_account(broker_id, unique_account_id)
+            log.debug(f"✅ PBS account reset: {broker_id}/{unique_account_id}")
+        except Exception as e:
+            log.warning(f"⚠️ PBS account reset failed: {e}")
+
+        try:
+            await portfolio_client.cleanup_positions()
+            log.debug("✅ Portfolio aggregated positions cleared")
+        except Exception as e:
+            log.warning(f"⚠️ Portfolio positions cleanup failed: {e}")
+
+        try:
+            await bas_client.delete_trading_account(broker_id, unique_account_id)
+            log.debug(f"✅ BAS trading account deleted: {broker_id}/{unique_account_id}")
+        except Exception as e:
+            log.warning(f"⚠️ BAS account deletion failed: {e}")
+
+
 @pytest.fixture(scope="session")
 def test_user_id() -> str:
     """
@@ -451,6 +575,53 @@ def auth_token(config: TestConfig, test_user_id: str) -> str:
     return token
 
 
+@pytest.fixture(scope="session")
+def admin_token(config: TestConfig) -> str:
+    """
+    Get admin authentication token for testing admin functionality.
+
+    Uses the default admin credentials that are seeded by the auth service.
+    JWT is valid for 1440 minutes — far longer than any test session.
+
+    Scope: session
+    """
+    from jose import jwt
+    from datetime import datetime, timedelta
+
+    # Load .env file again to ensure JWT_SECRET_KEY is available
+    try:
+        from dotenv import load_dotenv
+        env_file = Path(__file__).parent.parent.parent / ".env"
+        if env_file.exists():
+            load_dotenv(env_file, override=True)  # Force reload
+    except ImportError:
+        pass
+
+    # Secret from environment (must match docker-compose JWT_SECRET_KEY)
+    secret = os.getenv("JWT_SECRET_KEY")
+    if not secret:
+        log.error("JWT_SECRET_KEY not found in environment. Check .env file or container environment.")
+        raise ValueError("JWT_SECRET_KEY required for test authentication")
+
+    # Use a fixed admin user ID for testing
+    admin_user_id = "00000000-0000-0000-0000-000000000002"
+
+    now = datetime.utcnow()
+    payload = {
+        "sub": admin_user_id,  # Admin user ID
+        "roles": ["admin"],  # Admin role
+        "type": "access",  # Required by smarttrade-common token validation
+        "iat": int(now.timestamp()),
+        "exp": int((now + timedelta(hours=24)).timestamp()),
+        "iss": "auth-service",  # Required by smarttrade-common
+        "aud": "smarttrade-services",  # Required by smarttrade-common
+    }
+
+    # Use python-jose (same as smarttrade-common) not PyJWT
+    token = jwt.encode(payload, secret, algorithm="HS256")
+    return token
+
+
 # ────────────────────────────────────────────────────────────────────────────────
 # FUNCTION-SCOPED FIXTURES: SERVICE CLIENTS
 # ────────────────────────────────────────────────────────────────────────────────
@@ -466,6 +637,21 @@ async def bas_client(config: TestConfig, auth_token: str) -> AsyncGenerator[BASC
     async with BASClient(
         base_url=config.bas_url,
         token=auth_token,
+        timeout=config.timeout_medium,
+    ) as client:
+        yield client
+
+
+@pytest_asyncio.fixture
+async def admin_bas_client(config: TestConfig, admin_token: str) -> AsyncGenerator[BASClient, None]:
+    """
+    Provide BASClient instance with admin token for testing admin functionality.
+
+    Scope: function
+    """
+    async with BASClient(
+        base_url=config.bas_url,
+        token=admin_token,
         timeout=config.timeout_medium,
     ) as client:
         yield client

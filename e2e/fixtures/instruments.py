@@ -1,11 +1,12 @@
 """Instrument catalog for E2E tests.
 
-Instruments are pre-seeded into consumer service databases (BAS, PBS)
-during test setup, following the event-driven architecture where:
-1. Instruments are synced from external sources to MDS
-2. MDS emits instrument events to consumers
-3. Consumers store instruments in their own databases
-4. Tests load instruments from consumer databases, not MDS
+Instruments are fetched from MDS, which contains the real Fyers instrument master.
+The flow:
+1. MDS DB is populated with real instruments from Fyers broker sync (deployment environment)
+2. Tests query MDS /api/v1/instruments to discover available instruments
+3. Tests trigger MDS restream to ensure BAS has the full catalog
+4. BAS consumes instruments from market.instrument.v1 Redis stream
+5. Tests use real canonical instrument IDs when placing orders
 """
 
 import logging
@@ -16,14 +17,14 @@ log = logging.getLogger(__name__)
 
 class InstrumentCatalog:
     """
-    Session-scoped instrument catalog loaded from consumer service databases.
+    Session-scoped instrument catalog loaded from MDS.
 
     Provides convenient methods to fetch instruments by symbol, ID, or get arbitrary equities.
     Caches all instruments in memory for fast lookup.
 
-    Note: Instruments are pre-seeded into BAS/PBS databases during fixture setup.
-    This simulates the event-driven flow where consumer services receive instrument
-    events and store them in their own databases.
+    Instruments come from the deployment environment's MDS DB (populated by Fyers broker sync).
+    Uses canonical instrument IDs in the format: {exchange}:{segment}:{instrument_type}:{symbol}
+    Example: NSE:CM:EQUITY:SBIN
     """
 
     def __init__(self, instruments_data: list[dict]):
@@ -41,10 +42,10 @@ class InstrumentCatalog:
 
     async def load(self) -> None:
         """
-        Load instruments from pre-seeded data.
+        Load instruments from MDS data.
 
-        This simulates the event-driven architecture where instruments
-        are already in consumer service databases.
+        Assumes instruments_data was fetched from MDS /api/v1/instruments endpoint.
+        Builds lookup maps by ID (canonical) and by symbol for convenience.
 
         Raises:
             Exception: If no instruments are provided
@@ -55,7 +56,7 @@ class InstrumentCatalog:
 
         try:
             self._instruments = self._instruments_data
-            log.info(f"Loaded {len(self._instruments)} instruments from test data")
+            log.info(f"Loaded {len(self._instruments)} instruments from MDS")
 
             # Build lookup maps
             for instrument in self._instruments:
@@ -126,30 +127,36 @@ class InstrumentCatalog:
 
     def get_any_equity(self, n: int = 1) -> list[dict]:
         """
-        Get n arbitrary equity instruments.
+        Get n arbitrary pure equity (cash stock) instruments.
 
-        Useful for tests that don't care which specific instrument is used.
+        Filters out derivatives (options, futures) to return only plain equities.
+        Useful for tests that need any tradable cash equity, not a derivative contract.
 
         Args:
             n: Number of instruments to return
 
         Returns:
-            List of instrument dictionaries
+            List of pure equity instrument dictionaries
 
         Raises:
-            ValueError: If fewer than n instruments available
+            ValueError: If fewer than n pure equities available
+            RuntimeError: If catalog not loaded
         """
         if not self._loaded:
             raise RuntimeError("Instrument catalog not loaded. Call load() first.")
 
-        if len(self._instruments) < n:
+        pure_equities = [
+            i for i in self._instruments
+            if i.get("instrument_type") == "EQUITY" and not i.get("derivative_type")
+        ]
+
+        if len(pure_equities) < n:
             raise ValueError(
-                f"Only {len(self._instruments)} instruments available, "
+                f"Only {len(pure_equities)} pure equities available, "
                 f"cannot get {n}"
             )
 
-        # Return first n instruments
-        return self._instruments[:n]
+        return pure_equities[:n]
 
     def search_by_segment(self, segment: str) -> list[dict]:
         """

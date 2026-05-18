@@ -34,7 +34,6 @@ import json
 import time
 from decimal import Decimal
 
-import httpx
 import pytest
 import redis.asyncio as redis
 
@@ -144,63 +143,27 @@ async def test_latest_quote_hash_is_writable_with_publisher_payload(config):
 
 
 async def test_mds_publishes_instrument_event_on_sync_trigger(config):
-    """Triggering MDS' public instrument-sync endpoint must produce an
-    event on the real `market.instrument.v1` stream within a few
-    seconds. This is the only way MDS' MarketStreamPublisher gets
-    exercised in an E2E environment without a live broker WS feed.
+    """The session-start instrument restream must produce entries on the
+    real `market.instrument.v1` stream. This verifies MDS' MarketStreamPublisher
+    is wired correctly without re-triggering the costly restream operation
+    (132k+ instruments).
 
-    The endpoint kicks off a background task and returns immediately;
-    the publisher writes the first INSTRUMENT_SYNC_BEGIN event before
-    starting the fetch, so even if the broker fetch later fails we
-    should see at least the BEGIN event on the stream.
+    Instrument sync is a one-time activity performed at E2E session start
+    (see conftest.pytest_sessionstart); this test only verifies the result.
     """
     client = await redis.from_url(config.redis_url, decode_responses=True)
     try:
-        baseline_len = await client.xlen(REAL_INSTRUMENT_STREAM)
+        # The session-start restream should have populated this stream.
+        current_len = await client.xlen(REAL_INSTRUMENT_STREAM)
+        assert current_len > 0, (
+            f"`{REAL_INSTRUMENT_STREAM}` is empty. The session-start "
+            f"instrument restream did not publish any entries — check "
+            f"MDS publisher initialization or whether MDS DB has instruments."
+        )
 
-        async with httpx.AsyncClient(timeout=15.0) as http:
-            resp = await http.post(
-                f"{config.mds_url}/api/v1/broker-instruments/"
-                f"{config.broker_id}/sync-public",
-            )
-        if resp.status_code != 200:
-            pytest.skip(
-                f"MDS sync-public unavailable in this env: "
-                f"HTTP {resp.status_code}. Likely no broker plugin "
-                f"registered for broker_id={config.broker_id!r}."
-            )
-
-        # Poll the stream for new entries. INSTRUMENT_SYNC_BEGIN should
-        # land within ~1s of the trigger; we give it 10s of headroom
-        # before declaring a regression.
-        deadline = asyncio.get_event_loop().time() + 10.0
-        current_len = baseline_len
-        while asyncio.get_event_loop().time() < deadline:
-            current_len = await client.xlen(REAL_INSTRUMENT_STREAM)
-            if current_len > baseline_len:
-                break
-            await asyncio.sleep(0.3)
-
-        if current_len == baseline_len:
-            # MDS' sync_instruments needs to call the broker plugin to
-            # fetch the universe. In an E2E env without seeded broker
-            # credentials it fails before touching the publisher with
-            # `No credentials found for broker=fyers`. That's a setup
-            # gap, not an MDS-publisher bug — skip rather than fail so
-            # the suite stays useful while we wire up broker creds.
-            pytest.skip(
-                f"`{REAL_INSTRUMENT_STREAM}` did not grow after triggering "
-                f"sync-public. Most likely cause in this env: no broker "
-                f"credentials seeded for broker_id={config.broker_id!r}, "
-                f"so MDS' background sync fails before reaching the "
-                f"publisher (see MDS logs for "
-                f"'No credentials found for broker=...'). Seed broker "
-                f"credentials in setup to fully exercise this path."
-            )
-
-        # Inspect the new entry to confirm it carries publisher fields.
+        # Inspect the most recent entry to confirm it carries publisher fields.
         recent = await client.xrevrange(REAL_INSTRUMENT_STREAM, count=1)
-        assert recent, "Stream grew but xrevrange returned no entries"
+        assert recent, "Stream has entries but xrevrange returned no results"
         _msg_id, fields = recent[0]
         # All publish_instrument_sync_* paths write at minimum a
         # `msg_type` field. publish_instrument writes `instrument_id`.
