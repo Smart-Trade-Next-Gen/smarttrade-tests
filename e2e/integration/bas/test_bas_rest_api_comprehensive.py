@@ -76,18 +76,32 @@ async def test_bas_get_order_by_id_endpoint(
 @pytest.mark.smoke
 async def test_bas_health_check(
     config,
-    bas_client,
 ):
     """
-    Test: BAS health check endpoint.
+    Test: BAS health check endpoints using common library.
 
     Validates:
-    - Health check endpoint responds
-    - Service is ready to accept requests
+    - Liveness probe (/) returns 200 OK
+    - Readiness probe (/ready) returns 200 OK when dependencies are healthy
     """
-    # The BAS client should have a health check method or we can use HTTP directly
-    # For now, we'll skip this as the client may not have a health check method
-    pytest.skip("BAS health check test requires client health check method")
+    import httpx
+    
+    bas_url = config.bas_url
+    
+    # Test liveness probe
+    async with httpx.AsyncClient(timeout=10.0) as http:
+        liveness_response = await http.get(f"{bas_url}/")
+        assert liveness_response.status_code == 200, "Liveness probe should return 200"
+        liveness_data = liveness_response.json()
+        assert liveness_data["status"] == "ok", "Liveness should return ok status"
+        
+    # Test readiness probe
+    async with httpx.AsyncClient(timeout=10.0) as http:
+        readiness_response = await http.get(f"{bas_url}/ready")
+        assert readiness_response.status_code == 200, "Readiness probe should return 200"
+        readiness_data = readiness_response.json()
+        assert readiness_data["status"] in ["ready", "not-ready"], "Readiness should return valid status"
+        assert "checks" in readiness_data, "Readiness should include dependency checks"
 
 
 @pytest.mark.smoke

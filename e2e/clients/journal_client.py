@@ -110,6 +110,10 @@ class JournalClient:
     async def get_trades(
         self,
         instrument_id: Optional[str] = None,
+        from_date: Optional[str] = None,
+        to_date: Optional[str] = None,
+        sort_by: Optional[str] = None,
+        sort_order: Optional[str] = None,
         limit: int = 50,
         offset: int = 0,
     ) -> list[dict]:
@@ -118,6 +122,10 @@ class JournalClient:
 
         Args:
             instrument_id: Optional filter by instrument ID
+            from_date: Optional filter trades executed after this datetime
+            to_date: Optional filter trades executed before this datetime
+            sort_by: Optional sort field (created_at, executed_at, price, quantity)
+            sort_order: Optional sort order (asc, desc)
             limit: Number of trades to return
             offset: Pagination offset
 
@@ -137,6 +145,14 @@ class JournalClient:
         params = {"limit": limit, "offset": offset}
         if instrument_id:
             params["instrument_id"] = instrument_id
+        if from_date:
+            params["from_date"] = from_date
+        if to_date:
+            params["to_date"] = to_date
+        if sort_by:
+            params["sort_by"] = sort_by
+        if sort_order:
+            params["sort_order"] = sort_order
 
         try:
             response = await self.client.get(url, params=params)
@@ -275,6 +291,8 @@ class JournalClient:
         status: Optional[str] = None,
         from_date: Optional[str] = None,
         to_date: Optional[str] = None,
+        sort_by: Optional[str] = None,
+        sort_order: Optional[str] = None,
         page: int = 1,
         page_size: int = 50,
     ) -> list[dict]:
@@ -286,6 +304,8 @@ class JournalClient:
             status: Optional filter by status (PENDING, FILLED, PARTIAL, CANCELLED, REJECTED)
             from_date: Optional filter orders placed after this datetime
             to_date: Optional filter orders placed before this datetime
+            sort_by: Optional sort field (created_at, placed_at, filled_at, price, quantity)
+            sort_order: Optional sort order (asc, desc)
             page: Page number (default: 1)
             page_size: Items per page (default: 50, max: 200)
 
@@ -313,6 +333,10 @@ class JournalClient:
             params["from_date"] = from_date
         if to_date:
             params["to_date"] = to_date
+        if sort_by:
+            params["sort_by"] = sort_by
+        if sort_order:
+            params["sort_order"] = sort_order
 
         try:
             response = await self.client.get(url, params=params)
