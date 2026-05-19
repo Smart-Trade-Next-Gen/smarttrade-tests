@@ -93,7 +93,7 @@ async def measure_one(
 
     # Trigger fill on the same instrument.
     await redis_client.xadd(
-        "market.quote.v1",
+        "market.quote",
         {
             "instrument_id": instrument_id,
             "ltp": "100.00",
@@ -102,13 +102,13 @@ async def measure_one(
         },
     )
 
-    # Wait for the FILLED event on events:order.updated.v1.
+    # Wait for the FILLED event on events:order.updated.
     deadline = time.monotonic() + 20.0
     while time.monotonic() < deadline:
         msgs = await redis_client.xreadgroup(
             group_name,
             "latency-consumer",
-            {"events:order.updated.v1": ">"},
+            {"events:order.updated": ">"},
             count=50,
             block=200,
         )
@@ -120,14 +120,14 @@ async def measure_one(
                     env = json.loads(fields.get("event", "{}"))
                 except json.JSONDecodeError:
                     await redis_client.xack(
-                        "events:order.updated.v1", group_name, msg_id
+                        "events:order.updated", group_name, msg_id
                     )
                     continue
                 payload = env.get("payload") or {}
                 bid = payload.get("broker_order_id") or payload.get("order_id")
                 status = payload.get("status")
                 await redis_client.xack(
-                    "events:order.updated.v1", group_name, msg_id
+                    "events:order.updated", group_name, msg_id
                 )
                 if bid == broker_order_id and status == "FILLED":
                     return (time.monotonic_ns() - t_start) / 1e6
@@ -155,7 +155,7 @@ async def run(args) -> int:
     group_name = f"latency-{uuid.uuid4().hex[:8]}"
     try:
         await redis_client.xgroup_create(
-            "events:order.updated.v1", group_name, id="$", mkstream=True
+            "events:order.updated", group_name, id="$", mkstream=True
         )
     except redis.ResponseError as e:
         if "BUSYGROUP" not in str(e):
@@ -189,7 +189,7 @@ async def run(args) -> int:
     finally:
         try:
             await redis_client.xgroup_destroy(
-                "events:order.updated.v1", group_name
+                "events:order.updated", group_name
             )
         except Exception:
             pass
@@ -215,7 +215,7 @@ async def run(args) -> int:
 **Samples:** {summary["samples"]}
 **Pause between samples:** {args.pause_ms}ms
 
-End-to-end latency (POST /orders → FILLED event on events:order.updated.v1).
+End-to-end latency (POST /orders → FILLED event on events:order.updated).
 
 | metric | ms |
 |---|---|

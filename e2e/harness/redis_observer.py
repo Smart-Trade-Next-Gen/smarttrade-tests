@@ -91,7 +91,7 @@ class RedisStreamObserver:
         """
         Read messages from a Redis stream using the observer consumer group.
 
-        Stream key format: `events:{event_type}` (e.g., `events:order.updated.v1`)
+        Stream key format: `events:{event_type}` (e.g., `events:order.updated`)
 
         Args:
             event_type: Event type name

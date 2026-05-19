@@ -1,10 +1,10 @@
 """
-Integration test — BAS → Redis `order.updated.v1`.
+Integration test — BAS → Redis `order.updated`.
 
-Pair under test: broker-adapter-service → Redis Streams (`events:order.updated.v1`).
+Pair under test: broker-adapter-service → Redis Streams (`events:order.updated`).
 
 Contract:
-    1. BAS publishes order.updated.v1 events for every order state transition:
+    1. BAS publishes order.updated events for every order state transition:
        PLACED → ACCEPTED → FILLED (or CANCELLED / REJECTED for terminal failures).
     2. Every event must publish `payload.order_id` equal to the `broker_order_id`
        returned by the broker. BAS is stateless — `broker_order_id` is the
@@ -51,7 +51,7 @@ async def _place_and_collect_order_events(
     qty: int = 100,
     price: Decimal = Decimal("550.00"),
 ) -> tuple[str, str, list[dict]]:
-    """Place a MARKET BUY, drive the fill, and return all order.updated.v1
+    """Place a MARKET BUY, drive the fill, and return all order.updated
     events for that order.
     """
     instrument = instrument_catalog.get_any_equity(1)[0]
@@ -88,7 +88,7 @@ async def _place_and_collect_order_events(
         await asyncio.sleep(0.05)
 
     all_events = redis_event_collector.get_events(broker_order_id)
-    order_events = [e for e in all_events if e.get("type") == "order.updated.v1"]
+    order_events = [e for e in all_events if e.get("type") == "order.updated"]
     return broker_order_id, client_order_id, order_events
 
 
@@ -100,7 +100,7 @@ async def test_every_order_event_uses_broker_order_id_as_canonical_id(
     mock_client,
     redis_event_collector,
 ):
-    """Per the stateless-BAS invariant, every order.updated.v1 event MUST
+    """Per the stateless-BAS invariant, every order.updated event MUST
     carry `payload.order_id = broker_order_id` so downstream consumers can
     track the full lifecycle by a single key.
     """
@@ -114,24 +114,24 @@ async def test_every_order_event_uses_broker_order_id_as_canonical_id(
     )
 
     assert len(order_events) >= 2, (
-        f"Expected at least ACCEPTED + FILLED order.updated.v1 events; got "
+        f"Expected at least ACCEPTED + FILLED order.updated events; got "
         f"{[(e.get('payload') or {}).get('status') for e in order_events]}"
     )
 
     for ev in order_events:
         payload = ev["payload"]
         assert payload.get("order_id") == broker_order_id, (
-            f"order.updated.v1 event with status={payload.get('status')} has "
+            f"order.updated event with status={payload.get('status')} has "
             f"order_id={payload.get('order_id')!r}; expected broker_order_id="
             f"{broker_order_id!r}. BAS must not use client_order_id as the "
             f"canonical id (see memory: bas-stateless-order-identity)."
         )
         assert payload.get("broker_order_id") == broker_order_id, (
-            f"order.updated.v1 event missing broker_order_id in payload: {payload}"
+            f"order.updated event missing broker_order_id in payload: {payload}"
         )
         if client_order_id is not None:
             assert payload.get("client_order_id") == client_order_id, (
-                f"order.updated.v1 client_order_id mismatch: "
+                f"order.updated client_order_id mismatch: "
                 f"got {payload.get('client_order_id')!r} expected {client_order_id!r}"
             )
 
@@ -144,7 +144,7 @@ async def test_order_event_status_sequence_reaches_filled(
     mock_client,
     redis_event_collector,
 ):
-    """The first order.updated.v1 event MUST be ACCEPTED (broker took the
+    """The first order.updated event MUST be ACCEPTED (broker took the
     order and assigned a broker_order_id) — BAS is stateless and does not
     emit PLACED before the broker call. FILLED MUST follow later.
 
@@ -184,7 +184,7 @@ async def test_filled_event_carries_fill_quantity_and_price(
     mock_client,
     redis_event_collector,
 ):
-    """The FILLED order.updated.v1 must carry `filled_quantity` and a non-zero
+    """The FILLED order.updated must carry `filled_quantity` and a non-zero
     `average_price`. A regression set average_price to "0" because the BAS
     plugin was reading `payload.get('avg_price')` while PBS' WS payload sent
     `average_price`.
@@ -228,7 +228,7 @@ async def test_order_event_ids_and_idempotency_keys_are_unique(
     mock_client,
     redis_event_collector,
 ):
-    """Each order.updated.v1 emission MUST have unique event_id and unique
+    """Each order.updated emission MUST have unique event_id and unique
     idempotency_key. Duplicate keys would let consumers skip a state
     transition, breaking the lifecycle.
     """
@@ -247,8 +247,8 @@ async def test_order_event_ids_and_idempotency_keys_are_unique(
         data = ev.get("data") or {}
         eid = data.get("event_id")
         ikey = data.get("idempotency_key")
-        assert eid, f"order.updated.v1 event missing event_id: {data}"
-        assert ikey, f"order.updated.v1 event missing idempotency_key: {data}"
+        assert eid, f"order.updated event missing event_id: {data}"
+        assert ikey, f"order.updated event missing idempotency_key: {data}"
         event_ids.append(eid)
         idempotency_keys.append(ikey)
 

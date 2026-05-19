@@ -41,7 +41,7 @@ class RedisEventCollector:
         self.events: dict[str, List[dict]] = {}
         # Mirror every consumed event under its stream name as well so tests
         # can find events that don't carry an order_id (notably
-        # position.updated.v1, which is keyed on instrument_id).
+        # position.updated, which is keyed on instrument_id).
         self.events_by_stream: dict[str, List[dict]] = {}
         self._subscribed_streams: set[str] = set()
         self._running = False
@@ -176,7 +176,7 @@ class RedisEventCollector:
                 or stream
             )
 
-            # BAS publishes order.updated.v1 with `payload.order_id` set to the
+            # BAS publishes order.updated with `payload.order_id` set to the
             # client_order_id for PLACED/ACCEPTED (before the broker call) and
             # to the broker_order_id for FILLED/CANCELLED (which originate from
             # the broker WS). Index the event under every id we can find so
@@ -197,7 +197,7 @@ class RedisEventCollector:
             }
 
             # Always mirror the event under its stream so tests can locate
-            # events that don't carry an order_id (e.g. position.updated.v1
+            # events that don't carry an order_id (e.g. position.updated
             # is keyed on instrument_id).
             self.events_by_stream.setdefault(stream, []).append(event)
 

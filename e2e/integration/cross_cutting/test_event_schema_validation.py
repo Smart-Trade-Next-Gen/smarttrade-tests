@@ -83,7 +83,7 @@ async def test_order_updated_event_structure(
     events = await redis_event_collector.wait_for_completion(order_resp.broker_order_id, timeout=config.timeout_medium)
     
     # Validate order updated events
-    order_events = [e for e in events if e.get("stream") == "events:order.updated.v1"]
+    order_events = [e for e in events if e.get("stream") == "events:order.updated"]
     assert len(order_events) > 0, "Should have order updated events"
     
     for event in order_events:
@@ -105,5 +105,5 @@ async def test_order_updated_event_structure(
         assert isinstance(event_data, dict), "event_data should be a dict"
         
         # Validate event metadata
-        assert event_data["event_name"] == "order.updated.v1", "event_name should be order.updated.v1"
+        assert event_data["event_name"] == "order.updated", "event_name should be order.updated"
         assert event_data["event_version"] == "1.0", "event_version should be 1.0"

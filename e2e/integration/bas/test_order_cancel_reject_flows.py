@@ -5,7 +5,7 @@ Pair under test: broker-adapter-service → paper-broker-service → Redis Strea
 
 Contract:
     1. Cancelling a PENDING/ACCEPTED LIMIT order produces an
-       order.updated.v1 event with status=CANCELLED on `events:order.updated.v1`.
+       order.updated event with status=CANCELLED on `events:order.updated`.
     2. The CANCELLED event uses `broker_order_id` as the canonical
        `payload.order_id` (consistent with BAS' stateless identity model).
     3. Attempting to cancel a FILLED order is rejected by BAS/PBS with a
@@ -87,12 +87,12 @@ async def _place_pending_limit_order(
 
 
 def _filter_cancelled_events(events: list[dict], broker_order_id: str) -> list[dict]:
-    """Return order.updated.v1 events with status=CANCELLED for a given
+    """Return order.updated events with status=CANCELLED for a given
     broker_order_id."""
     return [
         e
         for e in events
-        if e.get("type") == "order.updated.v1"
+        if e.get("type") == "order.updated"
         and (e.get("payload") or {}).get("status") == "CANCELLED"
         and (e.get("payload") or {}).get("order_id") == broker_order_id
     ]
@@ -107,7 +107,7 @@ async def test_cancel_pending_limit_emits_cancelled_event_on_redis(
     redis_event_collector,
 ):
     """Cancelling a PENDING LIMIT order produces a CANCELLED domain event
-    on `events:order.updated.v1` keyed by broker_order_id.
+    on `events:order.updated` keyed by broker_order_id.
 
     If this event isn't emitted, downstream consumers (Portfolio, Journal,
     Notification) never learn about the cancellation and their state
@@ -136,7 +136,7 @@ async def test_cancel_pending_limit_emits_cancelled_event_on_redis(
     )
     cancelled_events = _filter_cancelled_events(events, broker_order_id)
     assert cancelled_events, (
-        f"No CANCELLED order.updated.v1 event for broker_order_id="
+        f"No CANCELLED order.updated event for broker_order_id="
         f"{broker_order_id} after BAS cancel succeeded. Events seen: "
         f"{[(e.get('type'), (e.get('payload') or {}).get('status')) for e in events]}. "
         f"BAS' cancel handler may be skipping event emission."
@@ -207,7 +207,7 @@ async def test_cancel_filled_order_is_rejected_without_spurious_event(
     filled = [
         e
         for e in events
-        if e.get("type") == "order.updated.v1"
+        if e.get("type") == "order.updated"
         and (e.get("payload") or {}).get("status") == "FILLED"
     ]
     assert filled, (
@@ -255,7 +255,7 @@ async def test_cancel_filled_order_is_rejected_without_spurious_event(
         latest_status_events = [
             (e.get("payload") or {}).get("status")
             for e in redis_event_collector.get_events(broker_order_id)
-            if e.get("type") == "order.updated.v1"
+            if e.get("type") == "order.updated"
         ]
         assert latest_status_events[-1] == "FILLED", (
             f"Cancel on FILLED returned 200 but the most recent status "

@@ -8,14 +8,14 @@ Contract:
        account-scoped request), it MUST open a WebSocket to PBS at
        `/internal/api/v1/execution-updates` and keep it open for the life of
        the session.
-    2. When PBS executes a fill (driven by a quote on `market.quote.v1`), it
+    2. When PBS executes a fill (driven by a quote on `market.quote`), it
        broadcasts `order.update` + `trade.update` + `position.update` over
        that WebSocket.
     3. BAS receives those WS events and converts each into the corresponding
        domain event on Redis Streams:
-            order.update    → events:order.updated.v1 (status=FILLED)
-            trade.update    → events:trade.executed.v1
-            position.update → events:position.updated.v1
+            order.update    → events:order.updated (status=FILLED)
+            trade.update    → events:trade.executed
+            position.update → events:position.updated
     4. The connection survives multiple sequential fills — a second fill on a
        different order on the same session also produces all three Redis
        events.
@@ -56,7 +56,7 @@ async def _place_and_fill(
     qty: int = 100,
     price: Decimal = Decimal("550.00"),
 ) -> tuple[str, str, list[dict]]:
-    """Place a MARKET BUY through BAS, inject a quote on market.quote.v1 to
+    """Place a MARKET BUY through BAS, inject a quote on market.quote to
     drive PBS execution, and wait for the order to reach a terminal status
     via the Redis event stream.
 
@@ -94,8 +94,8 @@ async def _place_and_fill(
         broker_order_id, timeout=10.0
     )
 
-    # FILLED on order.updated.v1 is published first; trade.executed.v1 and
-    # position.updated.v1 follow within milliseconds. Give the reader loop a
+    # FILLED on order.updated is published first; trade.executed and
+    # position.updated follow within milliseconds. Give the reader loop a
     # short grace period to drain them into the per-order index before the
     # test inspects `events`.
     deadline = asyncio.get_event_loop().time() + 2.0
@@ -105,12 +105,12 @@ async def _place_and_fill(
         positions = [
             e
             for e in redis_event_collector.get_events_on_stream(
-                "events:position.updated.v1"
+                "events:position.updated"
             )
             if (e.get("payload") or {}).get("instrument_id") == instrument_id
         ]
         if (
-            {"order.updated.v1", "trade.executed.v1"}.issubset(per_order_types)
+            {"order.updated", "trade.executed"}.issubset(per_order_types)
             and positions
         ):
             break
@@ -119,15 +119,15 @@ async def _place_and_fill(
 
 
 def _assert_filled_event(events: list[dict], broker_order_id: str, qty: int) -> dict:
-    """Find the FILLED order.updated.v1 event and return it for further checks."""
+    """Find the FILLED order.updated event and return it for further checks."""
     filled = [
         e
         for e in events
         if (e.get("payload") or {}).get("status") == "FILLED"
-        and e.get("type") == "order.updated.v1"
+        and e.get("type") == "order.updated"
     ]
     assert filled, (
-        f"No FILLED order.updated.v1 event for broker_order_id={broker_order_id}. "
+        f"No FILLED order.updated event for broker_order_id={broker_order_id}. "
         f"Events seen: {[ (e.get('type'), (e.get('payload') or {}).get('status')) for e in events ]}"
     )
     event = filled[-1]
@@ -169,17 +169,17 @@ async def test_bas_receives_pbs_execution_events_and_publishes_to_redis(
         instrument_index=0,
     )
 
-    # 1. BAS must have published an order.updated.v1 with status=FILLED.
+    # 1. BAS must have published an order.updated with status=FILLED.
     _assert_filled_event(events, broker_order_id, qty=100)
 
-    # 2. trade.executed.v1 must exist for this order.
-    trade_events = [e for e in events if e.get("type") == "trade.executed.v1"]
+    # 2. trade.executed must exist for this order.
+    trade_events = [e for e in events if e.get("type") == "trade.executed"]
     assert trade_events, (
-        "No trade.executed.v1 emitted by BAS — BAS' _handle_trade_update either "
+        "No trade.executed emitted by BAS — BAS' _handle_trade_update either "
         "didn't fire (WS broken) or failed schema validation on its way to outbox."
     )
 
-    # 3. position.updated.v1 must exist for this instrument with non-zero qty.
+    # 3. position.updated must exist for this instrument with non-zero qty.
     #    Position events don't carry order_id (they're keyed on instrument),
     #    so look them up on the stream and filter by instrument_id.
     #    Past regressions sent net_quantity=0 because the plugin read the
@@ -187,16 +187,16 @@ async def test_bas_receives_pbs_execution_events_and_publishes_to_redis(
     position_events = [
         e
         for e in redis_event_collector.get_events_on_stream(
-            "events:position.updated.v1"
+            "events:position.updated"
         )
         if (e.get("payload") or {}).get("instrument_id") == instrument_id
     ]
     assert position_events, (
-        f"No position.updated.v1 emitted for instrument_id={instrument_id}."
+        f"No position.updated emitted for instrument_id={instrument_id}."
     )
     last_position_payload = position_events[-1].get("payload") or {}
     assert int(last_position_payload.get("net_quantity") or 0) != 0, (
-        f"position.updated.v1 has net_quantity=0 — likely a PBS↔BAS field "
+        f"position.updated has net_quantity=0 — likely a PBS↔BAS field "
         f"name mismatch (e.g. net_qty vs net_quantity). Payload: "
         f"{last_position_payload}"
     )

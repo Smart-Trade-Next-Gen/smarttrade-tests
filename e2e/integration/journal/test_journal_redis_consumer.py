@@ -1,13 +1,13 @@
 """
-Integration test — Journal Service ↔ Redis `order.updated.v1` / `trade.executed.v1`.
+Integration test — Journal Service ↔ Redis `order.updated` / `trade.executed`.
 
 Pair under test: journal-service ←→ Redis Streams.
 
 Contract:
-    1. Journal consumes `order.updated.v1` and persists the order. After a
+    1. Journal consumes `order.updated` and persists the order. After a
        fill, `GET /api/v1/orders/{broker}/{account}` returns the order with
        status FILLED, the broker_order_id, and the correct instrument_id.
-    2. Journal consumes `trade.executed.v1` and persists the trade. After a
+    2. Journal consumes `trade.executed` and persists the trade. After a
        fill, `GET /api/v1/trades/{broker}/{account}` returns a trade for that
        order with quantity and price matching the fill.
 
@@ -96,7 +96,7 @@ async def test_journal_consumes_order_event_and_exposes_via_rest(
     redis_event_collector,
     journal_client,
 ):
-    """A fill drives `order.updated.v1` events → Journal consumes them →
+    """A fill drives `order.updated` events → Journal consumes them →
     Journal's REST returns the order with status=FILLED.
     """
     broker_id = config.broker_id
@@ -140,7 +140,7 @@ async def test_journal_consumes_trade_event_and_exposes_via_rest(
     redis_event_collector,
     journal_client,
 ):
-    """A fill drives a `trade.executed.v1` event → Journal consumes it →
+    """A fill drives a `trade.executed` event → Journal consumes it →
     Journal's REST returns the trade with quantity and price matching the fill.
     """
     broker_id = config.broker_id

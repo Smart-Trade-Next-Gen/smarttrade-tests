@@ -160,16 +160,16 @@ async def test_outbox_row_is_published_to_redis_and_marked(config):
     marker = f"e2e-outbox-test-{uuid.uuid4().hex}"
 
     # Use a real event_name so the EventBus / SchemaRegistry path is
-    # exercised. order.updated.v1 is the most heavily-trafficked event
+    # exercised. order.updated is the most heavily-trafficked event
     # in this codebase; a regression in the poller affects it first.
     #
     # The envelope must match the shape DomainEventPublisher.to_dict()
     # produces (user_id, trace_id, request_id, idempotency_key at top
     # level) — otherwise the journal/notification consumers that also
-    # subscribe to `events:order.updated.v1` raise EventValidationError
+    # subscribe to `events:order.updated` raise EventValidationError
     # and spam ERROR logs on every test run. This event is supposed to
     # be picked up and processed cleanly by every subscriber.
-    event_name = "order.updated.v1"
+    event_name = "order.updated"
     event_id = str(uuid.uuid4())
     user_id = "00000000-0000-0000-0000-000000000001"
     event_data = {
@@ -246,10 +246,10 @@ async def test_outbox_already_published_rows_are_not_republished(config):
             VALUES ($1, $2::json, $3, NOW(), NOW(), 0)
             RETURNING id
             """,
-            "order.updated.v1",
+            "order.updated",
             json.dumps(
                 {
-                    "event_name": "order.updated.v1",
+                    "event_name": "order.updated",
                     "event_id": str(uuid.uuid4()),
                     "payload": {"marker": marker},
                 }
@@ -267,7 +267,7 @@ async def test_outbox_already_published_rows_are_not_republished(config):
 
     envelope = await _scan_stream_for_marker(
         config.redis_url,
-        stream="events:order.updated.v1",
+        stream="events:order.updated",
         marker=marker,
         timeout=1.0,
     )

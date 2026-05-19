@@ -210,7 +210,7 @@ pytest tests/ -v
 ```
 1. Test places order via BAS REST API
 2. Mock service injects fill
-3. BAS WebSocket delivers account event (order.filled.v1)
+3. BAS WebSocket delivers account event (order.filled)
 4. bas_ws_client streams event to event_collector
 5. Test observes via event_collector.wait_for_completion()
 ```

@@ -6,7 +6,7 @@ Tests use the production event-driven architecture with **Redis Streams**:
 
 | Stream | Purpose | Events |
 |--------|---------|--------|
-| **Redis Streams** | Event-driven event collection | `order.updated.v1`, `trade.executed.v1`, `position.updated.v1` |
+| **Redis Streams** | Event-driven event collection | `order.updated`, `trade.executed`, `position.updated` |
 
 **Event Collection Flow**:
 1. Services publish events to Redis Streams

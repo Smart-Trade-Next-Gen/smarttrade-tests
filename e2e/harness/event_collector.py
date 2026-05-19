@@ -114,7 +114,7 @@ class EventCollector:
             # Check current events
             events = self.get_events(order_id)
             for event in reversed(events):
-                # NEW: Check status field in consolidated event schema (order.updated.v1)
+                # NEW: Check status field in consolidated event schema (order.updated)
                 event_status = (
                     event.get("status")
                     or event.get("payload", {}).get("status")
@@ -172,7 +172,7 @@ class EventCollector:
             # Check current events
             events = self.get_events(order_id)
             for event in reversed(events):
-                # NEW: Check status field in consolidated event schema (order.updated.v1)
+                # NEW: Check status field in consolidated event schema (order.updated)
                 event_status = (
                     event.get("status")
                     or event.get("payload", {}).get("status")
@@ -229,7 +229,7 @@ class EventCollector:
 
         Args:
             order_id: Order ID
-            event_type: Event type to filter (e.g., "order.updated.v1", "trade.executed.v1")
+            event_type: Event type to filter (e.g., "order.updated", "trade.executed")
 
         Returns:
             List of events matching the type

@@ -31,7 +31,7 @@ async def test_pbs_does_not_emit_to_execution_topics(
     """
     Test that PBS never publishes directly to execution event topics.
 
-    Only BAS should emit order.updated.v1, trade.executed.v1, position.updated.v1.
+    Only BAS should emit order.updated, trade.executed, position.updated.
     PBS only emits broker.order_update which BAS consumes.
     """
     # Setup
@@ -68,10 +68,10 @@ async def test_pbs_does_not_emit_to_execution_topics(
     events = await redis_event_collector.wait_for_completion(order_id, timeout=config.timeout_medium)
 
     # Verify events came from BAS (not PBS)
-    # BAS should emit order.updated.v1 events
-    order_events = [e for e in events if e.get("type") == "order.updated.v1"]
+    # BAS should emit order.updated events
+    order_events = [e for e in events if e.get("type") == "order.updated"]
     
-    assert len(order_events) > 0, "order.updated.v1 events should be emitted by BAS"
+    assert len(order_events) > 0, "order.updated events should be emitted by BAS"
     
     # All events should have event_id (idempotency)
     for event in order_events:
@@ -409,5 +409,5 @@ async def test_database_per_service_enforcement(
     
     # Check that events are on Redis streams (event bus pattern)
     event_streams = {e.get("type") for e in events}
-    assert event_streams & {"order.updated.v1", "trade.executed.v1", "position.updated.v1"}, \
+    assert event_streams & {"order.updated", "trade.executed", "position.updated"}, \
         "Services should use Redis event streams for communication"

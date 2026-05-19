@@ -47,7 +47,7 @@ class MDSWebSocketClient:
             token: JWT token for authentication
             user_id: User UUID — included as a ?user_id= query param so the MDS
                 UI route is consistently keyed by user (matches the inter-service
-                subscription model on market.subscription.request.v1). MDS
+                subscription model on market.subscription.request). MDS
                 authoritatively reads user_id from the JWT; this query param is
                 cosmetic/observability for now.
             timeout: Connection timeout in seconds (default: 30.0)

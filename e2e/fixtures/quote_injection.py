@@ -15,7 +15,7 @@ class QuoteInjector:
     """
     Two-level quote injection for BAS QuoteStore population and PBS price execution.
 
-    Level 1: Publish to Redis stream `market.quote.v1` for BAS QuoteStore
+    Level 1: Publish to Redis stream `market.quote` for BAS QuoteStore
     Level 2: POST to PBS /api/v1/price/{broker_id} for price-driven execution
     """
 
@@ -55,7 +55,7 @@ class QuoteInjector:
         """
         Inject quote at two levels.
 
-        Level 1: XADD to Redis stream `market.quote.v1` (BAS QuoteStore)
+        Level 1: XADD to Redis stream `market.quote` (BAS QuoteStore)
         Level 2: POST to PBS price endpoint (price execution)
 
         Args:
@@ -79,7 +79,7 @@ class QuoteInjector:
 
         # Level 1: Inject to Redis stream (BAS QuoteStore)
         try:
-            stream_key = "market.quote.v1"  # Bare key, not prefixed with events:
+            stream_key = "market.quote"  # Bare key, not prefixed with events:
             quote_data = {
                 "instrument_id": instrument_id,
                 "ltp": str(ltp),

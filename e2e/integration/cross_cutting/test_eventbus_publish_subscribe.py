@@ -72,21 +72,21 @@ def _bas_dsn(redis_url: str) -> str:
 # and the test fails — the same regression mode as the silent
 # SchemaRegistry bug, just observable upstream.
 EXPECTED_GROUPS = {
-    "events:order.updated.v1": {
-        "journal-service-order.updated.v1-group",
-        "notification-service-order.updated.v1-group",
+    "events:order.updated": {
+        "journal-service-order.updated-group",
+        "notification-service-order.updated-group",
     },
-    "events:trade.executed.v1": {
-        "journal-service-trade.executed.v1-group",
-        "notification-service-trade.executed.v1-group",
+    "events:trade.executed": {
+        "journal-service-trade.executed-group",
+        "notification-service-trade.executed-group",
     },
-    "events:position.updated.v1": {
+    "events:position.updated": {
         # Journal does NOT consume position events — it consumes trade events
         # and computes its own positions via FIFO open-lot matching. Listing
         # it here would create a false-positive "missing group" failure on a
         # service that was never supposed to be subscribed.
-        "portfolio-service-position.updated.v1-group",
-        "notification-service-position.updated.v1-group",
+        "portfolio-service-position.updated-group",
+        "notification-service-position.updated-group",
     },
 }
 
@@ -133,13 +133,13 @@ async def test_eventbus_envelope_carries_required_fields(config):
     client = await redis.from_url(config.redis_url, decode_responses=True)
     try:
         entries = await client.xrevrange(
-            "events:order.updated.v1", count=10
+            "events:order.updated", count=10
         )
     finally:
         await client.close()
     if not entries:
         pytest.skip(
-            "No events:order.updated.v1 entries present yet. Run a "
+            "No events:order.updated entries present yet. Run a "
             "test that places an order first (e.g. "
             "test_bas_pbs_execution_ws.py) to populate the stream."
         )
@@ -182,8 +182,8 @@ async def test_eventbus_publish_subscribe_roundtrip(config):
       a) Insert a row into BAS' `event_outbox` (the production way to
          emit an event — saves it atomically with the business state).
       b) BAS' OutboxPoller picks the row up and publishes via the
-         EventBus to `events:order.updated.v1`.
-      c) The notification-service `@consume_event('order.updated.v1')`
+         EventBus to `events:order.updated`.
+      c) The notification-service `@consume_event('order.updated')`
          handler runs and (because we pre-create a subscription)
          persists a row in `notification_messages` for our test user.
 
@@ -236,7 +236,7 @@ async def test_eventbus_publish_subscribe_roundtrip(config):
     # entire pub/sub chain — pinning it here protects against it.
     marker = f"e2e-eventbus-{uuid.uuid4().hex}"
     event_id = str(uuid.uuid4())
-    event_name = "order.updated.v1"
+    event_name = "order.updated"
     event_data = {
         "event_id": event_id,
         "event_name": event_name,
@@ -306,7 +306,7 @@ async def test_eventbus_publish_subscribe_roundtrip(config):
         await conn.close()
 
     assert row["event_id"] == event_id
-    # FILLED status maps to order.filled.v1 inside notification-service
+    # FILLED status maps to order.filled inside notification-service
     # (see services.process_event: status_to_event mapping).
-    assert row["event_name"] == "order.filled.v1"
+    assert row["event_name"] == "order.filled"
     assert str(row["user_id"]) == user_id

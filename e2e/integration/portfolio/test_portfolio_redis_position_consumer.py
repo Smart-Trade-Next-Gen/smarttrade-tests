@@ -1,10 +1,10 @@
 """
-Integration test — Portfolio Service ↔ Redis `position.updated.v1`.
+Integration test — Portfolio Service ↔ Redis `position.updated`.
 
-Pair under test: portfolio-service ←→ Redis Streams (`events:position.updated.v1`).
+Pair under test: portfolio-service ←→ Redis Streams (`events:position.updated`).
 
 Contract:
-    1. Portfolio Service consumes position.updated.v1 events from Redis.
+    1. Portfolio Service consumes position.updated events from Redis.
     2. After consumption, Portfolio's REST endpoint
        `GET /api/v1/positions/{broker}/{account}` returns a position whose
        `net_quantity`, `average_price` and `instrument_id` match the event
@@ -72,7 +72,7 @@ async def test_portfolio_consumes_position_event_and_exposes_via_rest(
     redis_event_collector,
     portfolio_client,
 ):
-    """A fill drives a position.updated.v1 event → Portfolio consumes it →
+    """A fill drives a position.updated event → Portfolio consumes it →
     Portfolio's REST endpoint returns the position with matching fields.
     """
     broker_id = config.broker_id
@@ -103,12 +103,12 @@ async def test_portfolio_consumes_position_event_and_exposes_via_rest(
     position_events = [
         e
         for e in redis_event_collector.get_events_on_stream(
-            "events:position.updated.v1"
+            "events:position.updated"
         )
         if (e.get("payload") or {}).get("instrument_id") == instrument_id
     ]
     assert position_events, (
-        f"No position.updated.v1 event found for instrument_id={instrument_id}. "
+        f"No position.updated event found for instrument_id={instrument_id}. "
         f"BAS→Redis position path is broken; Portfolio test cannot proceed."
     )
 
@@ -126,7 +126,7 @@ async def test_portfolio_consumes_position_event_and_exposes_via_rest(
     assert Decimal(str(position["average_price"])) == price, (
         f"Portfolio average_price={position['average_price']!r}; "
         f"expected fill price={price}. Portfolio may be reading the wrong "
-        f"field from position.updated.v1 (regression: avg_price vs "
+        f"field from position.updated (regression: avg_price vs "
         f"average_price)."
     )
     assert position["broker_id"] == broker_id

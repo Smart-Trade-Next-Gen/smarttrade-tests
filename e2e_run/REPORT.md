@@ -52,10 +52,10 @@ return {
 Effect:
 - Test places order with canonical `instrument_id=NSE:SBIN:EQ`.
 - BAS rewrites the field to broker symbol `NSE:SBIN`, sends to PBS.
-- PBS stores `instrument_id=NSE:SBIN`. Every downstream event (`broker.order_update`, `order.filled.v1`, `trade.executed.v1`) carries `NSE:SBIN`.
+- PBS stores `instrument_id=NSE:SBIN`. Every downstream event (`broker.order_update`, `order.filled`, `trade.executed`) carries `NSE:SBIN`.
 - Tests/portfolio query for `NSE:SBIN:EQ` → never matches.
 
-Confirmed in BAS log: `order.placed.v1` outbox payload has `instrument_id: 'NSE:SBIN:EQ'`, but `order.filled.v1` payload has `instrument_id: 'NSE:SBIN'`.
+Confirmed in BAS log: `order.placed` outbox payload has `instrument_id: 'NSE:SBIN:EQ'`, but `order.filled` payload has `instrument_id: 'NSE:SBIN'`.
 
 **Fix:** keep `instrument_id` canonical end-to-end; introduce a separate `broker_symbol` field for broker-facing wire format, OR have PBS look up the canonical id and round-trip it.
 
@@ -63,26 +63,26 @@ Confirmed in BAS log: `order.placed.v1` outbox payload has `instrument_id: 'NSE:
 
 ---
 
-### RC-2 — `position.updated.v1` is **never published** to the bus
-**Files:** `broker-adapter-service/src/broker_adapter_service/services/order_fill_consumer.py:374-424` (only emits `order.filled.v1` and `trade.executed.v1`); `paper-broker-service/src/paper_broker_service/services/execution_engine.py:267` (comment: "PBS is external broker - doesn't publish trading events").
+### RC-2 — `position.updated` is **never published** to the bus
+**Files:** `broker-adapter-service/src/broker_adapter_service/services/order_fill_consumer.py:374-424` (only emits `order.filled` and `trade.executed`); `paper-broker-service/src/paper_broker_service/services/execution_engine.py:267` (comment: "PBS is external broker - doesn't publish trading events").
 
-The flow described in the BAS comments — *PBS emits `position.updated` → BAS consumes → BAS publishes `position.updated.v1`* — does not exist:
+The flow described in the BAS comments — *PBS emits `position.updated` → BAS consumes → BAS publishes `position.updated`* — does not exist:
 - PBS never publishes `position.updated` (grep confirms only `broker.order_update`).
 - BAS `position_sync_consumer` (`@subscribe("position.updated")`) therefore never fires.
 - Portfolio service `position_consumer.handle_position_updated` never receives an event.
 
 In the captured run, `grep -E "position\.updated" /tmp/e2e_run/*.log` returns zero hits.
 
-**Fix:** either have PBS publish `position.updated` after `execution_engine` updates the position, or have BAS emit `position.updated.v1` directly inside `_process_execution` alongside `order.filled.v1`/`trade.executed.v1`.
+**Fix:** either have PBS publish `position.updated` after `execution_engine` updates the position, or have BAS emit `position.updated` directly inside `_process_execution` alongside `order.filled`/`trade.executed`.
 
 **Blocks:** all `test_portfolio_integration.*` and any test that depends on portfolio position state (~10+ tests).
 
 ---
 
-### RC-3 — Race: `order.placed.v1` (outbox) vs `order.filled.v1` (direct publish)
+### RC-3 — Race: `order.placed` (outbox) vs `order.filled` (direct publish)
 **Files:**
-- BAS publishes `order.placed.v1` via outbox poller — `broker_adapter_service/services/order_handler.py:316` (`Saved order.placed event to OUTBOX`).
-- BAS publishes `order.filled.v1` directly to Redis — `order_fill_consumer.py:507` (`Published order.filled.v1 event via EventBus`).
+- BAS publishes `order.placed` via outbox poller — `broker_adapter_service/services/order_handler.py:316` (`Saved order.placed event to OUTBOX`).
+- BAS publishes `order.filled` directly to Redis — `order_fill_consumer.py:507` (`Published order.filled event via EventBus`).
 - Portfolio's `handle_order_filled` requires the snapshot to already exist — `portfolio-service/src/portfolio_service/events/order_consumer.py:124` (`update_order` raises `ValueError` if missing).
 
 Captured timeline (portfolio.log, order `2bf0b157`):
@@ -96,7 +96,7 @@ Captured timeline (portfolio.log, order `2bf0b157`):
 
 Three retries, then the fill is sent to the Redis DLQ and never re-applied → snapshot stays in PENDING with filled_quantity=0, position never aggregated.
 
-**Fix:** either route `order.placed.v1` through the same direct-publish path so ordering is preserved, OR teach the portfolio fill consumer to upsert (create-then-update) when the snapshot is missing, OR have it block/retry with backoff long enough to absorb the outbox cycle.
+**Fix:** either route `order.placed` through the same direct-publish path so ordering is preserved, OR teach the portfolio fill consumer to upsert (create-then-update) when the snapshot is missing, OR have it block/retry with backoff long enough to absorb the outbox cycle.
 
 **Blocks:** all injection tests, partial-fill tests, and any portfolio-dependent assertion on FAST fills (~25 tests).
 
@@ -113,7 +113,7 @@ Both have:
 ```
 The `OrderSnapshot.price` column is `nullable=False` (journal models.py:86; portfolio likely the same). MARKET orders have `price=None`.
 
-Captured journal log: 102 `Error processing event_name=order.placed.v1` errors all reading `null value in column "price" of relation "order_snapshots" violates not-null constraint`.
+Captured journal log: 102 `Error processing event_name=order.placed` errors all reading `null value in column "price" of relation "order_snapshots" violates not-null constraint`.
 
 **Fix:** default to `"0"` instead of `None` when price is absent, or make the column nullable in the schema.
 
@@ -127,7 +127,7 @@ Captured journal log: 102 `Error processing event_name=order.placed.v1` errors a
 ```python
 filled_quantity = event_payload.get("filled_quantity", 0)
 ```
-The `order.filled.v1` payload BAS actually publishes (per `OrderFilledV1` in `order_events.py`) uses `delta_quantity` and `total_filled_quantity` — there is no `filled_quantity`. So portfolio writes `filled_quantity=0` to every snapshot, and the order never visibly transitions to FILLED.
+The `order.filled` payload BAS actually publishes (per `OrderFilledV1` in `order_events.py`) uses `delta_quantity` and `total_filled_quantity` — there is no `filled_quantity`. So portfolio writes `filled_quantity=0` to every snapshot, and the order never visibly transitions to FILLED.
 
 Confirmed in log:
 ```
@@ -186,7 +186,7 @@ With no event arriving, `__anext__()` blocks indefinitely. pytest's 120s `timeou
 2. **RC-3** (order.placed/order.filled ordering) — unblocks the injection test family.
 3. **RC-4** (`price=None` NOT NULL violation) — quick win, two-line fix per service.
 4. **RC-5** (`filled_quantity` field name) — quick win.
-5. **RC-2** (publish `position.updated.v1`) — needed for portfolio_integration.
+5. **RC-2** (publish `position.updated`) — needed for portfolio_integration.
 6. **RC-7** (`BasOrderPlaceResponse.instrument_id`) — fixed implicitly by RC-1 if you also set it on the response.
 7. **RC-6** (duplicate publish from WS reader) — cleanup, not a hard blocker.
 8. **RC-8** (test hang) — fix to keep CI runs from being truncated.
@@ -196,7 +196,7 @@ With no event arriving, `__anext__()` blocks indefinitely. pytest's 120s `timeou
 - `broker-adapter-service/src/broker_adapter_service/plugins/paper/dto_to_paper_mapper.py:41,84`
 - `broker-adapter-service/src/broker_adapter_service/plugins/paper/plugin.py:68-73`
 - `broker-adapter-service/src/broker_adapter_service/plugins/paper/plugin.py:230-240`
-- `broker-adapter-service/src/broker_adapter_service/services/order_fill_consumer.py:374-424` (add position.updated.v1 emission)
+- `broker-adapter-service/src/broker_adapter_service/services/order_fill_consumer.py:374-424` (add position.updated emission)
 - `broker-adapter-service/src/broker_adapter_service/services/order_handler.py:316` (decide: outbox vs direct for placed)
 - `journal-service/src/journal_service/services/order_service.py:61`
 - `portfolio-service/src/portfolio_service/services/order_service.py:61` and `:95`

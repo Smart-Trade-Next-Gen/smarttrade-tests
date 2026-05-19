@@ -9,7 +9,7 @@ Contract:
        without a valid token.
     2. On accept, MDS sends two control frames in order:
           a. `system.connected` carrying conn_id, user_id, broker_id
-          b. `system.subscription_set.v1` listing currently-active
+          b. `system.subscription_set` listing currently-active
              instrument_ids for the broker (firehose model — UI joins the
              broker-wide set, no explicit account subscription needed)
     3. A `subscribe.market` request with `quote=[instrument_id, ...]` is
@@ -22,7 +22,7 @@ Contract:
        channel survives idle periods without disconnecting the client.
 
 This test does NOT validate the full quote-fanout path (a quote on
-`market.quote.v1` ultimately reaching the UI WS), because driving that
+`market.quote` ultimately reaching the UI WS), because driving that
 end-to-end requires a broker mock pushing onPriceChange. The full
 fanout is covered by the broker-plugin tests inside MDS. Here we verify
 only the UI-facing WS contract.
@@ -105,10 +105,10 @@ async def test_ui_ws_handshake_sends_system_connected_and_subscription_set(
     test_user_id,
 ):
     """On UI WS connect, MDS must send `system.connected` then
-    `system.subscription_set.v1` in that order.
+    `system.subscription_set` in that order.
 
     Order matters: the frontend uses `system.connected` to flip its
-    `wsReady` state, and `system.subscription_set.v1` to seed the
+    `wsReady` state, and `system.subscription_set` to seed the
     initially-active instrument set so the UI can render the live
     quote list without making a separate REST call.
     """
@@ -131,18 +131,18 @@ async def test_ui_ws_handshake_sends_system_connected_and_subscription_set(
             f"got {first.get('consumer_type')!r}"
         )
 
-        # Second message MUST be system.subscription_set.v1
+        # Second message MUST be system.subscription_set
         subscription_set = await _recv_until(
             ws,
-            lambda t: t == "system.subscription_set.v1",
+            lambda t: t == "system.subscription_set",
             timeout=5.0,
         )
         assert "active_instrument_ids" in subscription_set, (
-            f"system.subscription_set.v1 missing active_instrument_ids: "
+            f"system.subscription_set missing active_instrument_ids: "
             f"{subscription_set}"
         )
         assert isinstance(subscription_set["active_instrument_ids"], list), (
-            f"system.subscription_set.v1.active_instrument_ids must be a "
+            f"system.subscription_set.active_instrument_ids must be a "
             f"list; got {type(subscription_set['active_instrument_ids'])}"
         )
         assert subscription_set.get("broker_id") == config.broker_id
@@ -172,7 +172,7 @@ async def test_ui_ws_subscribe_market_ack_arrives_before_confirm(
     try:
         # Drain handshake frames.
         await _recv_until(
-            ws, lambda t: t == "system.subscription_set.v1", timeout=5.0
+            ws, lambda t: t == "system.subscription_set", timeout=5.0
         )
 
         # Send subscribe.
@@ -234,7 +234,7 @@ async def test_ui_ws_unsubscribe_market_acked_symmetrically(
     ws = await _connect_ui_ws(config, auth_token, test_user_id)
     try:
         await _recv_until(
-            ws, lambda t: t == "system.subscription_set.v1", timeout=5.0
+            ws, lambda t: t == "system.subscription_set", timeout=5.0
         )
 
         # Subscribe first so we have something to unsubscribe.
@@ -325,7 +325,7 @@ async def test_ui_ws_receives_periodic_heartbeat(
     try:
         # Drain initial handshake.
         await _recv_until(
-            ws, lambda t: t == "system.subscription_set.v1", timeout=5.0
+            ws, lambda t: t == "system.subscription_set", timeout=5.0
         )
 
         # Wait up to ~7s for a heartbeat (interval is 5s, give 2s slack).

@@ -165,7 +165,7 @@ class MockClient:
         Drive an order fill by publishing a quote on the production Redis stream.
 
         PBS no longer exposes an HTTP /execute endpoint. Fills are produced by
-        the price-driven path: a quote on `market.quote.v1` is consumed by
+        the price-driven path: a quote on `market.quote` is consumed by
         PBSMarketDataConsumer, which enqueues an ExecutionWorker fill at the
         quote's LTP for the **full remaining qty** of every open order on that
         instrument. The worker emits ORDER_UPDATE / TRADE_UPDATE /
@@ -230,7 +230,7 @@ class MockClient:
         self._quote_sequence[instrument_id] = now_ms
 
         await self._redis.xadd(
-            "market.quote.v1",
+            "market.quote",
             {
                 "instrument_id": instrument_id,
                 "ltp": str(fill_price),
@@ -276,7 +276,7 @@ class MockClient:
         """
         Test-only HTTP shortcut to synchronously trigger PBS PriceExecutionEngine.
 
-        Production data flow is via the Redis stream `market.quote.v1` consumed
+        Production data flow is via the Redis stream `market.quote` consumed
         by PBSMarketDataConsumer. This endpoint bypasses that path and is used
         by E2E tests to keep LIMIT/STOP trigger assertions deterministic when
         consumer-group lag would otherwise race the test.

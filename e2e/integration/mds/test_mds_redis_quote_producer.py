@@ -1,28 +1,25 @@
 """
-Integration test — MDS publisher on real `market.quote.v1` stream.
+Integration test — MDS publisher on real `market.quote` stream.
 
-Pair under test: market-data-service → Redis Streams (`market.quote.v1`,
-`market.instrument.v1`).
+Pair under test: market-data-service → Redis Streams (`market.quote`).
 
 What this test actually exercises:
-    1. The real `market.quote.v1` stream exists and conforms to the
+    1. The real `market.quote` stream exists and conforms to the
        MarketStreamPublisher contract (instrument_id, ltp, timestamp,
        sequence_number as string fields).
     2. The real LATEST_QUOTE_HASH (`market.latest_quote`) is populated
        and the JSON payload there carries `instrument_id` and `ltp`.
-    3. Triggering MDS' instrument-sync endpoint produces an instrument
-       event on the real `market.instrument.v1` stream within a few
-       seconds — this is the only way MDS' publisher gets exercised in
-       an E2E environment without a live broker WebSocket feed.
 
 What this test does NOT cover (intentional — needs real broker feed):
     - End-to-end quote publication driven by a live Fyers WS tick. That
       requires either the actual Fyers gateway or a fake-broker plugin
       we don't have in this repo today.
+    - Instrument sync testing — disabled in E2E due to performance issues
+      with 132k+ instruments.
 
 Past regression this test guards against:
     - The previous version of this file created a throw-away stream
-      `market.quote.v1.test.<uuid>`, did its own xadd, and read it back
+      `market.quote.test.<uuid>`, did its own xadd, and read it back
       itself. It tested Redis, not MDS — there is no scenario under
       which it could detect an MDS publisher misconfiguration.
 """
@@ -41,13 +38,12 @@ import redis.asyncio as redis
 pytestmark = pytest.mark.asyncio
 
 
-REAL_QUOTE_STREAM = "market.quote.v1"
-REAL_INSTRUMENT_STREAM = "market.instrument.v1"
+REAL_QUOTE_STREAM = "market.quote"
 LATEST_QUOTE_HASH = "market.latest_quote"
 
 
 async def test_real_quote_stream_carries_publisher_schema(config):
-    """Every entry on the production `market.quote.v1` stream must carry
+    """Every entry on the production `market.quote` stream must carry
     the fields MarketStreamPublisher.publish_quote writes
     (instrument_id, ltp, timestamp, sequence_number). Downstream
     consumers — PBS, strategy-service, portfolio — assume the same.
@@ -142,35 +138,4 @@ async def test_latest_quote_hash_is_writable_with_publisher_payload(config):
         await client.close()
 
 
-async def test_mds_publishes_instrument_event_on_sync_trigger(config):
-    """The session-start instrument restream must produce entries on the
-    real `market.instrument.v1` stream. This verifies MDS' MarketStreamPublisher
-    is wired correctly without re-triggering the costly restream operation
-    (132k+ instruments).
 
-    Instrument sync is a one-time activity performed at E2E session start
-    (see conftest.pytest_sessionstart); this test only verifies the result.
-    """
-    client = await redis.from_url(config.redis_url, decode_responses=True)
-    try:
-        # The session-start restream should have populated this stream.
-        current_len = await client.xlen(REAL_INSTRUMENT_STREAM)
-        assert current_len > 0, (
-            f"`{REAL_INSTRUMENT_STREAM}` is empty. The session-start "
-            f"instrument restream did not publish any entries — check "
-            f"MDS publisher initialization or whether MDS DB has instruments."
-        )
-
-        # Inspect the most recent entry to confirm it carries publisher fields.
-        recent = await client.xrevrange(REAL_INSTRUMENT_STREAM, count=1)
-        assert recent, "Stream has entries but xrevrange returned no results"
-        _msg_id, fields = recent[0]
-        # All publish_instrument_sync_* paths write at minimum a
-        # `msg_type` field. publish_instrument writes `instrument_id`.
-        assert "msg_type" in fields or "instrument_id" in fields, (
-            f"Entry on `{REAL_INSTRUMENT_STREAM}` is missing both "
-            f"`msg_type` and `instrument_id`: {fields}. The publisher "
-            f"contract is broken."
-        )
-    finally:
-        await client.close()

@@ -113,7 +113,7 @@ async def trigger_mds_instrument_restream(client: httpx.AsyncClient, config: Tes
     Trigger MDS to restream all instruments to Redis.
 
     This calls the MDS /api/v1/instruments/restream endpoint which publishes
-    all instruments from the MDS database to the Redis stream market.instrument.v1.
+    all instruments from the MDS database to the Redis stream market.instrument.
     BAS will consume these events and populate its instruments table.
 
     This is a safety net to ensure BAS has the full instrument catalog even if
@@ -124,7 +124,7 @@ async def trigger_mds_instrument_restream(client: httpx.AsyncClient, config: Tes
         if response.status_code == 200:
             result = response.json()
             count = result.get("count", 0)
-            log.info(f"✅ MDS restreamed {count} instruments to Redis market.instrument.v1")
+            log.info(f"✅ MDS restreamed {count} instruments to Redis market.instrument")
             if count == 0:
                 log.warning("⚠️ MDS has 0 instruments — run Fyers instrument sync before E2E tests")
         else:
@@ -248,7 +248,7 @@ async def instrument_catalog(config: TestConfig) -> InstrumentCatalog:
     - MDS is the source of truth for instrument metadata
     - Tests query MDS /api/v1/instruments to discover available instruments
     - Tests use real canonical instrument IDs (e.g., NSE:CM:EQUITY:SBIN)
-    - BAS has consumed these same instruments via market.instrument.v1 Redis stream
+    - BAS has consumed these same instruments via market.instrument Redis stream
 
     Scope: session (loaded once per test run)
     """
@@ -667,7 +667,7 @@ async def mock_client(
     Provide MockClient instance for fill injection.
 
     inject_fill drives PBS fills by publishing to the Redis stream
-    `market.quote.v1` (production path) — there is no longer an HTTP
+    `market.quote` (production path) — there is no longer an HTTP
     /execute shortcut, so we pass the redis URL here.
 
     Scope: function
@@ -724,7 +724,7 @@ async def market_data_stream(mock_client: MockClient, config: TestConfig) -> Moc
     """
     Provide MockMarketDataStream for real execution mode tests.
 
-    Publishes price updates on the production Redis stream `market.quote.v1`
+    Publishes price updates on the production Redis stream `market.quote`
     (read by BAS QuoteStore and PBS PriceExecutionEngine) and also calls the
     PBS HTTP shortcut for deterministic LIMIT/STOP triggering.
 
@@ -757,11 +757,11 @@ async def redis_observer(config: TestConfig) -> AsyncGenerator[RedisStreamObserv
     # created lazily inside observe_stream() — by which point any events the
     # test produced before its first observe_stream() call are already past
     # the group's $ position and invisible.
-    for event_type in ["order.updated.v1", "trade.executed.v1", "position.updated.v1"]:
+    for event_type in ["order.updated", "trade.executed", "position.updated"]:
         await observer._ensure_consumer_group(f"events:{event_type}")
     yield observer
     # Cleanup: delete observer consumer groups
-    for event_type in ["order.updated.v1", "trade.executed.v1", "position.updated.v1"]:
+    for event_type in ["order.updated", "trade.executed", "position.updated"]:
         await observer.delete_consumer_group(event_type)
     await observer.stop()
 
@@ -794,7 +794,7 @@ async def mds_client(
     The MDS UI channel is exclusively a UI-facing market data feed (quotes,
     depth, candles, instrument subscription requests). BAS and PBS no longer
     consume MDS via WebSocket — they read market data from the Redis stream
-    market.quote.v1. Tests must therefore not use mds_client as a stand-in
+    market.quote. Tests must therefore not use mds_client as a stand-in
     for the BAS/PBS data path.
 
     Account/execution events are collected via Redis Streams using redis_event_collector.
@@ -898,9 +898,9 @@ async def redis_event_collector(config: TestConfig) -> RedisEventCollector:
     )
     await collector.connect()
     await collector.subscribe_to_streams([
-        "events:order.updated.v1",
-        "events:trade.executed.v1",
-        "events:position.updated.v1",
+        "events:order.updated",
+        "events:trade.executed",
+        "events:position.updated",
     ])
     
     yield collector

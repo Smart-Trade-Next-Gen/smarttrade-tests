@@ -93,7 +93,7 @@ async def test_market_buy_full_fill(
     events = await redis_event_collector.wait_for_completion(order_id, timeout=config.timeout_medium)
 
     # Assert: Order lifecycle
-    order_events = [e for e in events if e.get("type") == "order.updated.v1"]
+    order_events = [e for e in events if e.get("type") == "order.updated"]
     assert len(order_events) > 0, "Order events should be present"
     
     # Check for FILLED status
@@ -175,7 +175,7 @@ async def test_market_sell_full_fill(
     events = await redis_event_collector.wait_for_completion(order_id, timeout=config.timeout_medium)
 
     # Assert: Order lifecycle
-    order_events = [e for e in events if e.get("type") == "order.updated.v1"]
+    order_events = [e for e in events if e.get("type") == "order.updated"]
     assert len(order_events) > 0, "Order events should be present"
     
     # Check for FILLED status
@@ -257,7 +257,7 @@ async def test_limit_buy_triggers_at_price(
     events = await redis_event_collector.wait_for_completion(order_id, timeout=config.timeout_medium)
 
     # Assert: Order filled
-    order_events = [e for e in events if e.get("type") == "order.updated.v1"]
+    order_events = [e for e in events if e.get("type") == "order.updated"]
     assert len(order_events) > 0, "Order events should be present"
     
     filled_events = [e for e in order_events if e.get("data", {}).get("payload", {}).get("status") == "FILLED"]
@@ -333,7 +333,7 @@ async def test_limit_sell_triggers_at_price(
     events = await redis_event_collector.wait_for_completion(order_id, timeout=config.timeout_medium)
 
     # Assert: Order filled
-    order_events = [e for e in events if e.get("type") == "order.updated.v1"]
+    order_events = [e for e in events if e.get("type") == "order.updated"]
     assert len(order_events) > 0, "Order events should be present"
     
     filled_events = [e for e in order_events if e.get("data", {}).get("payload", {}).get("status") == "FILLED"]
@@ -398,7 +398,7 @@ async def test_order_cancelled_lifecycle(
     events = await redis_event_collector.wait_for_completion(order_id, timeout=config.timeout_medium)
 
     # Assert: CANCELLED event emitted
-    order_events = [e for e in events if e.get("type") == "order.updated.v1"]
+    order_events = [e for e in events if e.get("type") == "order.updated"]
     cancelled_events = [e for e in order_events if e.get("data", {}).get("payload", {}).get("status") == "CANCELLED"]
     assert len(cancelled_events) > 0, "CANCELLED event should be emitted"
 
@@ -559,5 +559,5 @@ async def test_order_modified_lifecycle(
     events = await redis_event_collector.wait_for_completion(order_id, timeout=config.timeout_medium)
 
     # Assert: Order filled
-    order_events = [e for e in events if e.get("type") == "order.updated.v1"]
+    order_events = [e for e in events if e.get("type") == "order.updated"]
     assert len(order_events) > 0, "Order events should be present"

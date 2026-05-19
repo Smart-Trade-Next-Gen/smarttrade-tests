@@ -1,13 +1,13 @@
 """
 Integration test — MDS subscription consumer on the real
-`market.subscription.request.v1` stream.
+`market.subscription.request` stream.
 
 Pair under test: market-data-service ←→ Redis Streams
-(`market.subscription.request.v1`).
+(`market.subscription.request`).
 
 Contract:
     1. MDS owns the `mds-subscription-consumer` group on the real
-       `market.subscription.request.v1` stream (see
+       `market.subscription.request` stream (see
        SubscriptionConsumer.STREAM / GROUP).
     2. When a SUBSCRIBE request lands on the stream, MDS' consumer
        picks it up and ACKs it (the group's pending count must not
@@ -25,7 +25,7 @@ What this test does NOT cover (intentional):
 
 Past regression this test guards against:
     - The previous version of this file created its own throw-away
-      stream (`market.subscription.request.v1.test.<uuid>`), did its own
+      stream (`market.subscription.request.test.<uuid>`), did its own
       xadd, and read it back with its own group. It tested Redis, not
       MDS. The `mds-subscription-consumer` group could be missing in
       production and the previous test wouldn't notice.
@@ -45,7 +45,7 @@ import redis.asyncio as redis
 pytestmark = pytest.mark.asyncio
 
 
-REAL_SUBSCRIPTION_STREAM = "market.subscription.request.v1"
+REAL_SUBSCRIPTION_STREAM = "market.subscription.request"
 MDS_CONSUMER_GROUP = "mds-subscription-consumer"
 
 

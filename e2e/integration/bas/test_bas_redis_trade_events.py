@@ -1,10 +1,10 @@
 """
-Integration test — BAS → Redis `trade.executed.v1`.
+Integration test — BAS → Redis `trade.executed`.
 
-Pair under test: broker-adapter-service → Redis Streams (`events:trade.executed.v1`).
+Pair under test: broker-adapter-service → Redis Streams (`events:trade.executed`).
 
 Contract:
-    1. BAS publishes trade.executed.v1 events when trades are executed.
+    1. BAS publishes trade.executed events when trades are executed.
     2. Every trade event must include required fields: trade_id, instrument_id, side, quantity, price, order_id.
     3. Trade events must validate against the schema.
     4. Each trade event has a unique event_id and idempotency_key.
@@ -34,10 +34,10 @@ async def test_trade_event_published_after_fill(
     mock_client,
     redis_event_collector,
 ):
-    """BAS publishes trade.executed.v1 event when a fill occurs.
+    """BAS publishes trade.executed event when a fill occurs.
 
     This test validates:
-    1. After placing and filling an order, a trade.executed.v1 event is published
+    1. After placing and filling an order, a trade.executed event is published
     2. The trade event contains all required fields
     3. The trade event is linked to the order via order_id
     """
@@ -56,10 +56,10 @@ async def test_trade_event_published_after_fill(
         instrument_index=0,
     )
 
-    # Verify trade.executed.v1 event was published
-    trade_events = [e for e in events if e.get("type") == "trade.executed.v1"]
+    # Verify trade.executed event was published
+    trade_events = [e for e in events if e.get("type") == "trade.executed"]
     assert trade_events, (
-        f"No trade.executed.v1 event found for broker_order_id={broker_order_id}. "
+        f"No trade.executed event found for broker_order_id={broker_order_id}. "
         f"Events seen: {[ (e.get('type')) for e in events ]}"
     )
 
@@ -67,25 +67,25 @@ async def test_trade_event_published_after_fill(
     trade_event = trade_events[0]
     payload = trade_event.get("payload") or {}
 
-    # Required fields per trade.executed.v1 schema
+    # Required fields per trade.executed schema
     required_fields = ["trade_id", "instrument_id", "side", "quantity", "price"]
     for field in required_fields:
         assert payload.get(field) is not None, (
-            f"trade.executed.v1 missing required field '{field}'. Payload: {payload}"
+            f"trade.executed missing required field '{field}'. Payload: {payload}"
         )
 
     # Verify the trade is linked to the correct order
     assert payload.get("order_id") == broker_order_id, (
-        f"trade.executed.v1 order_id mismatch: got {payload.get('order_id')}, "
+        f"trade.executed order_id mismatch: got {payload.get('order_id')}, "
         f"expected {broker_order_id}"
     )
 
     # Verify trade quantities and prices are reasonable
     assert int(payload.get("quantity", 0)) > 0, (
-        f"trade.executed.v1 has invalid quantity: {payload.get('quantity')}"
+        f"trade.executed has invalid quantity: {payload.get('quantity')}"
     )
     assert Decimal(payload.get("price", "0")) > 0, (
-        f"trade.executed.v1 has invalid price: {payload.get('price')}"
+        f"trade.executed has invalid price: {payload.get('price')}"
     )
 
 
@@ -97,7 +97,7 @@ async def test_trade_events_have_unique_ids_and_idempotency_keys(
     mock_client,
     redis_event_collector,
 ):
-    """Each trade.executed.v1 event has unique event_id and idempotency_key.
+    """Each trade.executed event has unique event_id and idempotency_key.
 
     This test validates the event publishing contract for trade events.
     """
@@ -116,19 +116,19 @@ async def test_trade_events_have_unique_ids_and_idempotency_keys(
     )
 
     # Collect trade events
-    trade_events = [e for e in events if e.get("type") == "trade.executed.v1"]
-    assert trade_events, "No trade.executed.v1 events found"
+    trade_events = [e for e in events if e.get("type") == "trade.executed"]
+    assert trade_events, "No trade.executed events found"
 
     # Verify each trade event has unique event_id
     event_ids = [e.get("event_id") for e in trade_events]
     assert len(event_ids) == len(set(event_ids)), (
-        f"trade.executed.v1 events have duplicate event_ids: {event_ids}"
+        f"trade.executed events have duplicate event_ids: {event_ids}"
     )
 
     # Verify each trade event has unique idempotency_key
     idempotency_keys = [e.get("idempotency_key") for e in trade_events]
     assert len(idempotency_keys) == len(set(idempotency_keys)), (
-        f"trade.executed.v1 events have duplicate idempotency_keys: {idempotency_keys}"
+        f"trade.executed events have duplicate idempotency_keys: {idempotency_keys}"
     )
 
 
@@ -140,7 +140,7 @@ async def test_multiple_fills_generate_multiple_trade_events(
     mock_client,
     redis_event_collector,
 ):
-    """Multiple fills on the same order generate multiple trade.executed.v1 events.
+    """Multiple fills on the same order generate multiple trade.executed events.
 
     This test validates that each fill produces its own trade event.
     """
@@ -162,7 +162,7 @@ async def test_multiple_fills_generate_multiple_trade_events(
     # Note: The current test infrastructure uses a single fill per order.
     # This test is a placeholder for when partial fills are supported.
     # For now, we just verify that a single fill produces exactly one trade event.
-    trade_events = [e for e in events if e.get("type") == "trade.executed.v1"]
+    trade_events = [e for e in events if e.get("type") == "trade.executed"]
     
     # With the current single-fill approach, we expect exactly 1 trade event
     assert len(trade_events) == 1, (

@@ -163,7 +163,7 @@ E2E tests use **Redis Streams** aligned with the v4.0 stateless architecture:
 
 | Stream | Purpose | Events |
 |--------|---------|--------|
-| **Redis Streams** | Event-driven event collection | `order.updated.v1`, `trade.executed.v1`, `position.updated.v1` |
+| **Redis Streams** | Event-driven event collection | `order.updated`, `trade.executed`, `position.updated` |
 
 ### Event Flow
 

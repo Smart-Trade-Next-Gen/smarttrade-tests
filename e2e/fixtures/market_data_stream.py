@@ -1,7 +1,7 @@
 """
 Mock market data stream fixture for real execution mode tests.
 
-Publishes price updates on the production Redis stream `market.quote.v1` so
+Publishes price updates on the production Redis stream `market.quote` so
 both BAS QuoteStore and PBS PriceExecutionEngine see them through their
 real consumer paths. Also calls the PBS `/price/{broker_id}` HTTP endpoint
 to synchronously trigger order evaluation — this avoids consumer-group lag
@@ -38,7 +38,7 @@ class MockMarketDataStream:
     Injects price updates that drive both BAS QuoteStore and PBS execution.
 
     Two-level injection:
-      1. XADD to Redis stream `market.quote.v1` — the production path that
+      1. XADD to Redis stream `market.quote` — the production path that
          BAS' MarketDataConsumer and PBS' PBSMarketDataConsumer both read.
       2. POST to PBS `/api/v1/price/{broker_id}` — a deterministic test
          shortcut that synchronously triggers PriceExecutionEngine, used to
@@ -49,7 +49,7 @@ class MockMarketDataStream:
         await market_stream.update_price("INSTR_NSE_TCS_EQ", Decimal("3799.50"))
     """
 
-    QUOTE_STREAM = "market.quote.v1"
+    QUOTE_STREAM = "market.quote"
 
     def __init__(
         self,

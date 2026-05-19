@@ -5,8 +5,8 @@ Pair under test: notification-service ←→ Redis Streams (all domain events).
 
 Contract:
     1. With an active subscription for `order.*`, the notification service
-       consumes `order.updated.v1` events from Redis, maps the FILLED status
-       to `order.filled.v1`, and persists a row in `notification_messages`
+       consumes `order.updated` events from Redis, maps the FILLED status
+       to `order.filled`, and persists a row in `notification_messages`
        for our user.
     2. The persisted notification carries the event_id from the source event
        and the right event_name mapping.
@@ -147,8 +147,8 @@ async def test_notification_service_persists_order_fill_into_db(
     mock_client,
     redis_event_collector,
 ):
-    """A fill drives `order.updated.v1` with status=FILLED. Notification
-    service maps that to `order.filled.v1`, finds a matching subscription,
+    """A fill drives `order.updated` with status=FILLED. Notification
+    service maps that to `order.filled`, finds a matching subscription,
     and persists a notification_messages row with the same event_id.
     """
     # 1. Ensure the test user has a subscription matching order.* events.
@@ -173,33 +173,33 @@ async def test_notification_service_persists_order_fill_into_db(
         price=price,
     )
 
-    # 2. Find the FILLED order.updated.v1 event so we know which event_id
+    # 2. Find the FILLED order.updated event so we know which event_id
     #    to look up in notification_messages.
     filled_events = [
         e
         for e in events
-        if e.get("type") == "order.updated.v1"
+        if e.get("type") == "order.updated"
         and (e.get("payload") or {}).get("status") == "FILLED"
     ]
     assert filled_events, (
-        "Test cannot proceed: BAS did not publish a FILLED order.updated.v1 "
+        "Test cannot proceed: BAS did not publish a FILLED order.updated "
         "event. The bug is upstream of notification-service."
     )
     # The event envelope stores event_id alongside payload.
     fill_event_data = filled_events[-1].get("data") or {}
     event_id = fill_event_data.get("event_id")
     assert event_id, (
-        f"FILLED order.updated.v1 event has no event_id: {fill_event_data}"
+        f"FILLED order.updated event has no event_id: {fill_event_data}"
     )
 
     # 3. Verify notification-service persisted a notification for it.
     row = await _wait_for_notification(dsn, event_id=event_id, timeout=20.0)
 
     assert row["event_id"] == event_id
-    # notification-service maps order.updated.v1 (status=FILLED) → order.filled.v1
-    assert row["event_name"] == "order.filled.v1", (
+    # notification-service maps order.updated (status=FILLED) → order.filled
+    assert row["event_name"] == "order.filled", (
         f"Notification event_name={row['event_name']!r}; expected "
-        f"order.filled.v1 (notification-service must map order.updated.v1 "
+        f"order.filled (notification-service must map order.updated "
         f"status=FILLED to the legacy fine-grained event_name for "
         f"subscription matching)."
     )
@@ -243,7 +243,7 @@ async def test_notification_service_does_not_double_persist(
 
     filled = [
         e for e in events
-        if e.get("type") == "order.updated.v1"
+        if e.get("type") == "order.updated"
         and (e.get("payload") or {}).get("status") == "FILLED"
     ]
     assert filled

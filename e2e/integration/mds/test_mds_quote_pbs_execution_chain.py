@@ -1,7 +1,7 @@
 """
 Integration test — MDS quote → PBS execution chain.
 
-Pair under test: Redis Streams (`market.quote.v1`) ←→ paper-broker-service.
+Pair under test: Redis Streams (`market.quote`) ←→ paper-broker-service.
 
 What we verify here:
     1. A LIMIT BUY placed against an empty price cache stays PENDING (no
@@ -43,7 +43,7 @@ import redis.asyncio as redis
 pytestmark = pytest.mark.asyncio
 
 
-REAL_QUOTE_STREAM = "market.quote.v1"
+REAL_QUOTE_STREAM = "market.quote"
 
 
 async def _publish_quote(
@@ -76,9 +76,9 @@ async def _publish_quote(
 
 
 def _has_filled_event(events: list[dict]) -> bool:
-    """Return True if any event in `events` is order.updated.v1 status=FILLED."""
+    """Return True if any event in `events` is order.updated status=FILLED."""
     return any(
-        e.get("type") == "order.updated.v1"
+        e.get("type") == "order.updated"
         and (e.get("payload") or {}).get("status") == "FILLED"
         for e in events
     )
@@ -92,7 +92,7 @@ async def test_limit_buy_fills_after_quote_arrives_on_market_quote_v1(
     redis_event_collector,
 ):
     """LIMIT BUY placed against an empty price cache stays PENDING until a
-    quote for that instrument lands on `market.quote.v1`. Once the quote
+    quote for that instrument lands on `market.quote`. Once the quote
     arrives, PBS' PriceExecutionEngine enqueues the order and the worker
     fills it.
 
@@ -138,7 +138,7 @@ async def test_limit_buy_fills_after_quote_arrives_on_market_quote_v1(
     )
     assert _has_filled_event(events), (
         f"LIMIT BUY on {instrument_id} never reached FILLED after a quote "
-        f"on market.quote.v1. Either PBS' quote consumer group is dead or "
+        f"on market.quote. Either PBS' quote consumer group is dead or "
         f"the on_price_update → execution_worker path is broken. Events: "
         f"{[(e.get('type'), (e.get('payload') or {}).get('status')) for e in events]}"
     )
@@ -188,7 +188,7 @@ async def test_limit_sell_fills_after_quote_arrives_on_market_quote_v1(
     )
     assert _has_filled_event(events), (
         f"LIMIT SELL on {instrument_id} never reached FILLED after a quote "
-        f"on market.quote.v1."
+        f"on market.quote."
     )
 
 

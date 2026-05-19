@@ -30,7 +30,7 @@ async def test_high_frequency_quote_processing(
     - All quotes are processed
     - No message loss occurs
     """
-    stream_name = "market.quote.v1"
+    stream_name = "market.quote"
     consumer_group = f"e2e-test-hf-quotes-{uuid.uuid4().hex[:8]}"
     
     try:
@@ -60,7 +60,7 @@ async def test_quote_delivery_latency(
     - Latency is consistent
     - No queue delays
     """
-    stream_name = "market.quote.v1"
+    stream_name = "market.quote"
     consumer_group = f"e2e-test-quote-latency-{uuid.uuid4().hex[:8]}"
     
     try:

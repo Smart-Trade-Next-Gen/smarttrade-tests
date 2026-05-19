@@ -68,7 +68,7 @@ async def test_event_replay_after_restart(
     - Events are replayed from correct position
     - No duplicate processing
     """
-    stream_name = "market.quote.v1"
+    stream_name = "market.quote"
     consumer_group = f"e2e-test-event-replay-{uuid.uuid4().hex[:8]}"
     
     try:

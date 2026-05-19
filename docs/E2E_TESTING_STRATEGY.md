@@ -133,8 +133,8 @@ test_market_buy_full_fill_real_execution (Real) ✓ PASSED — verify Mock fill 
 2. BAS (internally) forwards order to Mock → Mock stores order, ready to fill
 3. Test calls `await mock_client.inject_fill(order_id, qty, price)` → Mock immediately publishes execution update
 4. Mock sends `ExecutionUpdate` via internal WS to BAS
-5. BAS receives update → processes → publishes `order.filled.v1` event to bus
-6. MDS consumes `order.filled.v1` event → maps to WS message `type: "order_fill"` → pushes to all connected clients
+5. BAS receives update → processes → publishes `order.filled` event to bus
+6. MDS consumes `order.filled` event → maps to WS message `type: "order_fill"` → pushes to all connected clients
 7. MDSWebSocketClient receives `order_fill` message → pumps into `event_collector.queues[order_id]`
 
 **Assertion Phase:**

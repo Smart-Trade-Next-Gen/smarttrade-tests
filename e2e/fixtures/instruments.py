@@ -5,7 +5,7 @@ The flow:
 1. MDS DB is populated with real instruments from Fyers broker sync (deployment environment)
 2. Tests query MDS /api/v1/instruments to discover available instruments
 3. Tests trigger MDS restream to ensure BAS has the full catalog
-4. BAS consumes instruments from market.instrument.v1 Redis stream
+4. BAS consumes instruments from market.instrument Redis stream
 5. Tests use real canonical instrument IDs when placing orders
 """
 

@@ -1,10 +1,10 @@
 """
-Integration test — PBS quote consumer on real `market.quote.v1` stream.
+Integration test — PBS quote consumer on real `market.quote` stream.
 
-Pair under test: paper-broker-service ←→ Redis Streams (`market.quote.v1`).
+Pair under test: paper-broker-service ←→ Redis Streams (`market.quote`).
 
 Contract:
-    1. PBS subscribes to the real `market.quote.v1` stream using the
+    1. PBS subscribes to the real `market.quote` stream using the
        `pbs-quote-consumer` group (see
        PBSMarketDataConsumer.STREAM / GROUP).
     2. When a quote arrives, PBS updates its in-memory price cache for the
@@ -15,7 +15,7 @@ Contract:
 
 Past regression this test guards against:
     - The previous version of this test created its own throw-away stream
-      (`market.quote.v1.test.<uuid>`) and its own consumer group, then
+      (`market.quote.test.<uuid>`) and its own consumer group, then
       asserted that XADD followed by XREADGROUP returned the same payload.
       It tested Redis, not PBS — the actual "missing pbs-quote-consumer
       group" production incident could not be detected by it.
@@ -35,7 +35,7 @@ import redis.asyncio as redis
 pytestmark = pytest.mark.asyncio
 
 
-REAL_QUOTE_STREAM = "market.quote.v1"
+REAL_QUOTE_STREAM = "market.quote"
 
 
 async def _publish_quote(
@@ -68,7 +68,7 @@ async def _publish_quote(
 
 async def test_pbs_consumer_group_is_attached_to_real_stream(config):
     """PBS owns the `pbs-quote-consumer` group on the real
-    `market.quote.v1` stream. If this fixture is missing in production
+    `market.quote` stream. If this fixture is missing in production
     no order will ever fill because the quote events go undelivered.
     """
     client = await redis.from_url(config.redis_url, decode_responses=True)
@@ -93,7 +93,7 @@ async def test_pbs_consumes_real_quote_and_market_order_fills_at_that_price(
     redis_event_collector,
 ):
     """End-to-end proof that PBS' quote consumer is alive on the real
-    stream: publish a quote on `market.quote.v1`, then place a MARKET
+    stream: publish a quote on `market.quote`, then place a MARKET
     order. PBS' OrderService auto-fills the market order at the cached
     LTP, and the LTP must be the one we just published.
 
@@ -124,7 +124,7 @@ async def test_pbs_consumes_real_quote_and_market_order_fills_at_that_price(
     )
     broker_order_id = place_response[0]["broker_order_id"]
 
-    # 2. Publish a quote on the real `market.quote.v1` stream. PBS'
+    # 2. Publish a quote on the real `market.quote` stream. PBS'
     #    quote consumer must:
     #       a) consume this quote via the `pbs-quote-consumer` group, and
     #       b) call PriceExecutionEngine.on_price_update, which looks up
@@ -145,11 +145,11 @@ async def test_pbs_consumes_real_quote_and_market_order_fills_at_that_price(
     filled = [
         e
         for e in events
-        if e.get("type") == "order.updated.v1"
+        if e.get("type") == "order.updated"
         and (e.get("payload") or {}).get("status") == "FILLED"
     ]
     assert filled, (
-        f"No FILLED order.updated.v1 event for broker_order_id="
+        f"No FILLED order.updated event for broker_order_id="
         f"{broker_order_id}. Likely PBS' quote consumer never received "
         f"the quote we published on `{REAL_QUOTE_STREAM}` — check the "
         f"`pbs-quote-consumer` consumer group."

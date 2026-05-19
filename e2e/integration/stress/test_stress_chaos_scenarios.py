@@ -2,7 +2,7 @@
 Integration test — stress / chaos scenarios on the live execution path.
 
 Pair under test: end-to-end (broker-adapter-service ↔ paper-broker-service ↔
-market.quote.v1 ↔ Redis Streams).
+market.quote ↔ Redis Streams).
 
 Contract:
     1. Concurrent orders on different instruments fill independently. The
@@ -55,7 +55,7 @@ import redis.asyncio as redis
 pytestmark = pytest.mark.asyncio
 
 
-REAL_QUOTE_STREAM = "market.quote.v1"
+REAL_QUOTE_STREAM = "market.quote"
 
 
 async def _publish_quote(
@@ -90,9 +90,9 @@ async def _publish_quote(
 
 
 def _filled_event(events: list[dict], broker_order_id: str) -> dict | None:
-    """Return the FILLED order.updated.v1 event for `broker_order_id` if any."""
+    """Return the FILLED order.updated event for `broker_order_id` if any."""
     for e in events:
-        if e.get("type") != "order.updated.v1":
+        if e.get("type") != "order.updated":
             continue
         payload = e.get("payload") or {}
         if (
@@ -188,7 +188,7 @@ async def test_concurrent_orders_on_distinct_instruments_fill_independently(
         for e in events:
             payload_for_event = e.get("payload") or {}
             if "order_id" not in payload_for_event:
-                # position.updated.v1 carries instrument_id, not order_id;
+                # position.updated carries instrument_id, not order_id;
                 # those land here because the collector's per-order index
                 # tags any event referencing the order. That's fine.
                 continue
@@ -336,7 +336,7 @@ async def test_duplicate_quote_sequence_does_not_emit_extra_fills(
     filled_events = [
         e
         for e in redis_event_collector.get_events(broker_order_id)
-        if e.get("type") == "order.updated.v1"
+        if e.get("type") == "order.updated"
         and (e.get("payload") or {}).get("status") == "FILLED"
     ]
     assert len(filled_events) == 1, (
@@ -408,7 +408,7 @@ async def test_rapid_price_ladder_fills_market_order_once(
     filled_events = [
         e
         for e in redis_event_collector.get_events(broker_order_id)
-        if e.get("type") == "order.updated.v1"
+        if e.get("type") == "order.updated"
         and (e.get("payload") or {}).get("status") == "FILLED"
     ]
     assert len(filled_events) == 1, (

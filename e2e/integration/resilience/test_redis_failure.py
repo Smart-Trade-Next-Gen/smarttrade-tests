@@ -72,7 +72,7 @@ async def test_redis_stream_consumer_recovery(
     - Consumer resumes from last read position
     - No duplicate processing
     """
-    stream_name = "market.quote.v1"
+    stream_name = "market.quote"
     consumer_group = f"e2e-test-resilience-recovery-{uuid.uuid4().hex[:8]}"
     
     try:

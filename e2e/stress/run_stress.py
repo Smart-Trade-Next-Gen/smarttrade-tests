@@ -6,7 +6,7 @@ would dominate any measurement of the production path. This script is
 deliberately a single asyncio program that:
 
   1. Starts with a clean account (one-shot cleanup against PBS/BAS).
-  2. Subscribes to Redis Streams (events:order.updated.v1) before
+  2. Subscribes to Redis Streams (events:order.updated) before
      issuing any orders, so no FILLED event can be missed.
   3. Drives a burst of MARKET BUYs at the target concurrency, then
      pushes a single quote per instrument to trigger the fills.
@@ -214,14 +214,14 @@ class OrderRecord:
 
 
 class FillCollector:
-    """Tail events:order.updated.v1 and stamp the fill time on each order."""
+    """Tail events:order.updated and stamp the fill time on each order."""
 
     def __init__(self, redis_url: str):
         self.redis_url = redis_url
         self.client: Optional[redis.Redis] = None
         self.group_name = f"stress-{uuid.uuid4().hex[:8]}"
         self.consumer_name = "consumer-1"
-        self.streams = ["events:order.updated.v1"]
+        self.streams = ["events:order.updated"]
         self._stop = asyncio.Event()
         self._task: Optional[asyncio.Task] = None
         # broker_order_id → OrderRecord
@@ -353,7 +353,7 @@ async def trigger_fills(cfg: StressConfig, instruments_used: set[str]) -> None:
         base_seq = int(time.time() * 1000)
         for i, instrument in enumerate(sorted(instruments_used)):
             await client.xadd(
-                "market.quote.v1",
+                "market.quote",
                 {
                     "instrument_id": instrument,
                     "ltp": "100.00",

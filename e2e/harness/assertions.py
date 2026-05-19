@@ -50,12 +50,12 @@ class AssertionEngine:
             raise AssertionError("No events found for order")
 
         # Pick the event whose status matches the expected lifecycle terminal:
-        # for FILLED outcomes that means an order.updated.v1 event with status FILLED;
-        # for CANCELLED / REJECTED the broker emits order.updated.v1 with those statuses.
+        # for FILLED outcomes that means an order.updated event with status FILLED;
+        # for CANCELLED / REJECTED the broker emits order.updated with those statuses.
         terminal_event_types = {
-            "FILLED": {"order.updated.v1"},
-            "CANCELLED": {"order.updated.v1"},
-            "REJECTED": {"order.updated.v1"},
+            "FILLED": {"order.updated"},
+            "CANCELLED": {"order.updated"},
+            "REJECTED": {"order.updated"},
         }
         match_types = terminal_event_types.get(expected_status, set())
 
@@ -70,11 +70,11 @@ class AssertionEngine:
                     terminal_event = event
                     break
         if terminal_event is None:
-            # Fall back to the prior heuristic (order.updated.v1) so unrelated callers
+            # Fall back to the prior heuristic (order.updated) so unrelated callers
             # still surface a useful error.
             for event in events:
-                if (event.get("type") == "order.updated.v1" or
-                    (event.get("payload") or {}).get("event_type") == "order.updated.v1"):
+                if (event.get("type") == "order.updated" or
+                    (event.get("payload") or {}).get("event_type") == "order.updated"):
                     terminal_event = event
                     break
 
@@ -574,7 +574,7 @@ class AssertionEngine:
 
         Returns list of dicts with qty, price, side.
 
-        Note: Only counts order.updated.v1 events with status FILLED/PARTIALLY_FILLED,
+        Note: Only counts order.updated events with status FILLED/PARTIALLY_FILLED,
         not trade.executed / trade_exec, since trade_exec is a derived event from order fill
         and would double-count the fill.
         """
@@ -582,7 +582,7 @@ class AssertionEngine:
         for event in events:
             # Only count order updated events with fill status, not trade execution events (to avoid double-counting)
             event_type = event.get("type") or (event.get("payload") or {}).get("event_type") or ""
-            if event_type == "order.updated.v1":
+            if event_type == "order.updated":
                 status = event.get("status") or (event.get("payload") or {}).get("status") or ""
                 if status in {"FILLED", "PARTIALLY_FILLED"}:
                     fill_data = event.get("payload", event)
@@ -656,7 +656,7 @@ class AssertionEngine:
         if not events:
             raise AssertionError("No events provided for broker state validation")
         
-        # Extract order state from events. The FILLED order.updated.v1 event
+        # Extract order state from events. The FILLED order.updated event
         # carries fill data as `filled_quantity`/`average_price`; earlier
         # placement events carry the requested qty/price as `quantity`/`price`.
         last_event = events[-1]
