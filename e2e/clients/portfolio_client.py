@@ -192,11 +192,11 @@ class PortfolioClient:
                 # Find position with matching instrument_id and qty
                 for position in positions:
                     if position.get("instrument_id") == instrument_id:
-                        net_qty = int(position.get("net_qty", 0))
+                        net_qty = int(position.get("net_quantity", position.get("net_qty", 0)))
                         if net_qty == expected_qty:
                             log.info(
                                 f"✅ Position found: {instrument_id} qty={net_qty} "
-                                f"avg_price={position.get('avg_price')}"
+                                f"avg_price={position.get('average_price', position.get('avg_price'))}"
                             )
                             return position
 

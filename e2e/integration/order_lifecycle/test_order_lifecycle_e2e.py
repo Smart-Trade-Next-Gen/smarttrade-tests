@@ -74,7 +74,9 @@ async def test_market_buy_full_fill(
         tif=TimeInForce.DAY,
     )
 
-    [order_resp] = await bas_client.place_order(broker_id, test_account_id, order_request)
+    responses = await bas_client.place_order(broker_id, test_account_id, order_request)
+    # Broker may return multiple responses if it breaks large orders into smaller ones
+    order_resp = responses[0]
     order_id = order_resp.broker_order_id
 
     # Act: Inject deterministic fill
@@ -154,7 +156,9 @@ async def test_market_sell_full_fill(
         tif=TimeInForce.DAY,
     )
 
-    [order_resp] = await bas_client.place_order(broker_id, test_account_id, order_request)
+    responses = await bas_client.place_order(broker_id, test_account_id, order_request)
+    # Broker may return multiple responses if it breaks large orders into smaller ones
+    order_resp = responses[0]
     order_id = order_resp.broker_order_id
 
     # Act: Inject deterministic fill
@@ -233,7 +237,9 @@ async def test_limit_buy_triggers_at_price(
         tif=TimeInForce.DAY,
     )
 
-    [order_resp] = await bas_client.place_order(broker_id, test_account_id, order_request)
+    responses = await bas_client.place_order(broker_id, test_account_id, order_request)
+    # Broker may return multiple responses if it breaks large orders into smaller ones
+    order_resp = responses[0]
     order_id = order_resp.broker_order_id
 
     # Act: Inject fill at price below limit
@@ -307,7 +313,9 @@ async def test_limit_sell_triggers_at_price(
         tif=TimeInForce.DAY,
     )
 
-    [order_resp] = await bas_client.place_order(broker_id, test_account_id, order_request)
+    responses = await bas_client.place_order(broker_id, test_account_id, order_request)
+    # Broker may return multiple responses if it breaks large orders into smaller ones
+    order_resp = responses[0]
     order_id = order_resp.broker_order_id
 
     # Act: Inject fill at price above limit
@@ -377,7 +385,9 @@ async def test_order_cancelled_lifecycle(
         tif=TimeInForce.DAY,
     )
 
-    [order_resp] = await bas_client.place_order(broker_id, test_account_id, order_request)
+    responses = await bas_client.place_order(broker_id, test_account_id, order_request)
+    # Broker may return multiple responses if it breaks large orders into smaller ones
+    order_resp = responses[0]
     order_id = order_resp.broker_order_id
 
     # Cancel the order
@@ -441,7 +451,9 @@ async def test_order_rejected_lifecycle(
 
     # This should be rejected by BAS (invalid instrument)
     try:
-        [order_resp] = await bas_client.place_order(broker_id, test_account_id, order_request)
+        order_responses = await bas_client.place_order(broker_id, test_account_id, order_request)
+        # Broker may return multiple responses if it breaks large orders into smaller ones
+        order_resp = order_responses[0]
         # If we get here, the order was accepted - this is a bug!
         # The service should reject invalid instrument IDs
         assert False, f"Order with invalid instrument_id '{invalid_instrument_id}' should be rejected but was accepted: {order_resp}"
@@ -497,7 +509,9 @@ async def test_order_modified_lifecycle(
         tif=TimeInForce.DAY,
     )
 
-    [order_resp] = await bas_client.place_order(broker_id, test_account_id, order_request)
+    responses = await bas_client.place_order(broker_id, test_account_id, order_request)
+    # Broker may return multiple responses if it breaks large orders into smaller ones
+    order_resp = responses[0]
     order_id = order_resp.broker_order_id
 
     # Try to modify the order (change price)

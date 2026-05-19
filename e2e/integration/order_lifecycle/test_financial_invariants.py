@@ -77,7 +77,9 @@ async def test_buy_order_decreases_cash(
     )
     
     # Place order
-    [order_resp] = await bas_client.place_order(broker_id, test_account_id, order_request)
+    responses = await bas_client.place_order(broker_id, test_account_id, order_request)
+    # Broker may return multiple responses if it breaks large orders into smaller ones
+    order_resp = responses[0]
     order_id = order_resp.broker_order_id
     
     # Inject deterministic fill
@@ -158,7 +160,9 @@ async def test_sell_order_increases_cash(
         tif=TimeInForce.DAY,
     )
     
-    [buy_resp] = await bas_client.place_order(broker_id, test_account_id, buy_order)
+    buy_responses = await bas_client.place_order(broker_id, test_account_id, buy_order)
+    # Broker may return multiple responses if it breaks large orders into smaller ones
+    buy_resp = buy_responses[0]
     await mock_client.inject_fill(
         broker_id=broker_id,
         account_id=test_account_id,
@@ -195,7 +199,9 @@ async def test_sell_order_increases_cash(
         tif=TimeInForce.DAY,
     )
     
-    [sell_resp] = await bas_client.place_order(broker_id, test_account_id, sell_order)
+    sell_responses = await bas_client.place_order(broker_id, test_account_id, sell_order)
+    # Broker may return multiple responses if it breaks large orders into smaller ones
+    sell_resp = sell_responses[0]
     await mock_client.inject_fill(
         broker_id=broker_id,
         account_id=test_account_id,
@@ -267,7 +273,9 @@ async def test_position_quantity_matches_trades(
         tif=TimeInForce.DAY,
     )
     
-    [buy_resp_1] = await bas_client.place_order(broker_id, test_account_id, buy_order_1)
+    buy_responses_1 = await bas_client.place_order(broker_id, test_account_id, buy_order_1)
+    # Broker may return multiple responses if it breaks large orders into smaller ones
+    buy_resp_1 = buy_responses_1[0]
     await mock_client.inject_fill(
         broker_id=broker_id,
         account_id=test_account_id,
@@ -298,7 +306,9 @@ async def test_position_quantity_matches_trades(
         tif=TimeInForce.DAY,
     )
     
-    [buy_resp_2] = await bas_client.place_order(broker_id, test_account_id, buy_order_2)
+    buy_responses_2 = await bas_client.place_order(broker_id, test_account_id, buy_order_2)
+    # Broker may return multiple responses if it breaks large orders into smaller ones
+    buy_resp_2 = buy_responses_2[0]
     await mock_client.inject_fill(
         broker_id=broker_id,
         account_id=test_account_id,
@@ -342,7 +352,9 @@ async def test_position_quantity_matches_trades(
         tif=TimeInForce.DAY,
     )
     
-    [sell_resp] = await bas_client.place_order(broker_id, test_account_id, sell_order)
+    sell_responses = await bas_client.place_order(broker_id, test_account_id, sell_order)
+    # Broker may return multiple responses if it breaks large orders into smaller ones
+    sell_resp = sell_responses[0]
     await mock_client.inject_fill(
         broker_id=broker_id,
         account_id=test_account_id,
@@ -412,7 +424,9 @@ async def test_pnl_calculation_accuracy(
         tif=TimeInForce.DAY,
     )
     
-    [buy_resp] = await bas_client.place_order(broker_id, test_account_id, buy_order)
+    buy_responses = await bas_client.place_order(broker_id, test_account_id, buy_order)
+    # Broker may return multiple responses if it breaks large orders into smaller ones
+    buy_resp = buy_responses[0]
     await mock_client.inject_fill(
         broker_id=broker_id,
         account_id=test_account_id,
@@ -423,11 +437,12 @@ async def test_pnl_calculation_accuracy(
     )
     await redis_event_collector.wait_for_completion(buy_resp.broker_order_id, timeout=config.timeout_medium)
     
-    # Get position from portfolio service
-    positions = await portfolio_client.get_positions()
-    position = next((p for p in positions if p["instrument_id"] == instrument_id), None)
-    
-    assert position is not None, "Position should exist in portfolio"
+    # Wait for position to appear in portfolio service (event-driven, needs polling)
+    position = await portfolio_client.wait_for_position(
+        instrument_id=instrument_id,
+        expected_qty=buy_qty,
+        timeout=config.timeout_medium,
+    )
     
     # Sell order
     sell_price = Decimal("560.00")
@@ -451,7 +466,9 @@ async def test_pnl_calculation_accuracy(
         tif=TimeInForce.DAY,
     )
     
-    [sell_resp] = await bas_client.place_order(broker_id, test_account_id, sell_order)
+    sell_responses = await bas_client.place_order(broker_id, test_account_id, sell_order)
+    # Broker may return multiple responses if it breaks large orders into smaller ones
+    sell_resp = sell_responses[0]
     await mock_client.inject_fill(
         broker_id=broker_id,
         account_id=test_account_id,
@@ -531,7 +548,9 @@ async def test_no_negative_cash_or_positions(
     # This order may be accepted but should not cause negative cash
     # The system should have risk checks to prevent this
     try:
-        [order_resp] = await bas_client.place_order(broker_id, test_account_id, overbuy_order)
+        order_responses = await bas_client.place_order(broker_id, test_account_id, overbuy_order)
+        # Broker may return multiple responses if it breaks large orders into smaller ones
+        order_resp = order_responses[0]
         order_id = order_resp.broker_order_id
         
         # If order accepted, try to inject fill
@@ -579,7 +598,9 @@ async def test_no_negative_cash_or_positions(
     
     # This should be rejected or fail execution
     try:
-        [order_resp] = await bas_client.place_order(broker_id, test_account_id, sell_order)
+        order_responses = await bas_client.place_order(broker_id, test_account_id, sell_order)
+        # Broker may return multiple responses if it breaks large orders into smaller ones
+        order_resp = order_responses[0]
         order_id = order_resp.broker_order_id
         
         # Try to inject fill

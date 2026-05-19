@@ -67,7 +67,9 @@ async def test_order_updated_event_structure(
         tif=TimeInForce.DAY,
     )
     
-    [order_resp] = await bas_client.place_order(broker_id, test_account_id, order_request)
+    order_responses = await bas_client.place_order(broker_id, test_account_id, order_request)
+    # Broker may return multiple responses if it breaks large orders into smaller ones
+    order_resp = order_responses[0]
     await mock_client.inject_fill(
         broker_id=broker_id,
         account_id=test_account_id,

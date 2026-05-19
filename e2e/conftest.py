@@ -163,15 +163,17 @@ def pytest_sessionstart(session):
 
     async def trigger_instrument_sync_once():
         """Trigger MDS instrument restream — exactly once. Fire-and-forget on timeout."""
-        log.info("Triggering MDS instrument restream to Redis (one-time at session start)...")
-        async with httpx.AsyncClient() as client:
-            try:
-                await trigger_mds_instrument_restream(client, config)
-            except Exception as e:
-                log.warning(
-                    f"⚠️ MDS instrument restream call did not complete: {e}. "
-                    "Continuing — BAS likely has instruments from prior MDS startup sync."
-                )
+        log.info("Skipping MDS instrument restream (disabled for E2E testing due to performance issues)")
+        # DISABLED FOR E2E TESTING - MDS instrument restream takes too long
+        # log.info("Triggering MDS instrument restream to Redis (one-time at session start)...")
+        # async with httpx.AsyncClient() as client:
+        #     try:
+        #         await trigger_mds_instrument_restream(client, config)
+        #     except Exception as e:
+        #         log.warning(
+        #             f"⚠️ MDS instrument restream call did not complete: {e}. "
+        #             "Continuing — BAS likely has instruments from prior MDS startup sync."
+        #         )
 
     async def session_init():
         log.info("Waiting for services to be fully initialized...")
@@ -179,9 +181,9 @@ def pytest_sessionstart(session):
         if not ready:
             log.warning("Portfolio Service did not become ready in time — proceeding anyway")
         # Trigger instrument sync ONCE — independent of readiness loop
-        await trigger_instrument_sync_once()
-        log.info("Waiting for BAS to consume instruments (5s)...")
-        await asyncio.sleep(5)
+        # await trigger_instrument_sync_once()
+        # log.info("Waiting for BAS to consume instruments (5s)...")
+        # await asyncio.sleep(5)
         log.info("✅ E2E test environment initialized")
 
     try:
