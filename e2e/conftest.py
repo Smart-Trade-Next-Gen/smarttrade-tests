@@ -317,7 +317,7 @@ def _configure_test_timeout(request):
 
 @pytest_asyncio.fixture(autouse=True)
 async def setup_trading_account(
-    bas_client, mock_client, portfolio_client, test_account_id
+    bas_client, mock_client, portfolio_client, test_account_id, instrument_catalog
 ):
     """
     Create the BAS trading-account record (autouse).
@@ -364,35 +364,38 @@ async def setup_trading_account(
         except Exception as e:
             log.warning(f"⚠️ Account session start failed (will use lazy bootstrap): {e}")
 
-        # Clean up execution state, positions, and PBS' in-memory price
-        # cache so the next test starts from a clean slate. Without
-        # cleanup_price_cache, OrderService.create_order auto-fills any
-        # newly-placed order at whatever LTP a previous test left in the
-        # cache, before the current test's own quote can be injected.
-        try:
-            await mock_client.cleanup_execution_state(broker_id, test_account_id)
-            log.debug(f"✅ Execution state cleared: {broker_id}/{test_account_id}")
-        except Exception as e:
-            log.warning(f"⚠️ Execution state cleanup failed: {e}")
-
-        try:
-            await mock_client.cleanup_positions(broker_id, test_account_id)
-            log.debug(f"✅ Positions cleared: {broker_id}/{test_account_id}")
-        except Exception as e:
-            log.warning(f"⚠️ Positions cleanup failed: {e}")
-
+        # PBS account is now created synchronously by BAS when PAPER account is created
+        # No need for manual PBS account cleanup - BAS handles it on account deletion
+        # Only clear price cache to prevent LTP leakage between tests
         try:
             await mock_client.cleanup_price_cache()
             log.debug("✅ PBS price_cache cleared")
         except Exception as e:
             log.warning(f"⚠️ price_cache cleanup failed: {e}")
 
+        # Inject prices for common instruments to prevent VAL_001 errors
+        # MARKET orders require LTP for fund reservation with slippage buffer
         try:
-            await mock_client.cleanup_account(broker_id, test_account_id)
-            log.debug(f"✅ PBS account reset: {broker_id}/{test_account_id}")
+            from decimal import Decimal
+            # Get first 20 instruments from catalog to cover most test scenarios
+            instruments = instrument_catalog.list_all()[:20]
+            for instrument in instruments:
+                instrument_id = instrument.get("id")
+                if instrument_id:
+                    try:
+                        await mock_client.inject_price_update(
+                            broker_id=broker_id,
+                            instrument_id=instrument_id,
+                            ltp=Decimal("100.00"),
+                        )
+                    except Exception as price_error:
+                        # Log but don't fail - individual price injection failures shouldn't block tests
+                        log.debug(f"Failed to inject price for {instrument_id}: {price_error}")
+            log.debug(f"✅ Injected prices for {len(instruments)} instruments")
         except Exception as e:
-            log.warning(f"⚠️ PBS account reset failed: {e}")
+            log.warning(f"⚠️ Price injection failed: {e}")
 
+        # Clean up portfolio positions
         try:
             await portfolio_client.cleanup_positions()
             log.debug("✅ Portfolio aggregated positions cleared")
@@ -493,41 +496,19 @@ async def isolated_test_account(
 
     finally:
         # Cleanup: delete account and all associated state
+        # PBS account and state are cleaned up automatically by BAS when account is deleted
         try:
-            await mock_client.cleanup_execution_state(broker_id, unique_account_id)
-            log.debug(f"✅ Execution state cleared: {broker_id}/{unique_account_id}")
+            await bas_client.delete_trading_account(broker_id, unique_account_id)
+            log.debug(f"✅ BAS trading account deleted (PBS cleanup handled synchronously): {broker_id}/{unique_account_id}")
         except Exception as e:
-            log.warning(f"⚠️ Execution state cleanup failed: {e}")
+            log.warning(f"⚠️ BAS account deletion failed: {e}")
 
-        try:
-            await mock_client.cleanup_positions(broker_id, unique_account_id)
-            log.debug(f"✅ Positions cleared: {broker_id}/{unique_account_id}")
-        except Exception as e:
-            log.warning(f"⚠️ Positions cleanup failed: {e}")
-
-        try:
-            await mock_client.cleanup_price_cache()
-            log.debug("✅ PBS price_cache cleared")
-        except Exception as e:
-            log.warning(f"⚠️ price_cache cleanup failed: {e}")
-
-        try:
-            await mock_client.cleanup_account(broker_id, unique_account_id)
-            log.debug(f"✅ PBS account reset: {broker_id}/{unique_account_id}")
-        except Exception as e:
-            log.warning(f"⚠️ PBS account reset failed: {e}")
-
+        # Clean up portfolio positions
         try:
             await portfolio_client.cleanup_positions()
             log.debug("✅ Portfolio aggregated positions cleared")
         except Exception as e:
             log.warning(f"⚠️ Portfolio positions cleanup failed: {e}")
-
-        try:
-            await bas_client.delete_trading_account(broker_id, unique_account_id)
-            log.debug(f"✅ BAS trading account deleted: {broker_id}/{unique_account_id}")
-        except Exception as e:
-            log.warning(f"⚠️ BAS account deletion failed: {e}")
 
 
 @pytest.fixture(scope="session")
@@ -677,7 +658,7 @@ async def admin_bas_client(config: TestConfig, admin_token: str) -> AsyncGenerat
 
 @pytest_asyncio.fixture
 async def mock_client(
-    config: TestConfig, auth_token: str
+    config: TestConfig, auth_token: str, admin_token: str
 ) -> AsyncGenerator[MockClient, None]:
     """
     Provide MockClient instance for fill injection.
@@ -693,6 +674,7 @@ async def mock_client(
         token=auth_token,
         timeout=config.timeout_fast,
         redis_url=config.redis_url,
+        admin_token=admin_token,
     ) as client:
         yield client
 

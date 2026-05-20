@@ -42,6 +42,7 @@ from typing import Optional
 import httpx
 import redis.asyncio as redis
 from jose import jwt as jose_jwt
+from e2e.clients.mock_client import MockClient
 
 
 log = logging.getLogger("stress")
@@ -110,6 +111,27 @@ def mint_jwt(user_id: str) -> str:
     }
     return jose_jwt.encode(payload, secret, algorithm="HS256")
 
+def mint_admin_jwt(user_id: str) -> str:
+    """Mint an admin JWT with admin role for cleanup operations."""
+    secret = os.getenv("JWT_SECRET_KEY")
+    if not secret:
+        raise RuntimeError(
+            "JWT_SECRET_KEY env var required. Set it to the same value "
+            "as in docker-compose.e2e.yml (default: 247ede858cd1b034a2c"
+            "8594452088c660b5a63b8cc89944ad3fe802ac7f2ae30 for local)."
+        )
+    now_unix = int(time.time())
+    payload = {
+        "sub": user_id,
+        "roles": ["admin"],
+        "type": "access",
+        "iat": now_unix,
+        "exp": now_unix + 3600,
+        "iss": "auth-service",
+        "aud": "smarttrade-services",
+    }
+    return jose_jwt.encode(payload, secret, algorithm="HS256")
+
 
 # ──────────────────────────────────────────────────────────────────────────
 # Account + instrument setup
@@ -138,6 +160,9 @@ INSTRUMENTS = [
 async def reset_account(cfg: StressConfig, token: str) -> None:
     """One-shot cleanup of the stress account state before the run."""
     headers = {"Authorization": f"Bearer {token}"}
+    # Use admin token for cleanup operations (requires admin role)
+    admin_headers = {"Authorization": f"Bearer {mint_admin_jwt(cfg.user_id)}"}
+    
     async with httpx.AsyncClient(timeout=15.0) as http:
         # Delete any prior trading account in BAS (idempotent — 404 is fine).
         try:
@@ -167,18 +192,12 @@ async def reset_account(cfg: StressConfig, token: str) -> None:
                 f"Failed to create trading account: HTTP {resp.status_code} {resp.text[:200]}"
             )
 
-        # Clear PBS execution state, positions, price cache, account
-        # balance reserve. Best-effort — 404s are fine.
-        for path in (
-            f"/api/v1/cleanup/execution_state/{cfg.broker_id}/{cfg.account_id}",
-            f"/api/v1/cleanup/positions/{cfg.broker_id}/{cfg.account_id}",
-            "/api/v1/cleanup/price_cache",
-            f"/api/v1/cleanup/account/{cfg.broker_id}/{cfg.account_id}",
-        ):
-            try:
-                await http.delete(f"{cfg.pbs_url}{path}", headers=headers)
-            except Exception:
-                pass
+        # Clear PBS price cache only - other cleanup handled by BAS on account deletion
+        # Use admin token for cleanup endpoint (requires admin role)
+        try:
+            await http.delete(f"{cfg.pbs_url}/api/v1/cleanup/price_cache", headers=admin_headers)
+        except Exception:
+            pass
     log.info("Account reset complete")
 
 
@@ -365,6 +384,33 @@ async def trigger_fills(cfg: StressConfig, instruments_used: set[str]) -> None:
         await client.close()
 
 
+async def inject_prices(cfg: StressConfig, instruments_used: set[str]) -> None:
+    """Inject prices for all instruments before placing orders.
+
+    MARKET orders require LTP for fund reservation with slippage buffer.
+    This function uses the PBS price injection endpoint to populate the
+    price cache before order submission, preventing VAL_001 errors.
+    """
+    admin_token = mint_admin_jwt(cfg.user_id)
+    async with MockClient(
+        base_url=cfg.pbs_url,
+        token=admin_token,
+        admin_token=admin_token,
+        timeout=15.0,
+    ) as client:
+        for instrument in sorted(instruments_used):
+            try:
+                await client.inject_price_update(
+                    broker_id=cfg.broker_id,
+                    instrument_id=instrument,
+                    ltp=Decimal("100.00"),
+                )
+                log.info(f"Injected price for {instrument}: 100.00")
+            except Exception as e:
+                log.error(f"Failed to inject price for {instrument}: {e}")
+                raise
+
+
 # ──────────────────────────────────────────────────────────────────────────
 # Reporting
 # ──────────────────────────────────────────────────────────────────────────
@@ -508,6 +554,11 @@ async def run(cfg: StressConfig) -> int:
         for i in range(cfg.orders)
     ]
     instruments_used = {r.instrument_id for r in records}
+
+    # Inject prices for all instruments before placing orders.
+    # MARKET orders require LTP for fund reservation with slippage buffer.
+    log.info("Injecting prices for %d instruments", len(instruments_used))
+    await inject_prices(cfg, instruments_used)
 
     # Concurrent submission, bounded by --concurrency.
     semaphore = asyncio.Semaphore(cfg.concurrency)

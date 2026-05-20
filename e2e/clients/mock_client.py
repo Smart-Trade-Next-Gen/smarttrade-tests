@@ -37,6 +37,7 @@ class MockClient:
         token: str,
         timeout: float = 5.0,
         redis_url: str = "redis://localhost:6379/0",
+        admin_token: Optional[str] = None,
     ):
         """
         Initialize MockClient.
@@ -46,6 +47,7 @@ class MockClient:
             token: Bearer token for authentication
             timeout: Request timeout in seconds (default: 5.0)
             redis_url: Redis URL for publishing quotes that drive PBS fills.
+            admin_token: Optional admin token for admin-only endpoints (e.g., price injection)
 
         Raises:
             ValueError: If token is empty
@@ -55,6 +57,7 @@ class MockClient:
 
         self.base_url = base_url.rstrip("/")
         self.token = token
+        self.admin_token = admin_token  # Optional admin token for admin-only endpoints
         self.timeout = timeout
         self.client: Optional[httpx.AsyncClient] = None
         self._sequence_tracker: dict[str, int] = {}  # Track sequence per order_id
@@ -109,9 +112,17 @@ class MockClient:
             await self.client.aclose()
             self.client = None
 
-    def _get_headers(self) -> dict:
-        """Build request headers with Bearer token."""
-        return {"Authorization": f"Bearer {self.token}"}
+    def _get_headers(self, use_admin: bool = False) -> dict:
+        """Build request headers with Bearer token.
+
+        Args:
+            use_admin: If True, use admin_token instead of regular token
+
+        Returns:
+            Headers dict with Authorization header
+        """
+        token = self.admin_token if use_admin and self.admin_token else self.token
+        return {"Authorization": f"Bearer {token}"}
 
     def _ensure_imports(self) -> tuple:
         """
@@ -299,7 +310,8 @@ class MockClient:
             httpx.HTTPError: On HTTP error
         """
         client = self._get_client()
-        headers = self._get_headers()
+        # Use admin token for price injection endpoint (requires admin role)
+        headers = self._get_headers(use_admin=True)
 
         payload = {
             "instrument_id": instrument_id,
@@ -388,9 +400,12 @@ class MockClient:
         Each filled BUY debits the AccountBalance row, so without a reset
         the balance depletes across the test session until reserved exceeds
         balance and the financial invariant violation aborts further fills.
+
+        Note: This endpoint now requires admin role and ENV gate (local/test/dev only).
         """
         client = self._get_client()
-        headers = self._get_headers()
+        # Use admin token for cleanup endpoint (requires admin role)
+        headers = self._get_headers(use_admin=True)
         try:
             response = await client.delete(
                 f"/api/v1/cleanup/account/{broker_id}/{account_id}", headers=headers
@@ -412,11 +427,14 @@ class MockClient:
         order placed for SBIN gets filled at whatever LTP a previous test
         last published, before the current test's own quote arrives.
 
+        Note: This endpoint now requires admin role and ENV gate (local/test/dev only).
+
         Returns:
             Response with status="cleared"
         """
         client = self._get_client()
-        headers = self._get_headers()
+        # Use admin token for cleanup endpoint (requires admin role)
+        headers = self._get_headers(use_admin=True)
         try:
             response = await client.delete("/api/v1/cleanup/price_cache", headers=headers)
             response.raise_for_status()
@@ -437,6 +455,8 @@ class MockClient:
         Resets sequence tracking in paper broker service database.
         Used during test setup to ensure fresh fills start with sequence 1.
 
+        Note: This endpoint now requires admin role and ENV gate (local/test/dev only).
+
         Args:
             broker_id: Broker identifier
             account_id: Account identifier
@@ -448,7 +468,8 @@ class MockClient:
             httpx.HTTPError: If request fails
         """
         client = self._get_client()
-        headers = self._get_headers()
+        # Use admin token for cleanup endpoint (requires admin role)
+        headers = self._get_headers(use_admin=True)
         url = f"/api/v1/cleanup/execution_state/{broker_id}/{account_id}"
 
         try:
@@ -471,6 +492,8 @@ class MockClient:
         Deletes all Position records for the account.
         Used during test setup to ensure fresh position state for each test.
 
+        Note: This endpoint now requires admin role and ENV gate (local/test/dev only).
+
         Args:
             broker_id: Broker identifier
             account_id: Account identifier
@@ -482,7 +505,8 @@ class MockClient:
             httpx.HTTPError: If request fails
         """
         client = self._get_client()
-        headers = self._get_headers()
+        # Use admin token for cleanup endpoint (requires admin role)
+        headers = self._get_headers(use_admin=True)
         url = f"/api/v1/cleanup/positions/{broker_id}/{account_id}"
 
         try:
