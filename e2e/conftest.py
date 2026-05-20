@@ -348,6 +348,22 @@ async def setup_trading_account(
         )
         log.debug(f"✅ Paper trading account created: {broker_id}/{test_account_id}")
 
+        # Start the account session with guaranteed WebSocket connection
+        # This ensures BAS is ready to receive execution updates before orders are placed
+        try:
+            session_status = await bas_client.start_account_session(
+                broker_id=broker_id,
+                account_id=test_account_id,
+            )
+            log.debug(
+                f"✅ Account session started: {broker_id}/{test_account_id} | "
+                f"status={session_status.get('status')} | "
+                f"bootstrapped={session_status.get('bootstrapped')} | "
+                f"ws_connected={session_status.get('ws_connected')}"
+            )
+        except Exception as e:
+            log.warning(f"⚠️ Account session start failed (will use lazy bootstrap): {e}")
+
         # Clean up execution state, positions, and PBS' in-memory price
         # cache so the next test starts from a clean slate. Without
         # cleanup_price_cache, OrderService.create_order auto-fills any

@@ -373,6 +373,86 @@ class BASClient:
         response.raise_for_status()
         return response.json()
 
+    async def start_account_session(
+        self,
+        broker_id: str,
+        account_id: str,
+    ) -> dict:
+        """
+        Start an account session with guaranteed WebSocket connection.
+
+        This endpoint performs synchronous bootstrapping including:
+        - Fetching positions from broker
+        - Establishing WebSocket connection for execution updates
+        - Publishing snapshots to downstream services
+
+        Args:
+            broker_id: Broker ID (e.g., "fyers")
+            account_id: Account ID
+
+        Returns:
+            Session status dict with:
+            - status: "ready" or "degraded"
+            - bootstrapped: bool
+            - ws_connected: bool
+            - broker_id: str
+            - account_id: str
+
+        Raises:
+            httpx.HTTPError: On HTTP error
+        """
+        client = self._get_client()
+        headers = self._get_headers()
+
+        url = f"/api/v1/session/{broker_id}/{account_id}"
+
+        log.debug(
+            f"Starting account session | broker_id={broker_id} | account_id={account_id}"
+        )
+
+        response = await client.post(url, headers=headers)
+        response.raise_for_status()
+
+        return response.json()
+
+    async def get_account_session_health(
+        self,
+        broker_id: str,
+        account_id: str,
+    ) -> dict:
+        """
+        Get health status of an account session.
+
+        Args:
+            broker_id: Broker ID
+            account_id: Account ID
+
+        Returns:
+            Session health dict with:
+            - status: "healthy", "degraded", or "not_bootstrapped"
+            - bootstrapped: bool
+            - bootstrapped_at: timestamp or None
+            - ws_connected: bool
+            - ws_reconnect_attempts: int
+            - uptime_seconds: float
+
+        Raises:
+            httpx.HTTPError: On HTTP error
+        """
+        client = self._get_client()
+        headers = self._get_headers()
+
+        url = f"/api/v1/session/{broker_id}/{account_id}/health"
+
+        log.debug(
+            f"Getting account session health | broker_id={broker_id} | account_id={account_id}"
+        )
+
+        response = await client.get(url, headers=headers)
+        response.raise_for_status()
+
+        return response.json()
+
     async def upsert_broker_connection(
         self,
         broker_id: str,

@@ -4,8 +4,8 @@ Integration test — BAS ↔ Paper Broker execution-updates WebSocket.
 Pair under test: broker-adapter-service ←→ paper-broker-service (internal WS).
 
 Contract:
-    1. When BAS bootstraps an account session (lazily, on first order / first
-       account-scoped request), it MUST open a WebSocket to PBS at
+    1. When BAS bootstraps an account session (explicitly via session start endpoint
+       or lazily on first order), it MUST open a WebSocket to PBS at
        `/internal/api/v1/execution-updates` and keep it open for the life of
        the session.
     2. When PBS executes a fill (driven by a quote on `market.quote`), it
@@ -20,6 +20,12 @@ Contract:
        different order on the same session also produces all three Redis
        events.
 
+Session Lifecycle:
+    - Tests use explicit session start via `POST /api/v1/session/{broker_id}/{account_id}`
+      in the test fixture setup
+    - This ensures WebSocket is connected before orders are placed
+    - Lazy bootstrap fallback exists for backwards compatibility
+
 This test does NOT validate the *content* of the domain events beyond what is
 needed to prove the WS path is alive (qty > 0, status FILLED, broker_order_id
 present). Field-level contract checks belong in the BAS-→Redis test.
@@ -31,6 +37,8 @@ Past regressions this test guards against:
       after the first position event, breaking every subsequent fill.
     - BAS plugin reading wrong PBS payload field names (`net_quantity` vs
       `net_qty`, `avg_price` vs `average_price`) → events with all-zero fields.
+    - Session marked bootstrapped before WebSocket connected → orders placed
+      before BAS can receive execution updates.
 """
 
 from __future__ import annotations
