@@ -22,12 +22,12 @@ from broker_adapter_service.schemas.order_dtos import (
     BasOrderPlaceResponse,
 )
 
-# Import domain DTOs
-from smarttrade_common.schemas.services.trading.order_dtos import (
-    Order,
-    Position,
-    Trade,
-)
+# Import domain DTOs (no longer used - removed deprecated endpoints)
+# from smarttrade_common.schemas.services.trading.order_dtos import (
+#     Order,
+#     Position,
+#     Trade,
+# )
 
 # Import funds DTO
 from broker_adapter_service.schemas.funds_dtos import FundsResponse
@@ -241,117 +241,6 @@ class BASClient:
 
         return BasCancelOrderResponse.model_validate(response.json())
 
-    async def get_order(
-        self,
-        broker_id: str,
-        account_id: str,
-        broker_order_id: str,
-    ) -> Order:
-        """
-        Get a single order by ID.
-
-        Args:
-            broker_id: Broker ID
-            account_id: Account ID
-            broker_order_id: Broker order ID
-
-        Returns:
-            Order DTO
-
-        Raises:
-            httpx.HTTPError: On HTTP error
-        """
-        client = self._get_client()
-        headers = self._get_headers()
-
-        url = f"/api/v1/orders/{broker_id}/{account_id}/{broker_order_id}"
-        log.debug(
-            f"Getting order | broker_id={broker_id} | account_id={account_id} | "
-            f"broker_order_id={broker_order_id}"
-        )
-
-        response = await client.get(url, headers=headers)
-        response.raise_for_status()
-
-        return Order.model_validate(response.json())
-
-    async def get_orders(
-        self,
-        broker_id: str,
-        account_id: str,
-    ) -> list[Order]:
-        """
-        List all orders for an account.
-
-        Args:
-            broker_id: Broker ID
-            account_id: Account ID
-
-        Returns:
-            List of Order DTOs
-
-        Raises:
-            httpx.HTTPError: On HTTP error
-        """
-        client = self._get_client()
-        headers = self._get_headers()
-
-        url = f"/api/v1/orders/{broker_id}/{account_id}"
-        log.debug(
-            f"Listing orders | broker_id={broker_id} | account_id={account_id}"
-        )
-
-        response = await client.get(url, headers=headers)
-
-        # Handle 404 gracefully - no orders exist yet
-        if response.status_code == 404:
-            log.debug(
-                f"No orders found for {broker_id}/{account_id}"
-            )
-            return []
-
-        response.raise_for_status()
-
-        return [Order.model_validate(item) for item in response.json()]
-
-    async def get_trades(
-        self,
-        broker_id: str,
-        account_id: str,
-    ) -> list[Trade]:
-        """
-        List all trades for an account.
-
-        Args:
-            broker_id: Broker ID
-            account_id: Account ID
-
-        Returns:
-            List of Trade DTOs
-
-        Raises:
-            httpx.HTTPError: On HTTP error
-        """
-        client = self._get_client()
-        headers = self._get_headers()
-
-        url = f"/api/v1/trades/{broker_id}/{account_id}"
-        log.debug(
-            f"Listing trades | broker_id={broker_id} | account_id={account_id}"
-        )
-
-        response = await client.get(url, headers=headers)
-
-        # Handle 404 gracefully - no trades exist yet
-        if response.status_code == 404:
-            log.debug(
-                f"No trades found for {broker_id}/{account_id}"
-            )
-            return []
-
-        response.raise_for_status()
-
-        return [Trade.model_validate(item) for item in response.json()]
 
     async def get_funds(
         self,
@@ -395,44 +284,6 @@ class BASClient:
 
         return FundsResponse.model_validate(response.json())
 
-    async def get_positions(
-        self,
-        broker_id: str,
-        account_id: str,
-    ) -> list[Position]:
-        """
-        List all positions for an account.
-
-        Args:
-            broker_id: Broker ID
-            account_id: Account ID
-
-        Returns:
-            List of Position DTOs
-
-        Raises:
-            httpx.HTTPError: On HTTP error
-        """
-        client = self._get_client()
-        headers = self._get_headers()
-
-        url = f"/api/v1/portfolio/{broker_id}/{account_id}/positions"
-        log.debug(
-            f"Listing positions | broker_id={broker_id} | account_id={account_id}"
-        )
-
-        response = await client.get(url, headers=headers)
-
-        # Handle 404 gracefully - no positions exist yet
-        if response.status_code == 404:
-            log.debug(
-                f"No positions found for {broker_id}/{account_id}"
-            )
-            return []
-
-        response.raise_for_status()
-
-        return [Position.model_validate(item) for item in response.json()]
 
     async def create_trading_account(
         self,

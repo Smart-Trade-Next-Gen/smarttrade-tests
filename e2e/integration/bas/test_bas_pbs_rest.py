@@ -79,6 +79,7 @@ async def test_bas_routes_limit_order_placement_to_pbs(
 async def test_bas_cancel_removes_order_from_pbs(
     place_and_sync_order,
     bas_client,
+    journal_client,
     instrument_catalog,
     config,
     test_account_id,
@@ -116,10 +117,10 @@ async def test_bas_cancel_removes_order_from_pbs(
         f"cancel_order returned no body for broker_order_id={broker_order_id}"
     )
 
-    # Poll BAS' GET /orders until the order is gone or terminal.
+    # Poll Journal Service until the order is gone or terminal.
     deadline = asyncio.get_event_loop().time() + 5.0
     while True:
-        orders = await bas_client.get_orders(config.broker_id, test_account_id)
+        orders = await journal_client.get_orders()
         match = next(
             (
                 o for o in orders
@@ -152,6 +153,7 @@ async def test_bas_cancel_removes_order_from_pbs(
 async def test_bas_modify_propagates_to_pbs(
     place_and_sync_order,
     bas_client,
+    journal_client,
     instrument_catalog,
     config,
     test_account_id,
@@ -209,12 +211,22 @@ async def test_bas_modify_propagates_to_pbs(
             )
         raise
 
-    # Poll BAS' GET /order/{id} for the new price.
+    # Poll Journal Service GET /order/{id} for the new price.
     deadline = asyncio.get_event_loop().time() + 5.0
     while True:
-        order = await bas_client.get_order(
-            config.broker_id, test_account_id, broker_order_id
-        )
+        try:
+            order = await journal_client.get_order_by_id(
+                order_id=broker_order_id
+            )
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                if asyncio.get_event_loop().time() >= deadline:
+                    raise
+                await asyncio.sleep(0.1)
+                continue
+            else:
+                raise
+
         # Order object may expose `price` directly or via legs[0].price.
         current_price = None
         if hasattr(order, "price"):
@@ -235,11 +247,12 @@ async def test_bas_modify_propagates_to_pbs(
 async def test_bas_get_order_returns_canonical_broker_order_id(
     place_and_sync_order,
     bas_client,
+    journal_client,
     instrument_catalog,
     config,
     test_account_id,
 ):
-    """A placed order, fetched via BAS' GET /order/{broker_order_id},
+    """A placed order, fetched via Journal Service GET /order/{broker_order_id},
     must echo back the same broker_order_id. This is the read-side
     contract — UIs and tests look up orders by the id BAS returned at
     placement.
@@ -261,19 +274,28 @@ async def test_bas_get_order_returns_canonical_broker_order_id(
     )
     broker_order_id = response[0]["broker_order_id"]
 
-    fetched = await bas_client.get_order(
-        config.broker_id, test_account_id, broker_order_id
-    )
-    # Per the BAS stateless invariant (see memory:
-    # bas-stateless-order-identity), `order_id` on the read DTO IS the
-    # broker_order_id. `exchange_order_id` is a legacy alias kept for
-    # the few brokers that distinguish the two.
-    fetched_id = (
-        getattr(fetched, "order_id", None)
-        or getattr(fetched, "exchange_order_id", None)
-    )
+    # Poll Journal Service until the order is available (eventual consistency)
+    deadline = asyncio.get_event_loop().time() + 5.0
+    fetched = None
+    while True:
+        try:
+            fetched = await journal_client.get_order_by_id(
+                order_id=broker_order_id
+            )
+            break
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                if asyncio.get_event_loop().time() >= deadline:
+                    raise
+                await asyncio.sleep(0.1)
+            else:
+                raise
+
+    # Per the stateless invariant, `order_id` on the read DTO IS the
+    # broker_order_id. Journal Service returns the canonical order_id.
+    fetched_id = fetched.get("order_id")
     assert fetched_id == broker_order_id, (
-        f"BAS GET /order returned id={fetched_id!r}; expected "
+        f"Journal Service GET /order returned id={fetched_id!r}; expected "
         f"{broker_order_id!r}. Read-side contract is broken — UIs "
         f"can't track placed orders."
     )

@@ -7,6 +7,9 @@ Tests validate:
 - Request validation
 - Error handling
 - Rate limiting (if applicable)
+
+Note: Order query endpoints (GET /orders) have been moved to Journal Service.
+Tests for those endpoints should be in the Journal Service test suite.
 """
 
 from __future__ import annotations
@@ -15,62 +18,6 @@ import pytest
 from decimal import Decimal
 
 pytestmark = pytest.mark.asyncio
-
-
-@pytest.mark.smoke
-async def test_bas_get_orders_endpoint(
-    config,
-    bas_client,
-    test_account_id,
-):
-    """
-    Test: BAS GET /api/v1/orders/{broker}/{account} endpoint.
-
-    Validates:
-    - Endpoint returns 200 OK
-    - Returns list of orders (may be empty)
-    - Response structure is correct
-    """
-    broker_id = config.broker_id
-    
-    orders = await bas_client.get_orders(broker_id, test_account_id)
-    
-    # Should return a list
-    assert isinstance(orders, list), "Should return a list of orders"
-    
-    # Each order should have required fields
-    for order in orders:
-        assert "broker_order_id" in order, "Order should have broker_order_id"
-        assert "status" in order, "Order should have status"
-        assert "instrument_id" in order, "Order should have instrument_id"
-
-
-@pytest.mark.smoke
-async def test_bas_get_order_by_id_endpoint(
-    config,
-    bas_client,
-    test_account_id,
-):
-    """
-    Test: BAS GET /api/v1/orders/{broker}/{account}/{order_id} endpoint.
-
-    Validates:
-    - Endpoint returns 200 OK for existing order
-    - Endpoint returns 404 for non-existent order
-    - Response structure is correct
-    """
-    broker_id = config.broker_id
-    
-    # Try to get a non-existent order
-    try:
-        order = await bas_client.get_order(broker_id, test_account_id, "NONEXISTENT_ORDER_ID")
-        # If we get here, the order exists (unexpected)
-        assert False, "Non-existent order should return 404"
-    except Exception as e:
-        # Expected: should get 404 or similar error
-        error_str = str(e).lower()
-        assert any(err in error_str for err in ["404", "not found"]), \
-            f"Should return 404 for non-existent order, got: {e}"
 
 
 @pytest.mark.smoke

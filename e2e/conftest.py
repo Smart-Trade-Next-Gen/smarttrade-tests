@@ -720,6 +720,25 @@ async def journal_client(
 
 
 @pytest_asyncio.fixture
+async def admin_journal_client(
+    config: TestConfig, admin_token: str
+) -> AsyncGenerator[JournalClient, None]:
+    """
+    Provide JournalClient instance with admin token for testing admin functionality.
+
+    Scope: function
+    """
+    async with JournalClient(
+        base_url=config.journal_url,
+        token=admin_token,
+        broker_id="fyers",
+        account_id="TEST_ACCOUNT",
+        timeout=config.timeout_medium,
+    ) as client:
+        yield client
+
+
+@pytest_asyncio.fixture
 async def market_data_stream(mock_client: MockClient, config: TestConfig) -> MockMarketDataStream:
     """
     Provide MockMarketDataStream for real execution mode tests.

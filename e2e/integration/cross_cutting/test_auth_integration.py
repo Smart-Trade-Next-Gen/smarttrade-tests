@@ -390,7 +390,7 @@ async def test_jwt_from_auth_service_is_accepted_by_broker_adapter(
         base_url=config.bas_url, timeout=config.timeout_medium
     ) as client:
         response = await client.get(
-            f"/api/v1/orders/{config.broker_id}/{test_account_id}",
+            f"/api/v1/portfolio/{config.broker_id}/{test_account_id}/funds",
             headers={"Authorization": f"Bearer {access_token}"},
         )
     assert response.status_code != 401, (
@@ -413,7 +413,7 @@ async def test_broker_adapter_rejects_invalid_bearer_with_401(
         base_url=config.bas_url, timeout=config.timeout_medium
     ) as client:
         response = await client.get(
-            f"/api/v1/orders/{config.broker_id}/{test_account_id}",
+            f"/api/v1/portfolio/{config.broker_id}/{test_account_id}/funds",
             headers={"Authorization": "Bearer not.a.real.jwt"},
         )
     assert response.status_code == 401, (
@@ -436,7 +436,7 @@ async def test_broker_adapter_rejects_missing_bearer_with_401(
         base_url=config.bas_url, timeout=config.timeout_medium
     ) as client:
         response = await client.get(
-            f"/api/v1/orders/{config.broker_id}/{test_account_id}"
+            f"/api/v1/portfolio/{config.broker_id}/{test_account_id}/funds"
         )
     assert response.status_code == 401, (
         f"Expected 401 from broker-adapter-service for missing token; "

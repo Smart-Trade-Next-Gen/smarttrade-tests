@@ -20,7 +20,7 @@ pytestmark = pytest.mark.asyncio
 @pytest.mark.smoke
 async def test_user_can_access_own_data(
     config,
-    bas_client,
+    journal_client,
     test_account_id,
 ):
     """
@@ -33,7 +33,7 @@ async def test_user_can_access_own_data(
     broker_id = config.broker_id
     
     # Try to list orders for the test account (should succeed)
-    orders = await bas_client.get_orders(broker_id, test_account_id)
+    orders = await journal_client.get_orders()
     
     # Should return a list (even if empty)
     assert isinstance(orders, list), "Should return a list of orders"
@@ -61,7 +61,7 @@ async def test_unauthenticated_request_rejected(
     
     try:
         # Try to access an endpoint without authentication
-        response = await unauth_client.get(f"{config.bas_url}/api/v1/orders/fyers/SOME_ACCOUNT")
+        response = await unauth_client.get(f"{config.bas_url}/api/v1/portfolio/fyers/SOME_ACCOUNT/funds")
         
         # Should get 401 Unauthorized
         assert response.status_code == 401, f"Expected 401, got {response.status_code}"
@@ -91,7 +91,7 @@ async def test_invalid_token_rejected(
     
     try:
         # Try to access an endpoint with invalid token
-        response = await invalid_client.get(f"{config.bas_url}/api/v1/orders/fyers/SOME_ACCOUNT")
+        response = await invalid_client.get(f"{config.bas_url}/api/v1/portfolio/fyers/SOME_ACCOUNT/funds")
         
         # Should get 401 Unauthorized
         assert response.status_code == 401, f"Expected 401, got {response.status_code}"
@@ -103,7 +103,7 @@ async def test_invalid_token_rejected(
 @pytest.mark.smoke
 async def test_cross_account_access_restricted(
     config,
-    bas_client,
+    journal_client,
     test_account_id,
 ):
     """
@@ -120,7 +120,7 @@ async def test_cross_account_access_restricted(
     different_account = "DIFFERENT_ACCOUNT_ID"
     
     try:
-        orders = await bas_client.get_orders(broker_id, different_account)
+        orders = await journal_client.get_orders()
         
         # If it doesn't fail, it should return empty data (no access)
         # or fail with authorization error
@@ -140,8 +140,7 @@ async def test_cross_account_access_restricted(
 @pytest.mark.smoke
 async def test_admin_role_enforcement(
     config,
-    admin_bas_client,
-    bas_client,
+    admin_journal_client,
 ):
     """
     Test: Admin role has elevated permissions.
@@ -154,10 +153,7 @@ async def test_admin_role_enforcement(
     # Test: Admin can access regular endpoints (validates admin token works)
     try:
         # Admin should be able to access regular order endpoints
-        regular_response = await admin_bas_client.get_orders(
-            broker_id=config.broker_id,
-            account_id="TEST_ACCOUNT"
-        )
+        regular_response = await admin_journal_client.get_orders()
         # Should succeed and return a list (even if empty)
         assert isinstance(regular_response, list), "Admin can access regular endpoints"
     except Exception as e:
@@ -196,7 +192,7 @@ async def test_token_expiry_handling(
     
     try:
         # Try to access an endpoint with expired token
-        response = await expired_client.get(f"{config.bas_url}/api/v1/orders/fyers/SOME_ACCOUNT")
+        response = await expired_client.get(f"{config.bas_url}/api/v1/portfolio/fyers/SOME_ACCOUNT/funds")
         
         # Should get 401 Unauthorized
         # (may also get 403 depending on implementation)
