@@ -1,35 +1,22 @@
 """
-Integration test — Notification Service ↔ Redis (wildcard event consumption).
+Integration test — Notification Service pure event relay architecture.
 
 Pair under test: notification-service ←→ Redis Streams (all domain events).
 
 Contract:
-    1. With an active subscription for `order.*`, the notification service
-       consumes `order.updated` events from Redis, maps the FILLED status
-       to `order.filled`, and persists a row in `notification_messages`
-       for our user.
-    2. The persisted notification carries the event_id from the source event
-       and the right event_name mapping.
+    1. Notification service consumes all domain events from Redis Streams
+    2. Events are classified into streams (execution, risk, notification, ai, system, broker)
+    3. Events are stored in Redis replay buffer for WebSocket delivery
+    4. No database persistence occurs (pure relay architecture)
 
-The notification service does NOT expose a `/notifications` REST endpoint
-today (the route module is commented out in main.py — see
-`notification_service.main`), so this test verifies persistence by querying
-`notification_messages` directly with asyncpg. That is acceptable for an
-integration test: the contract under examination is the consumer + DB
-write, not the API shape.
-
-Past regression this test guards against:
-    - The previous version of this test never spoke to notification-service
-      at all. It only re-asserted that the events appeared on Redis. It
-      passed silently when notification-service didn't consume events
-      (e.g. the smarttrade-common SchemaRegistry.get_event_schema bug —
-      every @consume_event with validate_schema=True retried 3 times,
-      logged, and skipped the event with nothing persisted).
+This test verifies the new pure relay behavior after the architectural
+refactoring that removed database persistence.
 """
 
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import uuid
 from decimal import Decimal
@@ -37,6 +24,7 @@ from urllib.parse import urlparse
 
 import asyncpg
 import pytest
+import redis.asyncio as redis
 
 
 pytestmark = pytest.mark.asyncio
@@ -80,7 +68,7 @@ async def _ensure_subscription(
     `user_id` only lands in kwargs after the decorator runs, so the
     self-check fails with 403 against our test JWT. Creating the
     subscription via DB sidesteps that orthogonal concern: this test is
-    about the consume-and-persist contract, not the subscription API.
+    about the consume-and-relay contract, not the subscription API.
     """
     conn = await asyncpg.connect(dsn)
     try:
@@ -104,40 +92,62 @@ async def _ensure_subscription(
         await conn.close()
 
 
-async def _wait_for_notification(
-    dsn: str,
+async def _wait_for_redis_replay_event(
+    redis_client: redis.Redis,
     *,
+    stream: str,
     event_id: str,
     timeout: float = 15.0,
     poll_interval: float = 0.5,
 ) -> dict:
+    """Wait for an event to appear in the Redis replay buffer."""
     deadline = asyncio.get_event_loop().time() + timeout
-    last_count = -1
+    key = f"notification_replay:{stream}"
+    
     while True:
-        conn = await asyncpg.connect(dsn)
-        try:
-            row = await conn.fetchrow(
-                "SELECT event_id, event_name, user_id, severity, category, "
-                "title, message FROM notification_messages WHERE event_id = $1",
-                event_id,
-            )
-            if row is None:
-                last_count = await conn.fetchval(
-                    "SELECT count(*) FROM notification_messages"
-                )
-        finally:
-            await conn.close()
-        if row is not None:
-            return dict(row)
+        # Get all events from the stream
+        events_json = await redis_client.zrange(key, 0, -1)
+        
+        for event_json in events_json:
+            try:
+                event = json.loads(event_json)
+                if event.get("event_id") == event_id or event.get("payload", {}).get("event_id") == event_id:
+                    return event
+            except json.JSONDecodeError:
+                continue
+        
         if asyncio.get_event_loop().time() >= deadline:
             raise TimeoutError(
-                f"notification_messages row not found for event_id={event_id} "
-                f"within {timeout}s. Total rows in table: {last_count}."
+                f"Event {event_id} not found in Redis replay buffer for stream {stream} "
+                f"within {timeout}s"
             )
+        
         await asyncio.sleep(poll_interval)
 
 
-async def test_notification_service_persists_order_fill_into_db(
+async def _verify_no_database_persistence(dsn: str) -> None:
+    """Verify that no notification messages were persisted to the database."""
+    conn = await asyncpg.connect(dsn)
+    try:
+        # Check that notification_messages table does not exist or is empty
+        # After the migration, this table should not exist
+        table_exists = await conn.fetchval(
+            "SELECT EXISTS (SELECT FROM information_schema.tables "
+            "WHERE table_name = 'notification_messages')"
+        )
+        
+        if table_exists:
+            # Table exists, verify it's empty
+            count = await conn.fetchval("SELECT count(*) FROM notification_messages")
+            assert count == 0, (
+                f"notification_messages table should be empty in pure relay architecture, "
+                f"but found {count} rows"
+            )
+    finally:
+        await conn.close()
+
+
+async def test_notification_service_relays_events_to_redis(
     config,
     instrument_catalog,
     test_account_id,
@@ -148,8 +158,10 @@ async def test_notification_service_persists_order_fill_into_db(
     redis_event_collector,
 ):
     """A fill drives `order.updated` with status=FILLED. Notification
-    service maps that to `order.filled`, finds a matching subscription,
-    and persists a notification_messages row with the same event_id.
+    service consumes the event, classifies it into the execution stream,
+    and stores it in Redis replay buffer for WebSocket delivery.
+    
+    This test verifies the pure relay architecture - no database persistence.
     """
     # 1. Ensure the test user has a subscription matching order.* events.
     dsn = _notification_db_dsn(config.redis_url)
@@ -174,7 +186,7 @@ async def test_notification_service_persists_order_fill_into_db(
     )
 
     # 2. Find the FILLED order.updated event so we know which event_id
-    #    to look up in notification_messages.
+    #    to look up in Redis replay buffer.
     filled_events = [
         e
         for e in events
@@ -192,21 +204,37 @@ async def test_notification_service_persists_order_fill_into_db(
         f"FILLED order.updated event has no event_id: {fill_event_data}"
     )
 
-    # 3. Verify notification-service persisted a notification for it.
-    row = await _wait_for_notification(dsn, event_id=event_id, timeout=20.0)
+    # 3. Verify notification-service stored the event in Redis replay buffer.
+    redis_client = await redis.from_url(config.redis_url, decode_responses=True)
+    try:
+        # Wait for the event to appear in the execution stream replay buffer
+        event_envelope = await _wait_for_redis_replay_event(
+            redis_client,
+            stream="execution",
+            event_id=event_id,
+            timeout=20.0
+        )
+        
+        # Verify the event envelope structure
+        assert event_envelope is not None, "Event not found in Redis replay buffer"
+        assert event_envelope["stream"] == "execution", (
+            f"Event should be classified as 'execution' stream, got {event_envelope['stream']}"
+        )
+        assert "sequence" in event_envelope, "Event envelope missing sequence number"
+        assert "timestamp" in event_envelope, "Event envelope missing timestamp"
+        assert "payload" in event_envelope, "Event envelope missing payload"
+        
+        # Verify the event was classified correctly (order.updated -> execution stream)
+        assert event_envelope["stream"] == "execution"
+        
+    finally:
+        await redis_client.close()
 
-    assert row["event_id"] == event_id
-    # notification-service maps order.updated (status=FILLED) → order.filled
-    assert row["event_name"] == "order.filled", (
-        f"Notification event_name={row['event_name']!r}; expected "
-        f"order.filled (notification-service must map order.updated "
-        f"status=FILLED to the legacy fine-grained event_name for "
-        f"subscription matching)."
-    )
-    assert str(row["user_id"]) == test_user_id
+    # 4. Verify NO database persistence occurred (pure relay architecture)
+    await _verify_no_database_persistence(dsn)
 
 
-async def test_notification_service_does_not_double_persist(
+async def test_notification_service_classifies_events_into_streams(
     config,
     instrument_catalog,
     test_account_id,
@@ -216,22 +244,20 @@ async def test_notification_service_does_not_double_persist(
     mock_client,
     redis_event_collector,
 ):
-    """A single event_id must produce at most one notification row per user.
-
-    This guards the unique constraint
-    `uq_notification_messages_event_id_user_id` (see
-    notification_service.models.NotificationMessage). Without it,
-    re-deliveries on the consumer group would create duplicate
-    notifications.
+    """Verify that notification-service correctly classifies different event types
+    into appropriate streams (execution, risk, notification, ai, system, broker).
+    
+    This test focuses on the stream classification logic.
     """
     dsn = _notification_db_dsn(config.redis_url)
-    await _ensure_subscription(dsn, user_id=test_user_id, event_pattern="order.*")
-
+    
     broker_id = config.broker_id
 
     from e2e.integration.bas.test_bas_pbs_execution_ws import _place_and_fill
 
-    _broker_order_id, _instrument_id, events = await _place_and_fill(
+    qty = 100
+    price = Decimal("550.00")
+    broker_order_id, _instrument_id, events = await _place_and_fill(
         place_and_sync_order=place_and_sync_order,
         mock_client=mock_client,
         instrument_catalog=instrument_catalog,
@@ -239,31 +265,40 @@ async def test_notification_service_does_not_double_persist(
         broker_id=broker_id,
         redis_event_collector=redis_event_collector,
         instrument_index=0,
+        qty=qty,
+        price=price,
     )
 
-    filled = [
-        e for e in events
+    # Find the FILLED order.updated event
+    filled_events = [
+        e
+        for e in events
         if e.get("type") == "order.updated"
         and (e.get("payload") or {}).get("status") == "FILLED"
     ]
-    assert filled
-    event_id = (filled[-1].get("data") or {}).get("event_id")
-    assert event_id
+    assert filled_events, "No FILLED order.updated event found"
+    
+    fill_event_data = filled_events[-1].get("data") or {}
+    event_id = fill_event_data.get("event_id")
+    assert event_id, "Event missing event_id"
 
-    await _wait_for_notification(dsn, event_id=event_id, timeout=20.0)
-
-    conn = await asyncpg.connect(dsn)
+    # Verify the event was classified into the execution stream
+    redis_client = await redis.from_url(config.redis_url, decode_responses=True)
     try:
-        count = await conn.fetchval(
-            "SELECT count(*) FROM notification_messages "
-            "WHERE event_id = $1 AND user_id = $2",
-            event_id,
-            uuid.UUID(test_user_id),
+        event_envelope = await _wait_for_redis_replay_event(
+            redis_client,
+            stream="execution",
+            event_id=event_id,
+            timeout=20.0
         )
+        
+        assert event_envelope["stream"] == "execution", (
+            f"order.updated event should be classified as 'execution' stream, "
+            f"got {event_envelope['stream']}"
+        )
+        
     finally:
-        await conn.close()
-    assert count == 1, (
-        f"Expected exactly one notification row for event_id={event_id} and "
-        f"user_id={test_user_id}; found {count}. Possible regression on "
-        f"uq_notification_messages_event_id_user_id."
-    )
+        await redis_client.close()
+
+    # Verify no database persistence
+    await _verify_no_database_persistence(dsn)

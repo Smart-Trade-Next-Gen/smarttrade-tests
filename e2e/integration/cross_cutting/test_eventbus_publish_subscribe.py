@@ -17,6 +17,9 @@ Contract:
     3. After a published event flows through the bus, the per-service
        consumer group advances its `entries-read` past the publication
        and does not leave the message in `pending` permanently.
+    4. Notification-service operates as a pure event relay - it consumes
+       events, classifies them into streams, and stores them in Redis
+       replay buffer for WebSocket delivery without database persistence.
 
 Why this test is built around running services rather than the
 in-process EventBus client:
@@ -184,11 +187,11 @@ async def test_eventbus_publish_subscribe_roundtrip(config):
       b) BAS' OutboxPoller picks the row up and publishes via the
          EventBus to `events:order.updated`.
       c) The notification-service `@consume_event('order.updated')`
-         handler runs and (because we pre-create a subscription)
-         persists a row in `notification_messages` for our test user.
+         handler runs and stores the event in Redis replay buffer for
+         WebSocket delivery (pure relay architecture - no DB persistence).
 
     A failure here can be at any layer (publisher, stream, consumer,
-    handler, DB write); the test deliberately exercises the whole
+    handler, Redis write); the test deliberately exercises the whole
     chain because that is what services rely on.
     """
     # Imports kept local so this module's import-time doesn't pull
@@ -198,7 +201,7 @@ async def test_eventbus_publish_subscribe_roundtrip(config):
     )
     bas_dsn = _bas_dsn(config.redis_url)
 
-    # Pre-create a subscription so notification-service persists the
+    # Pre-create a subscription so notification-service processes the
     # event. Without a subscription the event is consumed but ignored,
     # and the test cannot tell the difference between "consumer is
     # broken" and "no matching subscription".
@@ -278,35 +281,58 @@ async def test_eventbus_publish_subscribe_roundtrip(config):
     finally:
         await conn.close()
 
-    # Wait for notification-service to persist the row for this
-    # event_id. notification-service uses event_id as the idempotency
-    # key (see NotificationMessage.event_id).
-    conn = await asyncpg.connect(notification_dsn)
+    # Wait for notification-service to store the event in Redis replay buffer.
+    # The pure relay architecture stores events in Redis for WebSocket delivery,
+    # not in the database.
+    redis_client = await redis.from_url(config.redis_url, decode_responses=True)
     try:
         deadline = asyncio.get_event_loop().time() + 15.0
+        replay_key = "notification_replay:execution"
+        
         while True:
-            row = await conn.fetchrow(
-                "SELECT event_id, event_name, user_id "
-                "FROM notification_messages WHERE event_id = $1",
-                event_id,
-            )
-            if row is not None:
+            # Check if event exists in Redis replay buffer
+            events_json = await redis_client.zrange(replay_key, 0, -1)
+            found = False
+            for event_json in events_json:
+                try:
+                    event = json.loads(event_json)
+                    if event.get("event_id") == event_id or event.get("payload", {}).get("event_id") == event_id:
+                        found = True
+                        break
+                except json.JSONDecodeError:
+                    continue
+            
+            if found:
                 break
+            
             if asyncio.get_event_loop().time() >= deadline:
                 pytest.fail(
-                    f"End-to-end EventBus chain broken: notification "
-                    f"row never appeared for event_id={event_id} "
+                    f"End-to-end EventBus chain broken: event "
+                    f"never appeared in Redis replay buffer for event_id={event_id} "
                     f"(marker={marker!r}) within 15s. The break is in "
                     f"one of: outbox poller, EventBus publish, "
                     f"notification @consume_event handler, or the "
-                    f"notification DB write."
+                    f"Redis replay buffer write."
                 )
             await asyncio.sleep(0.3)
     finally:
-        await conn.close()
+        await redis_client.close()
 
-    assert row["event_id"] == event_id
-    # FILLED status maps to order.filled inside notification-service
-    # (see services.process_event: status_to_event mapping).
-    assert row["event_name"] == "order.filled"
-    assert str(row["user_id"]) == user_id
+    # Verify NO database persistence occurred (pure relay architecture)
+    conn = await asyncpg.connect(notification_dsn)
+    try:
+        # Check that notification_messages table does not exist or is empty
+        table_exists = await conn.fetchval(
+            "SELECT EXISTS (SELECT FROM information_schema.tables "
+            "WHERE table_name = 'notification_messages')"
+        )
+        
+        if table_exists:
+            # Table exists, verify it's empty
+            count = await conn.fetchval("SELECT count(*) FROM notification_messages")
+            assert count == 0, (
+                f"notification_messages table should be empty in pure relay architecture, "
+                f"but found {count} rows for event_id={event_id}"
+            )
+    finally:
+        await conn.close()
