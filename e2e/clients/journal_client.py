@@ -167,18 +167,18 @@ class JournalClient:
 
     async def wait_for_trade(
         self,
-        order_id: str,
+        broker_order_id: str,
         timeout: float = 15.0,
         poll_interval: float = 0.5,
     ) -> dict:
         """
-        Poll trades until one matching the order_id is found.
+        Poll trades until one matching the broker_order_id is found.
 
         Implements hard timeout and polling for eventual consistency.
         Raises TimeoutError if trade not found within timeout.
 
         Args:
-            order_id: Order ID to wait for
+            broker_order_id: Broker Order ID to wait for
             timeout: Maximum wait time in seconds
             poll_interval: Time between polls in seconds
 
@@ -194,11 +194,11 @@ class JournalClient:
             try:
                 trades = await self.get_trades(limit=100)
 
-                # Find trade with matching order_id
+                # Find trade with matching broker_order_id
                 for trade in trades:
-                    if trade.get("order_id") == order_id:
+                    if trade.get("broker_order_id") == order_id:
                         log.info(
-                            f"✅ Trade found: order_id={order_id} "
+                            f"✅ Trade found: broker_order_id={order_id} "
                             f"qty={trade.get('quantity')} price={trade.get('price')}"
                         )
                         return trade
@@ -206,10 +206,10 @@ class JournalClient:
                 # Check timeout
                 elapsed = asyncio.get_event_loop().time() - start_time
                 if elapsed > timeout:
-                    log.error(f"❌ Trade not found within {timeout}s: order_id={order_id}")
+                    log.error(f"❌ Trade not found within {timeout}s: broker_order_id={order_id}")
                     raise TimeoutError(
-                        f"Trade with order_id={order_id} not found within {timeout}s. "
-                        f"Available trades: {[t.get('order_id') for t in trades]}"
+                        f"Trade with broker_order_id={order_id} not found within {timeout}s. "
+                        f"Available trades: {[t.get('broker_order_id') for t in trades]}"
                     )
 
                 # Wait before next poll
@@ -351,13 +351,13 @@ class JournalClient:
 
     async def get_order_by_id(
         self,
-        order_id: str,
+        broker_order_id: str,
     ) -> dict:
         """
-        Fetch a specific order by ID (broker_order_id).
+        Fetch a specific order by broker_order_id.
 
         Args:
-            order_id: Order ID (broker_order_id)
+            broker_order_id: Broker Order ID (canonical identifier)
 
         Returns:
             Order dictionary
@@ -371,14 +371,17 @@ class JournalClient:
                 headers=self._headers,
             )
 
-        url = f"{self.base_url}/api/v1/orders/{self.broker_id}/{self.account_id}/{order_id}"
+        url = f"{self.base_url}/api/v1/orders/{self.broker_id}/{self.account_id}/{broker_order_id}"
 
         try:
             response = await self.client.get(url)
             response.raise_for_status()
             order = response.json()
-            log.debug(f"Fetched order {order_id}")
+            log.debug(f"Fetched order {broker_order_id}")
             return order
+        except httpx.HTTPStatusError as e:
+            log.error(f"Failed to fetch order {broker_order_id}: {e.response.status_code}")
+            raise
         except httpx.HTTPStatusError as e:
             log.error(f"Failed to fetch order {order_id}: {e.response.status_code}")
             raise

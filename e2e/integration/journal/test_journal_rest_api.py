@@ -140,7 +140,7 @@ async def test_journal_order_by_id_endpoint(
     
     # Try to get a non-existent order
     try:
-        order = await journal_client.get_order_by_id("NONEXISTENT_ORDER_ID")
+        order = await journal_client.get_order_by_id(broker_order_id="NONEXISTENT_ORDER_ID")
         # If we get here, the order exists (unexpected)
         assert False, "Non-existent order should return 404"
     except Exception as e:

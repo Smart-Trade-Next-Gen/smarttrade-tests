@@ -216,7 +216,7 @@ async def test_bas_modify_propagates_to_pbs(
     while True:
         try:
             order = await journal_client.get_order_by_id(
-                order_id=broker_order_id
+                broker_order_id=broker_order_id
             )
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 404:
@@ -280,7 +280,7 @@ async def test_bas_get_order_returns_canonical_broker_order_id(
     while True:
         try:
             fetched = await journal_client.get_order_by_id(
-                order_id=broker_order_id
+                broker_order_id=broker_order_id
             )
             break
         except httpx.HTTPStatusError as e:
@@ -291,11 +291,11 @@ async def test_bas_get_order_returns_canonical_broker_order_id(
             else:
                 raise
 
-    # Per the stateless invariant, `order_id` on the read DTO IS the
-    # broker_order_id. Journal Service returns the canonical order_id.
-    fetched_id = fetched.get("order_id")
+    # Per the stateless invariant, `broker_order_id` on the read DTO IS the
+    # canonical order identifier. Journal Service returns the broker_order_id.
+    fetched_id = fetched.get("broker_order_id")
     assert fetched_id == broker_order_id, (
-        f"Journal Service GET /order returned id={fetched_id!r}; expected "
+        f"Journal Service GET /order returned broker_order_id={fetched_id!r}; expected "
         f"{broker_order_id!r}. Read-side contract is broken — UIs "
         f"can't track placed orders."
     )

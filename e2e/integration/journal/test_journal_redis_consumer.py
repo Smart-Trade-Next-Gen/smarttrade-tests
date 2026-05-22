@@ -47,11 +47,9 @@ async def _wait_for_journal_order(
         orders = await journal_client.get_orders(page_size=200)
         last_seen = orders
         for order in orders:
-            # Journal exposes the canonical broker order id as `order_id`
-            # in its response (the field is named for the abstracted view).
-            for candidate_key in ("order_id", "broker_order_id"):
-                if order.get(candidate_key) == broker_order_id:
-                    return order
+            # Journal exposes the canonical broker order id as `broker_order_id`
+            if order.get("broker_order_id") == broker_order_id:
+                return order
         if asyncio.get_event_loop().time() >= deadline:
             raise TimeoutError(
                 f"Journal did not expose an order with broker_order_id="
@@ -76,7 +74,7 @@ async def _wait_for_journal_trade(
         trades = await journal_client.get_trades(limit=200)
         last_seen = trades
         for trade in trades:
-            if trade.get("order_id") == broker_order_id:
+            if trade.get("broker_order_id") == broker_order_id:
                 return trade
         if asyncio.get_event_loop().time() >= deadline:
             raise TimeoutError(
