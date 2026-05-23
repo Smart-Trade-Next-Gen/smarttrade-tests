@@ -345,3 +345,335 @@ class PortfolioClient:
 
     # Orders and trades belong to Journal Service after the read split.
     # Use JournalClient.get_orders / JournalClient.get_trades instead.
+
+    # ========== Smart Exit Methods ==========
+
+    async def create_smart_exit_policy(
+        self,
+        name: str,
+        description: Optional[str] = None,
+        scope: str = "SELECTED",
+        position_ids: Optional[list[str]] = None,
+        rule_logic: str = "ANY",
+        action: str = "EXIT",
+        exit_percentage: int = 100,
+        rules: Optional[list[dict]] = None,
+        is_active: Optional[bool] = None,
+    ) -> dict:
+        """
+        Create a Smart Exit policy.
+
+        Args:
+            name: Policy name
+            description: Optional description
+            scope: SELECTED or ALL_INTRADAY
+            position_ids: List of position IDs (required if scope is SELECTED)
+            rule_logic: ANY or ALL
+            action: EXIT or ALERT_ONLY
+            exit_percentage: Exit percentage (100 for full exit)
+            rules: List of rule configurations
+            is_active: Optional initial active state (defaults to True if not provided)
+
+        Returns:
+            Created policy dictionary
+
+        Raises:
+            httpx.HTTPStatusError: If request fails
+        """
+        if not self.client:
+            self.client = httpx.AsyncClient(
+                timeout=self.timeout,
+                headers=self._headers,
+            )
+
+        url = f"{self.base_url}/api/v1/smart-exit/policies"
+        payload = {
+            "name": name,
+            "description": description,
+            "scope": scope,
+            "position_ids": position_ids or [],
+            "rule_logic": rule_logic,
+            "action": action,
+            "exit_percentage": exit_percentage,
+            "rules": rules or [],
+        }
+        
+        # Only add is_active if explicitly provided
+        if is_active is not None:
+            payload["is_active"] = is_active
+
+        try:
+            response = await self.client.post(url, json=payload)
+            response.raise_for_status()
+            policy = response.json()
+            log.info(f"Created Smart Exit policy: {policy.get('id')}")
+            return policy
+        except httpx.HTTPStatusError as e:
+            log.error(f"Failed to create Smart Exit policy: {e.response.status_code}")
+            raise
+
+    async def get_smart_exit_policies(
+        self,
+        broker_id: Optional[str] = None,
+        account_id: Optional[str] = None,
+        is_active: Optional[bool] = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> dict:
+        """
+        Get Smart Exit policies for the current user.
+
+        Args:
+            broker_id: Optional broker ID filter
+            account_id: Optional account ID filter
+            is_active: Optional active status filter
+            limit: Number of results
+            offset: Pagination offset
+
+        Returns:
+            Dictionary with policies list and total count
+
+        Raises:
+            httpx.HTTPStatusError: If request fails
+        """
+        if not self.client:
+            self.client = httpx.AsyncClient(
+                timeout=self.timeout,
+                headers=self._headers,
+            )
+
+        url = f"{self.base_url}/api/v1/smart-exit/policies"
+        params = {"limit": limit, "offset": offset}
+        if broker_id:
+            params["broker_id"] = broker_id
+        if account_id:
+            params["account_id"] = account_id
+        if is_active is not None:
+            params["is_active"] = is_active
+
+        try:
+            response = await self.client.get(url, params=params)
+            response.raise_for_status()
+            data = response.json()
+            log.debug(f"Fetched {len(data.get('items', []))} Smart Exit policies")
+            return data
+        except httpx.HTTPStatusError as e:
+            log.error(f"Failed to fetch Smart Exit policies: {e.response.status_code}")
+            raise
+
+    async def get_smart_exit_policy(self, policy_id: str) -> dict:
+        """
+        Get a specific Smart Exit policy by ID.
+
+        Args:
+            policy_id: Policy ID (UUID)
+
+        Returns:
+            Policy dictionary
+
+        Raises:
+            httpx.HTTPStatusError: If request fails or policy not found
+            ValueError: If policy_id is not a valid UUID
+        """
+        policy_id = _validate_uuid(policy_id)
+
+        if not self.client:
+            self.client = httpx.AsyncClient(
+                timeout=self.timeout,
+                headers=self._headers,
+            )
+
+        url = f"{self.base_url}/api/v1/smart-exit/policies/{policy_id}"
+
+        try:
+            response = await self.client.get(url)
+            response.raise_for_status()
+            policy = response.json()
+            log.debug(f"Fetched Smart Exit policy {policy_id}")
+            return policy
+        except httpx.HTTPStatusError as e:
+            log.error(f"Failed to fetch Smart Exit policy {policy_id}: {e.response.status_code}")
+            raise
+
+    async def update_smart_exit_policy(
+        self,
+        policy_id: str,
+        **updates,
+    ) -> dict:
+        """
+        Update a Smart Exit policy.
+
+        Args:
+            policy_id: Policy ID (UUID)
+            **updates: Fields to update (name, description, scope, etc.)
+
+        Returns:
+            Updated policy dictionary
+
+        Raises:
+            httpx.HTTPStatusError: If request fails or policy not found
+            ValueError: If policy_id is not a valid UUID
+        """
+        policy_id = _validate_uuid(policy_id)
+
+        if not self.client:
+            self.client = httpx.AsyncClient(
+                timeout=self.timeout,
+                headers=self._headers,
+            )
+
+        url = f"{self.base_url}/api/v1/smart-exit/policies/{policy_id}"
+
+        try:
+            response = await self.client.put(url, json=updates)
+            response.raise_for_status()
+            policy = response.json()
+            log.info(f"Updated Smart Exit policy {policy_id}")
+            return policy
+        except httpx.HTTPStatusError as e:
+            log.error(f"Failed to update Smart Exit policy {policy_id}: {e.response.status_code}")
+            raise
+
+    async def delete_smart_exit_policy(self, policy_id: str) -> dict:
+        """
+        Delete a Smart Exit policy.
+
+        Args:
+            policy_id: Policy ID (UUID)
+
+        Returns:
+            Deletion confirmation message
+
+        Raises:
+            httpx.HTTPStatusError: If request fails or policy not found
+            ValueError: If policy_id is not a valid UUID
+        """
+        policy_id = _validate_uuid(policy_id)
+
+        if not self.client:
+            self.client = httpx.AsyncClient(
+                timeout=self.timeout,
+                headers=self._headers,
+            )
+
+        url = f"{self.base_url}/api/v1/smart-exit/policies/{policy_id}"
+
+        try:
+            response = await self.client.delete(url)
+            response.raise_for_status()
+            result = response.json()
+            log.info(f"Deleted Smart Exit policy {policy_id}")
+            return result
+        except httpx.HTTPStatusError as e:
+            log.error(f"Failed to delete Smart Exit policy {policy_id}: {e.response.status_code}")
+            raise
+
+    async def activate_smart_exit_policy(self, policy_id: str) -> dict:
+        """
+        Activate a Smart Exit policy.
+
+        Args:
+            policy_id: Policy ID (UUID)
+
+        Returns:
+            Updated policy dictionary
+
+        Raises:
+            httpx.HTTPStatusError: If request fails or policy not found
+            ValueError: If policy_id is not a valid UUID
+        """
+        policy_id = _validate_uuid(policy_id)
+
+        if not self.client:
+            self.client = httpx.AsyncClient(
+                timeout=self.timeout,
+                headers=self._headers,
+            )
+
+        url = f"{self.base_url}/api/v1/smart-exit/policies/{policy_id}/activate"
+
+        try:
+            response = await self.client.post(url)
+            response.raise_for_status()
+            policy = response.json()
+            log.info(f"Activated Smart Exit policy {policy_id}")
+            return policy
+        except httpx.HTTPStatusError as e:
+            log.error(f"Failed to activate Smart Exit policy {policy_id}: {e.response.status_code}")
+            raise
+
+    async def deactivate_smart_exit_policy(self, policy_id: str) -> dict:
+        """
+        Deactivate a Smart Exit policy.
+
+        Args:
+            policy_id: Policy ID (UUID)
+
+        Returns:
+            Updated policy dictionary
+
+        Raises:
+            httpx.HTTPStatusError: If request fails or policy not found
+            ValueError: If policy_id is not a valid UUID
+        """
+        policy_id = _validate_uuid(policy_id)
+
+        if not self.client:
+            self.client = httpx.AsyncClient(
+                timeout=self.timeout,
+                headers=self._headers,
+            )
+
+        url = f"{self.base_url}/api/v1/smart-exit/policies/{policy_id}/deactivate"
+
+        try:
+            response = await self.client.post(url)
+            response.raise_for_status()
+            policy = response.json()
+            log.info(f"Deactivated Smart Exit policy {policy_id}")
+            return policy
+        except httpx.HTTPStatusError as e:
+            log.error(f"Failed to deactivate Smart Exit policy {policy_id}: {e.response.status_code}")
+            raise
+
+    async def get_smart_exit_policy_triggers(
+        self,
+        policy_id: str,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> dict:
+        """
+        Get trigger history for a Smart Exit policy.
+
+        Args:
+            policy_id: Policy ID (UUID)
+            limit: Number of results
+            offset: Pagination offset
+
+        Returns:
+            Dictionary with triggers list and total count
+
+        Raises:
+            httpx.HTTPStatusError: If request fails or policy not found
+            ValueError: If policy_id is not a valid UUID
+        """
+        policy_id = _validate_uuid(policy_id)
+
+        if not self.client:
+            self.client = httpx.AsyncClient(
+                timeout=self.timeout,
+                headers=self._headers,
+            )
+
+        url = f"{self.base_url}/api/v1/smart-exit/policies/{policy_id}/triggers"
+        params = {"limit": limit, "offset": offset}
+
+        try:
+            response = await self.client.get(url, params=params)
+            response.raise_for_status()
+            data = response.json()
+            log.debug(f"Fetched {len(data.get('items', []))} triggers for policy {policy_id}")
+            return data
+        except httpx.HTTPStatusError as e:
+            log.error(f"Failed to fetch triggers for policy {policy_id}: {e.response.status_code}")
+            raise
