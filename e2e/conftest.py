@@ -51,6 +51,7 @@ from e2e.fixtures.instruments import InstrumentCatalog
 from e2e.fixtures.test_instruments_data import get_test_instruments
 from e2e.fixtures.quote_injection import QuoteInjector
 
+
 log = logging.getLogger(__name__)
 
 
