@@ -1,14 +1,14 @@
 """
 Integration test — MDS UI WebSocket protocol contract.
 
-Pair under test: UI client ←→ market-data-service (`/ws/{broker_id}/ui`).
+Pair under test: UI client ←→ market-data-service (`/ws/{broker_id}/{account_id}/ui`).
 
 Contract:
     1. The UI WebSocket accepts a JWT via either Authorization header or
        `?token=` query param. The handshake is rejected (close code 4401)
        without a valid token.
     2. On accept, MDS sends two control frames in order:
-          a. `system.connected` carrying conn_id, user_id, broker_id
+          a. `system.connected` carrying conn_id, user_id, broker_id, account_id
           b. `system.subscription_set` listing currently-active
              instrument_ids for the broker (firehose model — UI joins the
              broker-wide set, no explicit account subscription needed)
@@ -88,12 +88,13 @@ async def _connect_ui_ws(
     config,
     auth_token: str,
     test_user_id: str,
+    test_account_id: str,
     *,
     open_timeout: float = 5.0,
 ):
     """Open a UI WebSocket against MDS. Returns the open connection."""
     ws_url = (
-        f"{config.mds_ws_url}/ws/{config.broker_id}/ui"
+        f"{config.mds_ws_url}/ws/{config.broker_id}/{test_account_id}/ui"
         f"?token={auth_token}&user_id={test_user_id}"
     )
     return await websockets.connect(ws_url, open_timeout=open_timeout)
@@ -103,6 +104,7 @@ async def test_ui_ws_handshake_sends_system_connected_and_subscription_set(
     config,
     auth_token,
     test_user_id,
+    test_account_id,
 ):
     """On UI WS connect, MDS must send `system.connected` then
     `system.subscription_set` in that order.
@@ -112,7 +114,7 @@ async def test_ui_ws_handshake_sends_system_connected_and_subscription_set(
     initially-active instrument set so the UI can render the live
     quote list without making a separate REST call.
     """
-    ws = await _connect_ui_ws(config, auth_token, test_user_id)
+    ws = await _connect_ui_ws(config, auth_token, test_user_id, test_account_id)
     try:
         # First message MUST be system.connected
         raw = await asyncio.wait_for(ws.recv(), timeout=5.0)
@@ -154,6 +156,7 @@ async def test_ui_ws_subscribe_market_ack_arrives_before_confirm(
     config,
     auth_token,
     test_user_id,
+    test_account_id,
     instrument_catalog,
 ):
     """`subscribe.market` request triggers `system.ack` (first) then
@@ -168,7 +171,7 @@ async def test_ui_ws_subscribe_market_ack_arrives_before_confirm(
     instrument_id = instrument["id"]
     request_id = f"e2e-{uuid.uuid4().hex[:12]}"
 
-    ws = await _connect_ui_ws(config, auth_token, test_user_id)
+    ws = await _connect_ui_ws(config, auth_token, test_user_id, test_account_id)
     try:
         # Drain handshake frames.
         await _recv_until(
@@ -221,6 +224,7 @@ async def test_ui_ws_unsubscribe_market_acked_symmetrically(
     config,
     auth_token,
     test_user_id,
+    test_account_id,
     instrument_catalog,
 ):
     """`unsubscribe.market` is acknowledged by `system.ack` + `system.unsubscribed_market`.
@@ -231,7 +235,7 @@ async def test_ui_ws_unsubscribe_market_acked_symmetrically(
     instrument = instrument_catalog.get_any_equity(1)[0]
     instrument_id = instrument["id"]
 
-    ws = await _connect_ui_ws(config, auth_token, test_user_id)
+    ws = await _connect_ui_ws(config, auth_token, test_user_id, test_account_id)
     try:
         await _recv_until(
             ws, lambda t: t == "system.subscription_set", timeout=5.0
@@ -279,6 +283,7 @@ async def test_ui_ws_unsubscribe_market_acked_symmetrically(
 
 async def test_ui_ws_handshake_rejected_without_token(
     config,
+    test_account_id,
 ):
     """Connecting without a JWT token must be rejected at handshake.
 
@@ -286,7 +291,7 @@ async def test_ui_ws_handshake_rejected_without_token(
     see authenticate_websocket()). The `websockets` client surfaces
     this as a ConnectionClosedError / InvalidStatus during connect.
     """
-    ws_url = f"{config.mds_ws_url}/ws/{config.broker_id}/ui"
+    ws_url = f"{config.mds_ws_url}/ws/{config.broker_id}/{test_account_id}/ui"
 
     raised = False
     try:
@@ -315,13 +320,14 @@ async def test_ui_ws_receives_periodic_heartbeat(
     config,
     auth_token,
     test_user_id,
+    test_account_id,
 ):
     """MDS sends `system.heartbeat` frames at ~5s intervals.
 
     The frontend uses heartbeat absence as its dead-connection signal.
     If MDS stops sending heartbeats, the UI re-establishes the WS.
     """
-    ws = await _connect_ui_ws(config, auth_token, test_user_id)
+    ws = await _connect_ui_ws(config, auth_token, test_user_id, test_account_id)
     try:
         # Drain initial handshake.
         await _recv_until(

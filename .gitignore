@@ -15,3 +15,4 @@ __pycache__/
 .mypy_cache/
 *.egg-info/
 .env
+e2e/e2e_tests.log

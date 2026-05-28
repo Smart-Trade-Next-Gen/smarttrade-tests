@@ -817,7 +817,7 @@ async def mds_client(
 
     Account/execution events are collected via Redis Streams using redis_event_collector.
     """
-    ws_url_with_path = f"{config.mds_ws_url}/ws/{config.broker_id}/ui"
+    ws_url_with_path = f"{config.mds_ws_url}/ws/{config.broker_id}/{test_account_id}/ui"
 
     client = MDSWebSocketClient(
         ws_url=ws_url_with_path,
