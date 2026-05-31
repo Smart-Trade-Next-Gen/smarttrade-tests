@@ -35,7 +35,7 @@ async def test_pbs_does_not_emit_to_execution_topics(
     PBS only emits broker.order_update which BAS consumes.
     """
     # Setup
-    instrument = instrument_catalog.get_any_equity(1)[0]
+    instrument = instrument_catalog.get_test_instrument(0)
     instrument_id = instrument["id"]
     qty = 100
     price = Decimal("550.00")
@@ -95,7 +95,7 @@ async def test_bas_does_not_require_mds_synchronously_for_execution(
     BAS uses local instrument master, not sync calls to MDS.
     """
     # Setup
-    instrument = instrument_catalog.get_any_equity(1)[0]
+    instrument = instrument_catalog.get_test_instrument(0)
     instrument_id = instrument["id"]
     qty = 100
     price = Decimal("550.00")
@@ -150,7 +150,7 @@ async def test_portfolio_does_not_affect_execution(
     Portfolio is a read-model consumer, not part of execution path.
     """
     # Setup
-    instrument = instrument_catalog.get_any_equity(1)[0]
+    instrument = instrument_catalog.get_test_instrument(0)
     instrument_id = instrument["id"]
     qty = 100
     price = Decimal("550.00")
@@ -206,7 +206,7 @@ async def test_journal_does_not_affect_execution(
     Journal is a read-model consumer, not part of execution path.
     """
     # Setup
-    instrument = instrument_catalog.get_any_equity(1)[0]
+    instrument = instrument_catalog.get_test_instrument(0)
     instrument_id = instrument["id"]
     qty = 100
     price = Decimal("550.00")
@@ -261,7 +261,7 @@ async def test_pbs_accepts_unknown_instrument_id(
     This test verifies PBS accepts instrument_id without any pre-seeded instrument record.
     """
     # Use an instrument from the catalog (it's seeded in BAS, not PBS)
-    instrument = instrument_catalog.get_any_equity(1)[0]
+    instrument = instrument_catalog.get_test_instrument(0)
     instrument_id = instrument["id"]
     qty = 100
     price = Decimal("550.00")
@@ -317,7 +317,7 @@ async def test_service_isolation(
     are slow or unavailable.
     """
     # Setup
-    instrument = instrument_catalog.get_any_equity(1)[0]
+    instrument = instrument_catalog.get_test_instrument(0)
     instrument_id = instrument["id"]
     qty = 100
     price = Decimal("550.00")
@@ -372,7 +372,7 @@ async def test_database_per_service_enforcement(
     not direct database queries.
     """
     # Setup
-    instrument = instrument_catalog.get_any_equity(1)[0]
+    instrument = instrument_catalog.get_test_instrument(0)
     instrument_id = instrument["id"]
     qty = 100
     price = Decimal("550.00")

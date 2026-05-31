@@ -54,7 +54,7 @@ async def _place_and_collect_order_events(
     """Place a MARKET BUY, drive the fill, and return all order.updated
     events for that order.
     """
-    instrument = instrument_catalog.get_any_equity(1)[0]
+    instrument = instrument_catalog.get_test_instrument(0)
     instrument_id = instrument["id"]
 
     place_response = await place_and_sync_order(

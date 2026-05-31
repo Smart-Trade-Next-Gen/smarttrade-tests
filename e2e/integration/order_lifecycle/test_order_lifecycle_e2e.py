@@ -49,7 +49,7 @@ async def test_market_buy_full_fill(
     - Position creation via Portfolio Service
     """
     broker_id = config.broker_id
-    instrument = instrument_catalog.get_any_equity(1)[0]
+    instrument = instrument_catalog.get_test_instrument(0)
     instrument_id = instrument["id"]
     qty = 100
     price = Decimal("550.00")
@@ -131,7 +131,7 @@ async def test_market_sell_full_fill(
     - Position state for SHORT via Portfolio Service
     """
     broker_id = config.broker_id
-    instrument = instrument_catalog.get_any_equity(1)[0]
+    instrument = instrument_catalog.get_test_instrument(0)
     instrument_id = instrument["id"]
     qty = 100
     price = Decimal("550.00")
@@ -212,7 +212,7 @@ async def test_limit_buy_triggers_at_price(
     - Position reflects fill price (not order price)
     """
     broker_id = config.broker_id
-    instrument = instrument_catalog.get_any_equity(2)[1]
+    instrument = instrument_catalog.get_test_instrument(1)
     instrument_id = instrument["id"]
     
     # Act: Place LIMIT BUY
@@ -288,7 +288,7 @@ async def test_limit_sell_triggers_at_price(
     - Short position created
     """
     broker_id = config.broker_id
-    instrument = instrument_catalog.get_any_equity(2)[1]
+    instrument = instrument_catalog.get_test_instrument(1)
     instrument_id = instrument["id"]
     
     # Act: Place LIMIT SELL (short, intraday allowed)
@@ -359,7 +359,7 @@ async def test_order_cancelled_lifecycle(
     - Order no longer active
     """
     broker_id = config.broker_id
-    instrument = instrument_catalog.get_any_equity(1)[0]
+    instrument = instrument_catalog.get_test_instrument(0)
     instrument_id = instrument["id"]
     qty = 10
     
@@ -425,7 +425,7 @@ async def test_order_rejected_lifecycle(
     from decimal import Decimal
     
     broker_id = config.broker_id
-    instrument = instrument_catalog.get_any_equity(1)[0]
+    instrument = instrument_catalog.get_test_instrument(0)
     
     # Place an order with invalid instrument_id (should be rejected by BAS)
     invalid_instrument_id = "INVALID_INSTRUMENT_12345"
@@ -484,7 +484,7 @@ async def test_order_modified_lifecycle(
     - Fill after modification
     """
     broker_id = config.broker_id
-    instrument = instrument_catalog.get_any_equity(1)[0]
+    instrument = instrument_catalog.get_test_instrument(0)
     instrument_id = instrument["id"]
     qty = 10
     

@@ -41,7 +41,7 @@ async def test_order_updated_event_structure(
     from decimal import Decimal
     
     broker_id = config.broker_id
-    instrument = instrument_catalog.get_any_equity(1)[0]
+    instrument = instrument_catalog.get_test_instrument(0)
     instrument_id = instrument["id"]
     
     # Place and execute an order

@@ -130,7 +130,7 @@ async def test_mds_consumes_subscribe_request_and_does_not_accumulate_pending(
     try/except for exactly this reason. A growing pending count would
     indicate the consumer is dead or broken.
     """
-    instrument = instrument_catalog.get_any_equity(1)[0]
+    instrument = instrument_catalog.get_test_instrument(0)
     instrument_id = instrument["id"]
 
     client = await redis.from_url(config.redis_url, decode_responses=True)
@@ -203,7 +203,7 @@ async def test_mds_consumes_subscribe_then_unsubscribe(
     Guards against an action-routing regression where one of the two
     paths leaks pending entries or crashes the consumer loop.
     """
-    instrument = instrument_catalog.get_any_equity(1)[0]
+    instrument = instrument_catalog.get_test_instrument(0)
     instrument_id = instrument["id"]
 
     client = await redis.from_url(config.redis_url, decode_responses=True)

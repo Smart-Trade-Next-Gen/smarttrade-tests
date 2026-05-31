@@ -374,25 +374,27 @@ async def setup_trading_account(
         except Exception as e:
             log.warning(f"⚠️ price_cache cleanup failed: {e}")
 
-        # Inject prices for common instruments to prevent VAL_001 errors
+        # Inject prices for test instruments to prevent VAL_001 errors
         # MARKET orders require LTP for fund reservation with slippage buffer
         try:
             from decimal import Decimal
-            # Get first 20 instruments from catalog to cover most test scenarios
-            instruments = instrument_catalog.list_all()[:20]
-            for instrument in instruments:
-                instrument_id = instrument.get("id")
-                if instrument_id:
-                    try:
-                        await mock_client.inject_price_update(
-                            broker_id=broker_id,
-                            instrument_id=instrument_id,
-                            ltp=Decimal("100.00"),
-                        )
-                    except Exception as price_error:
-                        # Log but don't fail - individual price injection failures shouldn't block tests
-                        log.debug(f"Failed to inject price for {instrument_id}: {price_error}")
-            log.debug(f"✅ Injected prices for {len(instruments)} instruments")
+            from e2e.fixtures.test_instrument_config import discover_actual_instrument_ids
+            
+            # Discover actual instrument IDs from the catalog by symbol
+            test_instrument_ids = discover_actual_instrument_ids(instrument_catalog)
+            log.info(f"Discovered {len(test_instrument_ids)} actual instrument IDs from catalog")
+            
+            for instrument_id in test_instrument_ids:
+                try:
+                    await mock_client.inject_price_update(
+                        broker_id=broker_id,
+                        instrument_id=instrument_id,
+                        ltp=Decimal("100.00"),
+                    )
+                except Exception as price_error:
+                    # Log but don't fail - individual price injection failures shouldn't block tests
+                    log.debug(f"Failed to inject price for {instrument_id}: {price_error}")
+            log.info(f"✅ Injected prices for {len(test_instrument_ids)} test instruments")
         except Exception as e:
             log.warning(f"⚠️ Price injection failed: {e}")
 

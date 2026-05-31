@@ -45,7 +45,7 @@ async def test_concurrent_order_placement(
     account_id = test_account_id
 
     # Use a test instrument from the catalog
-    instruments = instrument_catalog.get_any_equity(1)
+    instruments = instrument_catalog.get_test_instruments(1)
     instrument = instruments[0]
 
     instrument_id = instrument["id"]

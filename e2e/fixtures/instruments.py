@@ -125,6 +125,65 @@ class InstrumentCatalog:
 
         return self._by_id[instrument_id]
 
+    def get_test_instrument(self, index: int = 0) -> dict:
+        """
+        Get a specific test instrument by index from the fixed test instrument config.
+
+        Uses well-known instrument symbols for deterministic testing instead of
+        dynamic selection from the catalog. Discovers actual IDs from the catalog.
+
+        Args:
+            index: Index in the test instrument config (0-based)
+
+        Returns:
+            Instrument dictionary
+
+        Raises:
+            RuntimeError: If catalog not loaded
+            KeyError: If instrument symbol not found in catalog
+            ValueError: If index out of range
+        """
+        if not self._loaded:
+            raise RuntimeError("Instrument catalog not loaded. Call load() first.")
+
+        from e2e.fixtures.test_instrument_config import discover_actual_instrument_ids
+        instrument_ids = discover_actual_instrument_ids(self)
+        
+        if index >= len(instrument_ids):
+            raise ValueError(f"Index {index} out of range (only {len(instrument_ids)} test instruments available)")
+        
+        instrument_id = instrument_ids[index]
+        return self.get_by_id(instrument_id)
+
+    def get_test_instruments(self, n: int = 1) -> list[dict]:
+        """
+        Get n specific test instruments from the fixed test instrument config.
+
+        Uses well-known instrument symbols for deterministic testing instead of
+        dynamic selection from the catalog. Discovers actual IDs from the catalog.
+
+        Args:
+            n: Number of instruments to return
+
+        Returns:
+            List of instrument dictionaries
+
+        Raises:
+            RuntimeError: If catalog not loaded
+            KeyError: If any instrument symbol not found in catalog
+            ValueError: If n exceeds available test instruments
+        """
+        if not self._loaded:
+            raise RuntimeError("Instrument catalog not loaded. Call load() first.")
+
+        from e2e.fixtures.test_instrument_config import discover_actual_instrument_ids
+        instrument_ids = discover_actual_instrument_ids(self)
+        
+        if n > len(instrument_ids):
+            raise ValueError(f"Requested {n} instruments but only {len(instrument_ids)} available")
+        
+        return [self.get_by_id(instrument_id) for instrument_id in instrument_ids[:n]]
+
     def get_any_equity(self, n: int = 1) -> list[dict]:
         """
         Get n arbitrary pure equity (cash stock) instruments.

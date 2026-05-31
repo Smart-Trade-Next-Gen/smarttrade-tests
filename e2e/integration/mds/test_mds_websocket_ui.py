@@ -167,7 +167,7 @@ async def test_ui_ws_subscribe_market_ack_arrives_before_confirm(
     the request was committed, defeating the optimistic-update
     rollback path. Order must be ack→confirm.
     """
-    instrument = instrument_catalog.get_any_equity(1)[0]
+    instrument = instrument_catalog.get_test_instrument(0)
     instrument_id = instrument["id"]
     request_id = f"e2e-{uuid.uuid4().hex[:12]}"
 
@@ -232,7 +232,7 @@ async def test_ui_ws_unsubscribe_market_acked_symmetrically(
     Symmetric to subscribe — the same ack-before-confirm ordering must
     hold. Otherwise the frontend can leak optimistic subscriptions.
     """
-    instrument = instrument_catalog.get_any_equity(1)[0]
+    instrument = instrument_catalog.get_test_instrument(0)
     instrument_id = instrument["id"]
 
     ws = await _connect_ui_ws(config, auth_token, test_user_id, test_account_id)

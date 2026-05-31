@@ -49,7 +49,7 @@ async def test_bas_routes_limit_order_placement_to_pbs(
     post-placement states (ACCEPTED or PENDING — never FILLED for a
     LIMIT with no matching quote yet).
     """
-    instrument = instrument_catalog.get_any_equity(1)[0]
+    instrument = instrument_catalog.get_test_instrument(0)
     response = await place_and_sync_order(
         config.broker_id,
         test_account_id,
@@ -92,7 +92,7 @@ async def test_bas_cancel_removes_order_from_pbs(
     A non-cancellable order, or a silent "I cancelled it" response that
     PBS didn't actually honor, is the regression class this test catches.
     """
-    instrument = instrument_catalog.get_any_equity(1)[0]
+    instrument = instrument_catalog.get_test_instrument(0)
     response = await place_and_sync_order(
         config.broker_id,
         test_account_id,
@@ -166,7 +166,7 @@ async def test_bas_modify_propagates_to_pbs(
     endpoint should respond with 501/400 and we skip — that's a clear
     signal rather than a passive placeholder.
     """
-    instrument = instrument_catalog.get_any_equity(1)[0]
+    instrument = instrument_catalog.get_test_instrument(0)
     response = await place_and_sync_order(
         config.broker_id,
         test_account_id,
@@ -257,7 +257,7 @@ async def test_bas_get_order_returns_canonical_broker_order_id(
     contract — UIs and tests look up orders by the id BAS returned at
     placement.
     """
-    instrument = instrument_catalog.get_any_equity(1)[0]
+    instrument = instrument_catalog.get_test_instrument(0)
     response = await place_and_sync_order(
         config.broker_id,
         test_account_id,

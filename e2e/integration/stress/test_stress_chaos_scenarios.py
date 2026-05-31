@@ -122,7 +122,7 @@ async def test_concurrent_orders_on_distinct_instruments_fill_independently(
     orders).
     """
     broker_id = config.broker_id
-    instruments = instrument_catalog.get_any_equity(3)
+    instruments = instrument_catalog.get_test_instruments(3)
     assert len({i["id"] for i in instruments}) == 3, (
         "Test setup requires three distinct instruments; instrument catalog "
         f"returned duplicates: {[i['id'] for i in instruments]}"
@@ -217,7 +217,7 @@ async def test_burst_of_sequential_orders_all_fill_in_order(
     # path. Using the same instrument across five MARKET orders would
     # serialize through PBS' single execution worker per instrument and
     # tell us less about WS-session survival.
-    instruments = instrument_catalog.get_any_equity(5)
+    instruments = instrument_catalog.get_test_instruments(5)
     assert len(instruments) == 5, "Need 5 instruments for burst test"
 
     broker_ids: list[str] = []
@@ -289,7 +289,7 @@ async def test_duplicate_quote_sequence_does_not_emit_extra_fills(
     broker_order_id.
     """
     broker_id = config.broker_id
-    instrument = instrument_catalog.get_any_equity(1)[0]
+    instrument = instrument_catalog.get_test_instrument(0)
     instrument_id = instrument["id"]
 
     # Place MARKET BUY first (price cache empty → ACCEPTED, not filled).
@@ -364,7 +364,7 @@ async def test_rapid_price_ladder_fills_market_order_once(
     FILLED events.
     """
     broker_id = config.broker_id
-    instrument = instrument_catalog.get_any_equity(2)[1]
+    instrument = instrument_catalog.get_test_instrument(1)
     instrument_id = instrument["id"]
 
     # Place MARKET BUY against an empty price cache.

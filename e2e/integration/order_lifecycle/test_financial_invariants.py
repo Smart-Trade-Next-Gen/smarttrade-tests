@@ -45,7 +45,7 @@ async def test_buy_order_decreases_cash(
     - Cash never goes negative
     """
     broker_id = config.broker_id
-    instrument = instrument_catalog.get_any_equity(1)[0]
+    instrument = instrument_catalog.get_test_instrument(0)
     instrument_id = instrument["id"]
     
     # Get initial cash balance
@@ -130,7 +130,7 @@ async def test_sell_order_increases_cash(
     - Position quantity decreases
     """
     broker_id = config.broker_id
-    instrument = instrument_catalog.get_any_equity(1)[0]
+    instrument = instrument_catalog.get_test_instrument(0)
     instrument_id = instrument["id"]
     
     # Get initial cash balance
@@ -245,7 +245,7 @@ async def test_position_quantity_matches_trades(
     - Position quantity = sum of buy fills - sum of sell fills
     """
     broker_id = config.broker_id
-    instrument = instrument_catalog.get_any_equity(1)[0]
+    instrument = instrument_catalog.get_test_instrument(0)
     instrument_id = instrument["id"]
     
     # Place multiple buy orders with partial fills
@@ -398,7 +398,7 @@ async def test_pnl_calculation_accuracy(
     - Total P&L = realized + unrealized
     """
     broker_id = config.broker_id
-    instrument = instrument_catalog.get_any_equity(1)[0]
+    instrument = instrument_catalog.get_test_instrument(0)
     instrument_id = instrument["id"]
     
     # Buy order
@@ -511,7 +511,7 @@ async def test_no_negative_cash_or_positions(
     - System enforces financial constraints
     """
     broker_id = config.broker_id
-    instrument = instrument_catalog.get_any_equity(1)[0]
+    instrument = instrument_catalog.get_test_instrument(0)
     instrument_id = instrument["id"]
     
     # Get initial cash

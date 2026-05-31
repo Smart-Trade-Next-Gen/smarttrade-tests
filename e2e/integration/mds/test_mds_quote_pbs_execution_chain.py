@@ -101,7 +101,7 @@ async def test_limit_buy_fills_after_quote_arrives_on_market_quote_v1(
     is racy with PBS' async quote consumer).
     """
     broker_id = config.broker_id
-    instrument = instrument_catalog.get_any_equity(1)[0]
+    instrument = instrument_catalog.get_test_instrument(0)
     instrument_id = instrument["id"]
 
     # Place LIMIT BUY first — cache is empty (autouse cleanup), so create_order
@@ -157,7 +157,7 @@ async def test_limit_sell_fills_after_quote_arrives_on_market_quote_v1(
     position aggregation with sell_qty/sell_avg).
     """
     broker_id = config.broker_id
-    instrument = instrument_catalog.get_any_equity(2)[1]
+    instrument = instrument_catalog.get_test_instrument(1)
     instrument_id = instrument["id"]
 
     place_response = await place_and_sync_order(
@@ -206,7 +206,7 @@ async def test_quote_on_other_instrument_does_not_fill_order(
     key on instrument_id.
     """
     broker_id = config.broker_id
-    instruments = instrument_catalog.get_any_equity(2)
+    instruments = instrument_catalog.get_test_instruments(2)
     instrument_a = instruments[0]["id"]
     instrument_b = instruments[1]["id"]
     assert instrument_a != instrument_b, "Test setup requires two distinct instruments"

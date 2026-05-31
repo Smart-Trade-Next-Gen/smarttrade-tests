@@ -103,7 +103,7 @@ async def test_pbs_consumes_real_quote_and_market_order_fills_at_that_price(
     this test catches it.
     """
     broker_id = config.broker_id
-    instrument = instrument_catalog.get_any_equity(1)[0]
+    instrument = instrument_catalog.get_test_instrument(0)
     instrument_id = instrument["id"]
 
     quote_price = Decimal("612.50")
@@ -176,7 +176,7 @@ async def test_pbs_quote_consumer_idempotent_on_duplicate_sequence(
     is still ACKed (Redis-level), so the group's `entries-read` advances,
     but PBS' internal sequence map dedupes it before touching price_cache.
     """
-    instrument = instrument_catalog.get_any_equity(1)[0]
+    instrument = instrument_catalog.get_test_instrument(0)
     instrument_id = instrument["id"]
 
     seq = int(time.time() * 1000)

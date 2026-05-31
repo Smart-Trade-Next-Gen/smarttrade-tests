@@ -70,7 +70,7 @@ async def _place_and_fill(
 
     Returns (broker_order_id, instrument_id, collected events for that order).
     """
-    instrument = instrument_catalog.get_any_equity(instrument_index + 1)[instrument_index]
+    instrument = instrument_catalog.get_test_instrument(instrument_index)
     instrument_id = instrument["id"]
 
     place_response = await place_and_sync_order(
