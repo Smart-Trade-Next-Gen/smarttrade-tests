@@ -40,6 +40,13 @@ async def test_pbs_does_not_emit_to_execution_topics(
     qty = 100
     price = Decimal("550.00")
 
+    # Inject quote BEFORE placing MARKET order - PBS needs LTP to estimate cost
+    await mock_client.inject_price_update(
+        broker_id=config.broker_id,
+        instrument_id=instrument_id,
+        ltp=price,
+    )
+
     # Place & sync order
     order_responses = await place_and_sync_order(
         broker_id=config.broker_id,
@@ -100,6 +107,13 @@ async def test_bas_does_not_require_mds_synchronously_for_execution(
     qty = 100
     price = Decimal("550.00")
 
+    # Inject quote BEFORE placing MARKET order - PBS needs LTP to estimate cost
+    await mock_client.inject_price_update(
+        broker_id=config.broker_id,
+        instrument_id=instrument_id,
+        ltp=price,
+    )
+
     # Place & sync order (this uses instrument_id from local instrument master)
     order_responses = await place_and_sync_order(
         broker_id=config.broker_id,
@@ -154,6 +168,13 @@ async def test_portfolio_does_not_affect_execution(
     instrument_id = instrument["id"]
     qty = 100
     price = Decimal("550.00")
+
+    # Inject quote BEFORE placing MARKET order - PBS needs LTP to estimate cost
+    await mock_client.inject_price_update(
+        broker_id=config.broker_id,
+        instrument_id=instrument_id,
+        ltp=price,
+    )
 
     # Place & sync order
     order_responses = await place_and_sync_order(
@@ -211,6 +232,13 @@ async def test_journal_does_not_affect_execution(
     qty = 100
     price = Decimal("550.00")
 
+    # Inject quote BEFORE placing MARKET order - PBS needs LTP to estimate cost
+    await mock_client.inject_price_update(
+        broker_id=config.broker_id,
+        instrument_id=instrument_id,
+        ltp=price,
+    )
+
     # Place & sync order
     order_responses = await place_and_sync_order(
         broker_id=config.broker_id,
@@ -265,6 +293,13 @@ async def test_pbs_accepts_unknown_instrument_id(
     instrument_id = instrument["id"]
     qty = 100
     price = Decimal("550.00")
+
+    # Inject quote BEFORE placing MARKET order - PBS needs LTP to estimate cost
+    await mock_client.inject_price_update(
+        broker_id=config.broker_id,
+        instrument_id=instrument_id,
+        ltp=price,
+    )
 
     # Place & sync order through BAS
     order_responses = await place_and_sync_order(
@@ -322,6 +357,13 @@ async def test_service_isolation(
     qty = 100
     price = Decimal("550.00")
 
+    # Inject quote BEFORE placing MARKET order - PBS needs LTP to estimate cost
+    await mock_client.inject_price_update(
+        broker_id=config.broker_id,
+        instrument_id=instrument_id,
+        ltp=price,
+    )
+
     # Place & sync order
     order_responses = await place_and_sync_order(
         broker_id=config.broker_id,
@@ -376,6 +418,13 @@ async def test_database_per_service_enforcement(
     instrument_id = instrument["id"]
     qty = 100
     price = Decimal("550.00")
+
+    # Inject quote BEFORE placing MARKET order - PBS needs LTP to estimate cost
+    await mock_client.inject_price_update(
+        broker_id=config.broker_id,
+        instrument_id=instrument_id,
+        ltp=price,
+    )
 
     # Place & sync order
     order_responses = await place_and_sync_order(

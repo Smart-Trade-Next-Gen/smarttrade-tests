@@ -177,6 +177,13 @@ async def test_cancel_filled_order_is_rejected_without_spurious_event(
     instrument = instrument_catalog.get_any_equity(2)[1]
     instrument_id = instrument["id"]
 
+    # Inject quote BEFORE placing MARKET order - PBS needs LTP to estimate cost
+    await mock_client.inject_price_update(
+        broker_id=config.broker_id,
+        instrument_id=instrument_id,
+        ltp=Decimal("550.00"),
+    )
+
     response = await place_and_sync_order(
         config.broker_id,
         test_account_id,

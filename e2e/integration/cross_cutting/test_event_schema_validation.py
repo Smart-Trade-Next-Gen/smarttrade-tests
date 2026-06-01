@@ -48,6 +48,13 @@ async def test_order_updated_event_structure(
     qty = 10
     fill_price = Decimal("550.00")
     
+    # Inject quote BEFORE placing MARKET order - PBS needs LTP to estimate cost
+    await mock_client.inject_price_update(
+        broker_id=broker_id,
+        instrument_id=instrument_id,
+        ltp=fill_price,
+    )
+    
     order_request = BasOrderPlaceRequest(
         client_order_id=f"test_event_schema_{test_account_id}_{uuid.uuid4().hex[:8]}",
         position_type=PositionType.INTRADAY,

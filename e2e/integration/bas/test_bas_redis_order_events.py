@@ -57,6 +57,13 @@ async def _place_and_collect_order_events(
     instrument = instrument_catalog.get_any_equity(1)[0]
     instrument_id = instrument["id"]
 
+    # Inject quote BEFORE placing MARKET order - PBS needs LTP to estimate cost
+    await mock_client.inject_price_update(
+        broker_id=broker_id,
+        instrument_id=instrument_id,
+        ltp=price,
+    )
+
     place_response = await place_and_sync_order(
         broker_id,
         test_account_id,

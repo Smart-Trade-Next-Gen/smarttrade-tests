@@ -54,6 +54,13 @@ async def test_market_buy_full_fill(
     qty = 100
     price = Decimal("550.00")
 
+    # Inject quote BEFORE placing MARKET order - PBS needs LTP to estimate cost
+    await mock_client.inject_price_update(
+        broker_id=broker_id,
+        instrument_id=instrument_id,
+        ltp=price,
+    )
+
     # Act: Create and place order
     order_request = BasOrderPlaceRequest(
         client_order_id=f"test_market_buy_{test_account_id}_{uuid.uuid4().hex[:8]}",

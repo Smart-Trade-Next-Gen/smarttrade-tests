@@ -128,6 +128,14 @@ async def test_concurrent_orders_on_distinct_instruments_fill_independently(
         f"returned duplicates: {[i['id'] for i in instruments]}"
     )
 
+    # Inject quotes BEFORE placing MARKET orders - PBS needs LTP to estimate cost
+    for inst in instruments:
+        await mock_client.inject_price_update(
+            broker_id=broker_id,
+            instrument_id=inst["id"],
+            ltp=Decimal("550.00"),
+        )
+
     # Place three orders concurrently.
     place_tasks = [
         place_and_sync_order(
@@ -222,6 +230,13 @@ async def test_burst_of_sequential_orders_all_fill_in_order(
 
     broker_ids: list[str] = []
     for inst in instruments:
+        # Inject quote BEFORE placing MARKET order - PBS needs LTP to estimate cost
+        await mock_client.inject_price_update(
+            broker_id=broker_id,
+            instrument_id=inst["id"],
+            ltp=Decimal("550.00"),
+        )
+        
         place_resp = await place_and_sync_order(
             broker_id,
             test_account_id,
@@ -275,6 +290,7 @@ async def test_duplicate_quote_sequence_does_not_emit_extra_fills(
     instrument_catalog,
     test_account_id,
     place_and_sync_order,
+    mock_client,
     redis_event_collector,
 ):
     """Publishing the same quote (same instrument, same sequence_number)
@@ -291,6 +307,13 @@ async def test_duplicate_quote_sequence_does_not_emit_extra_fills(
     broker_id = config.broker_id
     instrument = instrument_catalog.get_any_equity(1)[0]
     instrument_id = instrument["id"]
+
+    # Inject quote BEFORE placing MARKET order - PBS needs LTP to estimate cost
+    await mock_client.inject_price_update(
+        broker_id=broker_id,
+        instrument_id=instrument_id,
+        ltp=Decimal("321.00"),
+    )
 
     # Place MARKET BUY first (price cache empty → ACCEPTED, not filled).
     place_resp = await place_and_sync_order(
@@ -351,6 +374,7 @@ async def test_rapid_price_ladder_fills_market_order_once(
     instrument_catalog,
     test_account_id,
     place_and_sync_order,
+    mock_client,
     redis_event_collector,
 ):
     """A rapid sequence of quotes (10 in ~50ms total) on a single
@@ -366,6 +390,13 @@ async def test_rapid_price_ladder_fills_market_order_once(
     broker_id = config.broker_id
     instrument = instrument_catalog.get_any_equity(2)[1]
     instrument_id = instrument["id"]
+
+    # Inject quote BEFORE placing MARKET order - PBS needs LTP to estimate cost
+    await mock_client.inject_price_update(
+        broker_id=broker_id,
+        instrument_id=instrument_id,
+        ltp=Decimal("250.00"),
+    )
 
     # Place MARKET BUY against an empty price cache.
     place_resp = await place_and_sync_order(

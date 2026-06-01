@@ -108,9 +108,14 @@ async def test_pbs_consumes_real_quote_and_market_order_fills_at_that_price(
 
     quote_price = Decimal("612.50")
 
-    # 1. Place the MARKET BUY first. PBS' OrderService.create_order will
-    #    read price_cache and find it empty (autouse fixture cleared it),
-    #    so the order is accepted but not yet enqueued for fill.
+    # 1. Publish a quote on the real `market.quote` stream first so PBS has LTP
+    #    for cost estimation at order placement time
+    await _publish_quote(
+        config.redis_url, instrument_id=instrument_id, ltp=quote_price
+    )
+
+    # 2. Place the MARKET BUY. PBS' OrderService.create_order will
+    #    read price_cache and find the LTP we just published.
     place_response = await place_and_sync_order(
         broker_id,
         test_account_id,
@@ -124,7 +129,7 @@ async def test_pbs_consumes_real_quote_and_market_order_fills_at_that_price(
     )
     broker_order_id = place_response[0]["broker_order_id"]
 
-    # 2. Publish a quote on the real `market.quote` stream. PBS'
+    # 3. Publish another quote to trigger the fill. PBS'
     #    quote consumer must:
     #       a) consume this quote via the `pbs-quote-consumer` group, and
     #       b) call PriceExecutionEngine.on_price_update, which looks up

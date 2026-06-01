@@ -57,6 +57,13 @@ async def test_buy_order_decreases_cash(
     qty = 10
     fill_price = Decimal("550.00")
     
+    # Inject quote BEFORE placing MARKET order - PBS needs LTP to estimate cost
+    await mock_client.inject_price_update(
+        broker_id=broker_id,
+        instrument_id=instrument_id,
+        ltp=fill_price,
+    )
+    
     order_request = BasOrderPlaceRequest(
         client_order_id=f"test_cash_debit_{test_account_id}_{uuid.uuid4().hex[:8]}",
         position_type=PositionType.INTRADAY,
@@ -141,6 +148,13 @@ async def test_sell_order_increases_cash(
     qty = 10
     fill_price = Decimal("550.00")
     
+    # Inject quote BEFORE placing MARKET order - PBS needs LTP to estimate cost
+    await mock_client.inject_price_update(
+        broker_id=broker_id,
+        instrument_id=instrument_id,
+        ltp=fill_price,
+    )
+    
     buy_order = BasOrderPlaceRequest(
         client_order_id=f"test_pos_create_{test_account_id}_{uuid.uuid4().hex[:8]}",
         position_type=PositionType.INTRADAY,
@@ -179,6 +193,13 @@ async def test_sell_order_increases_cash(
     
     # Now sell the position
     sell_price = Decimal("560.00")  # Higher price for profit
+    
+    # Inject quote BEFORE placing MARKET order - PBS needs LTP to estimate cost
+    await mock_client.inject_price_update(
+        broker_id=broker_id,
+        instrument_id=instrument_id,
+        ltp=sell_price,
+    )
     
     sell_order = BasOrderPlaceRequest(
         client_order_id=f"test_cash_credit_{test_account_id}_{uuid.uuid4().hex[:8]}",
@@ -253,6 +274,13 @@ async def test_position_quantity_matches_trades(
     buy_qty_2 = 5
     fill_price = Decimal("550.00")
     
+    # Inject quote BEFORE placing MARKET order - PBS needs LTP to estimate cost
+    await mock_client.inject_price_update(
+        broker_id=broker_id,
+        instrument_id=instrument_id,
+        ltp=fill_price,
+    )
+    
     # First buy order
     buy_order_1 = BasOrderPlaceRequest(
         client_order_id=f"test_pos_match_1_{test_account_id}_{uuid.uuid4().hex[:8]}",
@@ -287,6 +315,13 @@ async def test_position_quantity_matches_trades(
     await redis_event_collector.wait_for_completion(buy_resp_1.broker_order_id, timeout=config.timeout_medium)
     
     # Second buy order
+    # Inject quote BEFORE placing MARKET order - PBS needs LTP to estimate cost
+    await mock_client.inject_price_update(
+        broker_id=broker_id,
+        instrument_id=instrument_id,
+        ltp=fill_price,
+    )
+    
     buy_order_2 = BasOrderPlaceRequest(
         client_order_id=f"test_pos_match_2_{test_account_id}_{uuid.uuid4().hex[:8]}",
         position_type=PositionType.INTRADAY,
@@ -332,6 +367,13 @@ async def test_position_quantity_matches_trades(
     # Now sell part of the position
     sell_qty = 7
     sell_price = Decimal("560.00")
+    
+    # Inject quote BEFORE placing MARKET order - PBS needs LTP to estimate cost
+    await mock_client.inject_price_update(
+        broker_id=broker_id,
+        instrument_id=instrument_id,
+        ltp=sell_price,
+    )
     
     sell_order = BasOrderPlaceRequest(
         client_order_id=f"test_pos_match_3_{test_account_id}_{uuid.uuid4().hex[:8]}",
@@ -405,6 +447,13 @@ async def test_pnl_calculation_accuracy(
     buy_qty = 10
     buy_price = Decimal("550.00")
     
+    # Inject quote BEFORE placing MARKET order - PBS needs LTP to estimate cost
+    await mock_client.inject_price_update(
+        broker_id=broker_id,
+        instrument_id=instrument_id,
+        ltp=buy_price,
+    )
+    
     buy_order = BasOrderPlaceRequest(
         client_order_id=f"test_pnl_buy_{test_account_id}_{uuid.uuid4().hex[:8]}",
         position_type=PositionType.INTRADAY,
@@ -446,6 +495,13 @@ async def test_pnl_calculation_accuracy(
     
     # Sell order
     sell_price = Decimal("560.00")
+    
+    # Inject quote BEFORE placing MARKET order - PBS needs LTP to estimate cost
+    await mock_client.inject_price_update(
+        broker_id=broker_id,
+        instrument_id=instrument_id,
+        ltp=sell_price,
+    )
     
     sell_order = BasOrderPlaceRequest(
         client_order_id=f"test_pnl_sell_{test_account_id}_{uuid.uuid4().hex[:8]}",
