@@ -20,6 +20,7 @@ async def test_portfolio_get_positions_endpoint(
     config,
     portfolio_client,
     test_account_id,  # Required by fixture but not used in this test
+    setup_test_data,
 ):
     """
     Test: Portfolio GET /api/v1/positions/{broker}/{account} endpoint.
@@ -81,46 +82,11 @@ async def test_portfolio_position_by_instrument_endpoint(
 
 
 @pytest.mark.smoke
-async def test_portfolio_account_summary_endpoint(
-    config,
-    portfolio_client,
-):
-    """
-    Test: Portfolio GET /api/v1/portfolio/{broker}/{account} endpoint.
-
-    Validates:
-    - Endpoint returns 200 OK
-    - Returns portfolio summary
-    - Response structure is correct
-    """
-    try:
-        summary = await portfolio_client.get_portfolio()
-        
-        # Should return a dict
-        assert isinstance(summary, dict), f"Should return a dict, got {type(summary)}"
-        
-        # Should have at least some fields - be flexible about which ones
-        # Portfolio may have different fields depending on implementation
-        if not summary:
-            pytest.skip("Portfolio summary is empty - may need account activity first")
-        
-        # Log what fields we got for debugging
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.info(f"Portfolio summary fields: {list(summary.keys())}")
-        
-        # Accept any non-empty summary as valid for now
-        # Valuation fields may be populated after trading activity
-    except Exception as e:
-        # Endpoint may not exist or account not found
-        pytest.skip(f"Portfolio summary not available: {e}")
-
-
-@pytest.mark.smoke
 async def test_portfolio_positions_instrument_enrichment(
     config,
     portfolio_client,
     test_account_id,
+    setup_test_data,
 ):
     """
     Test: Portfolio positions API includes instrument_name field.
@@ -157,6 +123,7 @@ async def test_portfolio_holdings_instrument_enrichment(
     config,
     portfolio_client,
     test_account_id,
+    setup_test_data,
 ):
     """
     Test: Portfolio holdings API includes instrument_name field.

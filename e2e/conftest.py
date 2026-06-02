@@ -1187,6 +1187,94 @@ def chaos_engine() -> ChaosEngine:
     engine.reset()
 
 
+@pytest_asyncio.fixture
+async def setup_test_data(
+    bas_client: BASClient,
+    mock_client: MockClient,
+    config: TestConfig,
+    test_account_id: str,
+    instrument_catalog: InstrumentCatalog,
+    place_and_sync_order,
+):
+    """
+    Setup test data (orders, positions, portfolio) for integration tests.
+
+    Creates sample orders and executes them to populate Journal and Portfolio
+    services with test data. This fixture should be used by integration tests
+    that require existing orders/trades/positions.
+
+    Scope: function (creates fresh data per test)
+    """
+    broker_id = config.broker_id
+    
+    # Get a test instrument
+    instruments = instrument_catalog.get_any_equity(1)
+    if not instruments:
+        raise RuntimeError("No instruments available in catalog")
+    instrument = instruments[0]
+    
+    instrument_id = instrument["id"]
+    price = Decimal(str(instrument.get("ltp", "100.00")))
+    
+    try:
+        # Ensure trading account exists
+        try:
+            await bas_client.get_funds(broker_id, test_account_id)
+        except Exception:
+            # Account doesn't exist, create it
+            await bas_client.create_trading_account(
+                broker_id=broker_id,
+                account_id=test_account_id,
+                account_type="PAPER",
+            )
+            log.info(f"✅ Created trading account: {broker_id}/{test_account_id}")
+        
+        # Inject price quote for market order execution
+        await mock_client.inject_price_update(
+            broker_id=broker_id,
+            instrument_id=instrument_id,
+            ltp=price,
+        )
+        
+        # Place a BUY order
+        buy_order = {
+            "instrument_id": instrument_id,
+            "position_type": "INTRADAY",
+            "side": "BUY",
+            "order_type": "MARKET",
+            "qty": 10,
+            "ltp": price,
+        }
+        
+        buy_responses = await place_and_sync_order(broker_id, test_account_id, buy_order)
+        buy_order_id = buy_responses[0]["broker_order_id"]
+        log.info(f"✅ Placed BUY order: {buy_order_id}")
+        
+        # Inject fill to execute the order
+        await mock_client.inject_fill(
+            broker_id=broker_id,
+            account_id=test_account_id,
+            order_id=buy_order_id,
+            sequence=1,
+            fill_qty=10,
+            fill_price=price,
+        )
+        log.info(f"✅ Injected fill for BUY order: {buy_order_id}")
+        
+        # Wait for events to propagate to Journal and Portfolio services
+        await asyncio.sleep(3)
+        
+        yield {
+            "instrument_id": instrument_id,
+            "buy_order_id": buy_order_id,
+            "price": price,
+        }
+        
+    except Exception as e:
+        log.error(f"❌ Failed to setup test data: {e}")
+        raise
+
+
 # ────────────────────────────────────────────────────────────────────────────────
 # HTML REPORT STYLING & ENHANCEMENTS
 # ────────────────────────────────────────────────────────────────────────────────

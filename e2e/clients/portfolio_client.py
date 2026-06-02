@@ -352,6 +352,8 @@ class PortfolioClient:
         self,
         name: str,
         description: Optional[str] = None,
+        broker_id: Optional[str] = None,
+        account_id: Optional[str] = None,
         scope: str = "SELECTED",
         position_ids: Optional[list[str]] = None,
         rule_logic: str = "ANY",
@@ -366,6 +368,8 @@ class PortfolioClient:
         Args:
             name: Policy name
             description: Optional description
+            broker_id: Broker ID for the policy (defaults to client's broker_id)
+            account_id: Account ID for the policy (defaults to client's account_id)
             scope: SELECTED or ALL_INTRADAY
             position_ids: List of position IDs (required if scope is SELECTED)
             rule_logic: ANY or ALL
@@ -390,6 +394,8 @@ class PortfolioClient:
         payload = {
             "name": name,
             "description": description,
+            "broker_id": broker_id or self.broker_id,
+            "account_id": account_id or self.account_id,
             "scope": scope,
             "position_ids": position_ids or [],
             "rule_logic": rule_logic,

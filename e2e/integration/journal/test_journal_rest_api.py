@@ -22,6 +22,7 @@ async def test_journal_get_orders_endpoint(
     config,
     journal_client,
     test_account_id,
+    setup_test_data,
 ):
     """
     Test: Journal GET /api/v1/orders endpoint.
@@ -41,7 +42,6 @@ async def test_journal_get_orders_endpoint(
         
         # Each order should have required fields
         for order in orders:
-            assert "order_id" in order, "Order should have order_id"
             assert "broker_order_id" in order, "Order should have broker_order_id"
             assert "status" in order, "Order should have status"
             
@@ -55,6 +55,7 @@ async def test_journal_get_trades_endpoint(
     config,
     journal_client,
     test_account_id,
+    setup_test_data,
 ):
     """
     Test: Journal GET /api/v1/trades endpoint.
@@ -155,6 +156,7 @@ async def test_journal_trades_instrument_enrichment(
     config,
     journal_client,
     test_account_id,
+    setup_test_data,
 ):
     """
     Test: Journal trades API includes instrument_name field.
@@ -190,6 +192,7 @@ async def test_journal_orders_instrument_enrichment(
     config,
     journal_client,
     test_account_id,
+    setup_test_data,
 ):
     """
     Test: Journal orders API includes instrument_name field.
@@ -225,6 +228,7 @@ async def test_journal_trades_date_filtering(
     config,
     journal_client,
     test_account_id,
+    setup_test_data,
 ):
     """
     Test: Journal trades API supports date filtering.

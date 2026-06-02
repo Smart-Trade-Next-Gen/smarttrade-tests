@@ -32,6 +32,8 @@ async def test_smart_exit_create_policy(
         policy = await portfolio_client.create_smart_exit_policy(
             name="Test Policy",
             description="Integration test policy",
+            broker_id=config.broker_id,
+            account_id="TEST_E2E_SHARED",
             scope="SELECTED",
             position_ids=["test_position_1"],
             action="EXIT",
@@ -76,6 +78,8 @@ async def test_smart_exit_get_policies(
         # First create a test policy
         created_policy = await portfolio_client.create_smart_exit_policy(
             name="Test Policy for List",
+            broker_id=config.broker_id,
+            account_id="TEST_E2E_SHARED",
             scope="SELECTED",
             position_ids=["test_position_1"],
             action="ALERT_ONLY",
@@ -87,8 +91,11 @@ async def test_smart_exit_get_policies(
             ],
         )
         
-        # Get policies
-        policies_data = await portfolio_client.get_smart_exit_policies()
+        # Get policies (filter by broker_id and account_id to find our created policy)
+        policies_data = await portfolio_client.get_smart_exit_policies(
+            broker_id=config.broker_id,
+            account_id="TEST_E2E_SHARED",
+        )
         
         # Should return a dict with items and total
         assert isinstance(policies_data, dict), "Should return a dict"
@@ -130,6 +137,8 @@ async def test_smart_exit_get_policy_by_id(
         # Create a test policy
         created_policy = await portfolio_client.create_smart_exit_policy(
             name="Test Policy for Get",
+            broker_id=config.broker_id,
+            account_id="TEST_E2E_SHARED",
             scope="SELECTED",
             position_ids=["test_position_1"],
             action="EXIT",
@@ -177,6 +186,8 @@ async def test_smart_exit_update_policy(
         created_policy = await portfolio_client.create_smart_exit_policy(
             name="Test Policy for Update",
             description="Original description",
+            broker_id=config.broker_id,
+            account_id="TEST_E2E_SHARED",
             scope="SELECTED",
             position_ids=["test_position_1"],
             action="EXIT",
@@ -219,6 +230,8 @@ async def test_smart_exit_delete_policy(
         # Create a test policy
         created_policy = await portfolio_client.create_smart_exit_policy(
             name="Test Policy for Delete",
+            broker_id=config.broker_id,
+            account_id="TEST_E2E_SHARED",
             scope="SELECTED",
             position_ids=["test_position_1"],
             action="EXIT",
@@ -261,6 +274,8 @@ async def test_smart_exit_activate_deactivate_policy(
         # Create a test policy (active by default)
         created_policy = await portfolio_client.create_smart_exit_policy(
             name="Test Policy for Activation",
+            broker_id=config.broker_id,
+            account_id="TEST_E2E_SHARED",
             scope="SELECTED",
             position_ids=["test_position_1"],
             action="EXIT",
@@ -298,6 +313,8 @@ async def test_smart_exit_get_policy_triggers(
         # Create a test policy
         created_policy = await portfolio_client.create_smart_exit_policy(
             name="Test Policy for Triggers",
+            broker_id=config.broker_id,
+            account_id="TEST_E2E_SHARED",
             scope="SELECTED",
             position_ids=["test_position_1"],
             action="EXIT",
@@ -344,6 +361,8 @@ async def test_smart_exit_multiple_rule_types(
         # Note: Trailing is now a parameter within MTM_BASED rule
         policy = await portfolio_client.create_smart_exit_policy(
             name="Multi-Rule Policy",
+            broker_id=config.broker_id,
+            account_id="TEST_E2E_SHARED",
             scope="SELECTED",
             position_ids=["test_position_1"],
             action="EXIT",
@@ -405,6 +424,8 @@ async def test_smart_exit_mtm_trailing_validation(
         try:
             policy = await portfolio_client.create_smart_exit_policy(
                 name="Invalid Trailing Policy",
+                broker_id=config.broker_id,
+                account_id="TEST_E2E_SHARED",
                 scope="SELECTED",
                 position_ids=["test_position_1"],
                 action="EXIT",
@@ -425,6 +446,8 @@ async def test_smart_exit_mtm_trailing_validation(
         # Test 2: Trailing with positive threshold should succeed (Protect P&L mode)
         policy = await portfolio_client.create_smart_exit_policy(
             name="Valid Trailing Policy",
+            broker_id=config.broker_id,
+            account_id="TEST_E2E_SHARED",
             scope="SELECTED",
             position_ids=["test_position_1"],
             action="EXIT",
@@ -450,6 +473,8 @@ async def test_smart_exit_mtm_trailing_validation(
         # Test 3: Trailing with negative threshold should succeed (Stop Loss mode)
         policy = await portfolio_client.create_smart_exit_policy(
             name="Valid Trailing Policy SL",
+            broker_id=config.broker_id,
+            account_id="TEST_E2E_SHARED",
             scope="SELECTED",
             position_ids=["test_position_1"],
             action="EXIT",
