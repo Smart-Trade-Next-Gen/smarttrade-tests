@@ -13,6 +13,7 @@ from e2e.clients.broker_state_client import (
     PBSStateClient,
     create_broker_state_client,
 )
+from e2e.clients.signal_processor_client import SignalProcessorClient
 
 __all__ = [
     "AuthClient",
@@ -26,4 +27,5 @@ __all__ = [
     "FyersStateClient",
     "PBSStateClient",
     "create_broker_state_client",
+    "SignalProcessorClient",
 ]

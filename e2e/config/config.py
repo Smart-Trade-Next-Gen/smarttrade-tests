@@ -27,6 +27,7 @@ class TestConfig:
     portfolio_url: str  # NEW: Portfolio Service for async aggregation tests
     journal_url: str  # NEW: Journal Service for audit trail tests
     redis_url: str  # NEW: Redis for direct stream observation
+    signal_processor_url: str  # NEW: Signal Processor Service for signal analysis
     test_user: str
     test_password: str
     broker_id: str
@@ -99,6 +100,7 @@ class TestConfig:
             portfolio_url=get_setting("PORTFOLIO_URL", "portfolio_url"),
             journal_url=get_setting("JOURNAL_URL", "journal_url"),
             redis_url=get_setting("REDIS_URL", "redis_url"),
+            signal_processor_url=get_setting("SIGNAL_PROCESSOR_URL", "signal_processor_url"),
             test_user=get_setting("TEST_USER", "test_user"),
             test_password=get_setting("TEST_PASSWORD", "test_password"),
             broker_id=get_setting("BROKER_ID", "broker_id"),
@@ -144,6 +146,7 @@ def _get_default(key: str, env: str) -> str:
             "PORTFOLIO_URL": "http://localhost:8008",
             "JOURNAL_URL": "http://localhost:8007",
             "REDIS_URL": "redis://localhost:6379/0",
+            "SIGNAL_PROCESSOR_URL": "http://localhost:8012",
             "TEST_USER": "testuser@example.com",
             "TEST_PASSWORD": "testpassword123",
             "BROKER_ID": "fyers",
@@ -167,6 +170,7 @@ def _get_default(key: str, env: str) -> str:
             "PORTFOLIO_URL": "https://staging-portfolio.smarttrade.asia",
             "JOURNAL_URL": "https://staging-journal.smarttrade.asia",
             "REDIS_URL": "redis://staging-redis:6379/0",
+            "SIGNAL_PROCESSOR_URL": "https://staging-signal-processor.smarttrade.asia",
             "TEST_USER": "staging-testuser@example.com",
             "TEST_PASSWORD": "staging-testpassword123",
             "BROKER_ID": "fyers",
@@ -190,6 +194,7 @@ def _get_default(key: str, env: str) -> str:
             "PORTFOLIO_URL": "https://api.smarttrade.asia/portfolio",
             "JOURNAL_URL": "https://api.smarttrade.asia/journal",
             "REDIS_URL": "redis://prod-redis:6379/0",
+            "SIGNAL_PROCESSOR_URL": "https://api.smarttrade.asia/signal-processor",
             "TEST_USER": "prod-testuser@example.com",
             "TEST_PASSWORD": "prod-testpassword123",
             "BROKER_ID": "fyers",
