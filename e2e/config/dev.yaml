@@ -10,13 +10,13 @@ auth_url: http://localhost:8001
 portfolio_url: http://localhost:8008
 journal_url: http://localhost:8007
 redis_url: redis://localhost:6379/0
+amis_core_url: http://localhost:8000
+amis_lab_url: http://localhost:8016
 
-# Test credentials — must match the seeded user in
-# authentication-service/seeder.py (settings.DEFAULT_ADMIN_USERNAME /
-# DEFAULT_ADMIN_PASSWORD). The auth service seeds this user automatically
-# on startup; we don't register a separate test user.
-test_user: admin
-test_password: ChangeMe123!
+# Test credentials for AMIS E2E pipeline.
+# Override at runtime via E2E_TEST_USER / E2E_TEST_PASSWORD env vars.
+test_user: amit
+test_password: MARket1234!
 
 # Broker and account IDs
 broker_id: fyers

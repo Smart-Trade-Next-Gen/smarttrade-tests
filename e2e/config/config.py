@@ -5,7 +5,7 @@ Supports dev/staging/prod environments with environment variable and YAML file o
 """
 
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
@@ -28,6 +28,8 @@ class TestConfig:
     journal_url: str  # NEW: Journal Service for audit trail tests
     redis_url: str  # NEW: Redis for direct stream observation
     signal_processor_url: str  # NEW: Signal Processor Service for signal analysis
+    amis_core_url: str  # NEW: AMIS Core service
+    amis_lab_url: str  # NEW: AMIS Lab service
     test_user: str
     test_password: str
     broker_id: str
@@ -101,6 +103,8 @@ class TestConfig:
             journal_url=get_setting("JOURNAL_URL", "journal_url"),
             redis_url=get_setting("REDIS_URL", "redis_url"),
             signal_processor_url=get_setting("SIGNAL_PROCESSOR_URL", "signal_processor_url"),
+            amis_core_url=get_setting("AMIS_CORE_URL", "amis_core_url"),
+            amis_lab_url=get_setting("AMIS_LAB_URL", "amis_lab_url"),
             test_user=get_setting("TEST_USER", "test_user"),
             test_password=get_setting("TEST_PASSWORD", "test_password"),
             broker_id=get_setting("BROKER_ID", "broker_id"),
@@ -147,8 +151,10 @@ def _get_default(key: str, env: str) -> str:
             "JOURNAL_URL": "http://localhost:8007",
             "REDIS_URL": "redis://localhost:6379/0",
             "SIGNAL_PROCESSOR_URL": "http://localhost:8012",
-            "TEST_USER": "testuser@example.com",
-            "TEST_PASSWORD": "testpassword123",
+            "AMIS_CORE_URL": "http://localhost:8000",
+            "AMIS_LAB_URL": "http://localhost:8016",
+            "TEST_USER": "amit",
+            "TEST_PASSWORD": "MARket1234!",
             "BROKER_ID": "fyers",
             "ACCOUNT_ID": "TEST123456",
             "BROKER_TYPE": "pbs",

@@ -562,7 +562,9 @@ def auth_token(config: TestConfig, test_user_id: str) -> str:
     now = datetime.utcnow()
     payload = {
         "sub": test_user_id,  # Fixed UUID for consistency across test requests
-        "roles": ["user"],
+        "username": config.test_user,
+        "email": config.test_user,
+        "roles": ["user", "researcher", "amis_reviewer", "amis_admin"],
         "type": "access",  # Required by smarttrade-common token validation
         "iat": int(now.timestamp()),
         "exp": int((now + timedelta(hours=24)).timestamp()),

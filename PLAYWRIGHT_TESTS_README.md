@@ -1,12 +1,14 @@
-# Playwright UI Tests for SmartTrade Core Trading Functionality
+# Playwright UI Tests for SmartTrade
 
 ## Overview
 
-Comprehensive Playwright UI test suite covering all core trading platform functionality. Tests validate user-facing features including order placement, market data updates, position management, and account operations.
+Comprehensive Playwright UI test suite covering core trading and R&D platform (AMIS Control Tower). Legacy AMIS research tools tests are deprecated (ai-service removed).
 
 ## Test Files
 
-### 1. **core-trading-simple.spec.ts** (ACTIVE)
+### Core Trading
+
+#### **core-trading-simple.spec.ts** (ACTIVE)
 Simplified, working test suite optimized for actual UI interactions.
 
 **26 core tests** organized into 8 test suites:
@@ -21,37 +23,81 @@ Simplified, working test suite optimized for actual UI interactions.
 - **UI Responsiveness** (3 tests) - Console errors, navigation, loading state
 - **End-to-End Flows** (2 tests) - Multi-page user journeys
 
-### 2. **core-trading.spec.ts** (REFERENCE)
+#### **core-trading.spec.ts** (REFERENCE)
 Comprehensive test suite (45+ tests) with detailed coverage of all functionality areas.
 
-**8 test suites** covering:
-- Order Placement & Execution (6 tests)
-- Real-Time Market Data Updates (4 tests)
-- Trade Execution Flow (3 tests)
-- Position Management & Updates (5 tests)
-- Order History & Tracking (6 tests)
-- Account Balance Operations (4 tests)
-- Market Watch Functionality (6 tests)
-- Buy/Sell Order Validation & Execution (5 tests)
+### R&D Platform (AMIS Control Tower)
+
+#### **rd-smoke.spec.ts**
+Login baseline validation and basic R&D page accessibility (4 tests).
+
+#### **rd-navigation.spec.ts**
+Smoke tests for all 8 `/rd/*` routes via sidebar navigation (8 tests).
+
+#### **rd-dashboard.spec.ts**
+R&D Dashboard structural assertions: Dependency Health, Promotion Queue, Recent Decisions, Open Incidents (2 tests).
+
+#### **rd-programs.spec.ts**
+Research programs list and empty state (1 test).
+
+#### **rd-research.spec.ts**
+Candidate tabs (Candidates/Experiments/Assets) and tab switching (2 tests).
+
+#### **rd-governance.spec.ts**
+Governance tabs (Queue/History/Config), empty promotion queue, and decision history (3 tests).
+
+#### **rd-deployments.spec.ts**
+Deployments page structure and empty state (1 test).
+
+#### **rd-lineage.spec.ts**
+Lineage Explorer structural elements (1 test).
+
+#### **rd-readiness.spec.ts**
+Readiness page navigation (1 test). Note: Readiness API currently returns 500 in dev environment.
+
+#### **rd-workspace.spec.ts**
+Workspace wizard UI flow: template selection, form filling, and submission (1 test).
+
+### AMIS Research Tools — MIGRATED
+
+> **Note**: These tests were previously skipped because they routed to the legacy ai-service (port 8014). They have been migrated to their new homes and are now active.
+
+#### **amis-dashboard.spec.ts** (ACTIVE)
+Trade Intelligence panel — setup assessment via amis-lab-service (1 test).
+
+#### **amis-replay.spec.ts** (ACTIVE)
+Replay Dashboard — candle replay via amis-lab-service (1 test).
+
+#### **amis-training.spec.ts** (ACTIVE)
+Training Datasets page — dataset registry via amis-lab-service (1 test).
 
 ## Running Tests
 
 ### Quick Test Run
 ```bash
 cd /home/amit/Work/Smart-Trade/smarttrade-tests
+
+# Core trading tests
 npx playwright test playwright/core-trading-simple.spec.ts
+
+# R&D platform tests
+npx playwright test playwright/rd-*.spec.ts
+
+# All tests
+npx playwright test
 ```
 
 ### Generate HTML Report
 ```bash
-npx playwright test playwright/core-trading-simple.spec.ts --reporter=html
+npx playwright test --reporter=html
 npx playwright show-report
 ```
 
 ### Run Specific Test Suite
 ```bash
 npx playwright test playwright/core-trading-simple.spec.ts -g "Authentication"
-npx playwright test playwright/core-trading-simple.spec.ts -g "API Connectivity"
+npx playwright test playwright/rd-dashboard.spec.ts -g "R&D Dashboard"
+npx playwright test playwright/rd-workspace.spec.ts --headed
 ```
 
 ### Run with Debugging
@@ -97,7 +143,7 @@ npx playwright test playwright/core-trading-simple.spec.ts --headed
 - **Browser**: Chromium
 - **Timeout**: 45 seconds per test
 - **Retries**: 1 (auto-retry on failure)
-- **Base URL**: http://localhost:5173
+- **Base URL**: http://localhost:3000 (Docker) or http://localhost:5173 (local dev)
 - **Headless**: true
 - **Screenshots**: Only on failure
 - **Traces**: On first retry (for debugging)
@@ -130,7 +176,10 @@ All services must be running on expected ports:
 - **Paper Broker Service**: http://localhost:8002
 - **Market Data Service**: http://localhost:8004
 - **Broker Adapter Service**: http://localhost:8005
-- **Frontend**: http://localhost:5173
+- **AMIS Core Service**: http://localhost:8000
+- **AMIS Lab Service**: http://localhost:8016
+- **Frontend (Docker)**: http://localhost:3000
+- **Frontend (Local dev)**: http://localhost:5173
 
 ### Start Services
 ```bash
@@ -140,11 +189,10 @@ docker-compose up -d
 
 ## Known Issues & Limitations
 
-### 1. Dashboard Text Selector Issue
-**Problem**: Tests timeout looking for "text=Dashboard" after login
-**Impact**: Authentication tests fail
-**Root Cause**: Dashboard heading may use different text or be in sidebar (collapsible)
-**Fix**: Inspect Dashboard component and use more specific selector or data-testid
+### 1. Readiness API Returns 500
+**Problem**: `GET /api/v1/readiness/candidates` returns HTTP 500 in dev environment
+**Impact**: Readiness page shows error state instead of candidate readiness data
+**Fix**: Fixed `routes_readiness.py` to use `candidate_repo.list()` instead of non-existent `list_all()` method.
 
 ### 2. WebSocket Event Detection
 **Problem**: Playwright doesn't capture WebSocket connections in all cases
@@ -156,26 +204,36 @@ docker-compose up -d
 **Impact**: Live market data validation fails
 **Fix**: Inspect actual price element format in DOM
 
-### 4. Navigation URL Patterns
-**Problem**: Tests use URL patterns that may not match actual routes
-**Impact**: Some navigation tests fail
-**Fix**: Verify actual route structure in app
+### 4. Workspace Wizard Requires Valid Instrument IDs
+**Problem**: Workspace creation via UI may fail if backend rejects instrument IDs from templates
+**Impact**: Full workspace creation end-to-end flow may show error notification
+**Fix**: Ensure AMIS Core accepts template instrument IDs or seed valid instruments
+
+### 5. AMIS Lab 403 Forbidden Errors
+**Problem**: AMIS Lab operations endpoints (`/api/v1/operations/*`) return 403 for non-admin users
+**Impact**: Console shows 403 errors on R&D Dashboard, Programs, and other pages that fetch dependency health / incidents
+**Fix**: Tests filter these out as expected dev-environment noise. In production, ensure proper RBAC roles.
+
+## Bug Fixes Applied (This Session)
+
+### Backend
+- **AMIS Core readiness endpoint** (`routes_readiness.py`): Changed `candidate_repo.list_all()` to `candidate_repo.list()` because `CandidateArtifactRepository` inherits from `BaseRepository` which provides `list()`, not `list_all()`.
+
+### Frontend
+- **`amisCoreClient.ts`**: Added missing import for `amisCoreEndpoints` from `./apiConfig`.
+- **`apiConfig.ts`**: Removed duplicate `/amis-core` and `/amis-lab` prefixes from `amisCoreEndpoints` and `amisLabEndpoints`. The axios clients (`amisCoreService`, `amisLabService`) already provide these base URLs, so the endpoints should be relative paths (e.g., `/api/v1/research/candidates` instead of `/amis-core/api/v1/research/candidates`). This was causing all AMIS Core/Lab API calls to return 404 with double-prefixed URLs like `/amis-core/amis-core/api/v1/...`.
+- **`ResearchWorkspacePage.tsx`**: Added `data-testid` attributes to VIX min/max inputs (`workspace-vix-min`, `workspace-vix-max`) and governance tab buttons (`governance-tab-queue`, `governance-tab-history`, `governance-tab-config`).
 
 ## Recommendations for Improvement
 
-### 1. Add Data Test IDs (CRITICAL)
-Add `data-testid` attributes to key UI elements:
+### 1. Add Data Test IDs (PARTIALLY COMPLETE)
+R&D and AMIS pages now have `data-testid` attributes on headings, sidebar nav links, shared components (StatusBadge, HealthIndicator, GateStatusIndicator), and workspace wizard elements.
+
+Still needed for core trading UI:
 ```tsx
-<h1 data-testid="dashboard-title">Dashboard</h1>
 <div data-testid="account-equity">{equity}</div>
 <button data-testid="buy-button">Buy</button>
 <table data-testid="positions-table">
-```
-
-Then use in tests:
-```typescript
-const dashboard = page.locator('[data-testid="dashboard-title"]');
-const buyBtn = page.locator('[data-testid="buy-button"]');
 ```
 
 ### 2. Improve Login Flow Testing

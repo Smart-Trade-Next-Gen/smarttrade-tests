@@ -14,6 +14,8 @@ from e2e.clients.broker_state_client import (
     create_broker_state_client,
 )
 from e2e.clients.signal_processor_client import SignalProcessorClient
+from e2e.clients.amis_core_client import AMISCoreClient
+from e2e.clients.amis_lab_client import AMISLabClient
 
 __all__ = [
     "AuthClient",
@@ -28,4 +30,6 @@ __all__ = [
     "PBSStateClient",
     "create_broker_state_client",
     "SignalProcessorClient",
+    "AMISCoreClient",
+    "AMISLabClient",
 ]

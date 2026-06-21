@@ -152,7 +152,7 @@ jobs:
         timeout-minutes: 5
         run: |
           set -e
-          for svc in postgres redis auth-service market-data-service paper-broker-service broker-adapter-service journal-service portfolio-service notification-service; do
+          for svc in postgres redis auth-service market-data-service paper-broker-service broker-adapter-service journal-service portfolio-service notification-service amis-core-service amis-lab-service; do
             echo "Waiting for $svc..."
             for i in $(seq 1 60); do
               status=$(docker-compose -f docker-compose.e2e.yml ps --format json $svc 2>/dev/null | python -c 'import sys,json; line=sys.stdin.read().strip().split("\n")[0]; print(json.loads(line).get("Health","") if line else "")' 2>/dev/null || echo "")

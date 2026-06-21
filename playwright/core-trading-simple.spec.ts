@@ -7,7 +7,7 @@
 
 import { test, expect, Page, Browser } from "@playwright/test";
 
-const BASE_URL = "http://localhost:5173";
+const BASE_URL = "http://localhost:3000";
 const TEST_USERNAME = "test_pie_e2e";
 const TEST_PASSWORD = "Test123.e2e";
 
@@ -19,9 +19,9 @@ async function loginAndWait(page: Page) {
   await page.goto(BASE_URL);
 
   // Wait for login form
-  await page.locator('input[placeholder="Username"]').waitFor({ timeout: 15000 });
-  await page.locator('input[placeholder="Username"]').fill(TEST_USERNAME);
-  await page.locator('input[placeholder="Password"]').fill(TEST_PASSWORD);
+  await page.locator('input[placeholder="Enter your username"]').waitFor({ timeout: 15000 });
+  await page.locator('input[placeholder="Enter your username"]').fill(TEST_USERNAME);
+  await page.locator('input[placeholder="Enter your password"]').fill(TEST_PASSWORD);
   await page.locator("button").filter({ hasText: /^Login$/ }).click();
 
   // Handle account selection modal (BrokerSelectionModal — no role="dialog")
@@ -34,8 +34,8 @@ async function loginAndWait(page: Page) {
     // Modal didn't appear — account already selected from localStorage
   }
 
-  // Wait for Dashboard h1 to confirm trading UI has mounted
-  await page.getByRole("heading", { name: "Dashboard" }).waitFor({ timeout: 10000 });
+  // Wait for dashboard content to confirm trading UI has mounted
+  await page.getByText("Total portfolio value").waitFor({ timeout: 10000 });
 }
 
 test.describe("Core Trading - Authentication", () => {
